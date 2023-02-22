@@ -11,7 +11,7 @@ class Material {
 public:
     vec3 color = vec3(1);
     bool is_emit = false;
-    vec3 emission = vec3(1);
+    vec3 emission;
 };
 
 

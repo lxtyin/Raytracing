@@ -6,6 +6,8 @@
 #define B_SIZ 3    // 一个bvhnode占的vec3数量
 #define INF 1E18
 #define PI 3.1415926
+#define IVPI 0.3183098
+#define EPS 0.0001
 
 in float pixel_x;
 in float pixel_y;
@@ -24,7 +26,7 @@ uniform mat4 v2w_mat;
 
 uniform float RussianRoulette = 0.8;
 uniform int SPP = 4;
-uniform float fov = PI / 2;
+uniform float fov = PI / 3;
 
 uniform int SCREEN_W;
 uniform int SCREEN_H;
@@ -36,8 +38,8 @@ int stack_h = 0;
 // util
 // ---------------------------------------------- //
 uint seed = uint(
-    uint(pixel_x + 19293) * uint(1973) +
-    uint(pixel_y + 42931) * uint(9277) +
+    uint(pixel_x + SCREEN_W) * uint(1973) +
+    uint(pixel_y + SCREEN_H) * uint(9277) +
     uint(frameCounter) * uint(26699)) | uint(1);
 
 uint wang_hash(inout uint seed) {
@@ -65,6 +67,7 @@ struct Triangle {
     vec3 ver[3];
     vec2 uv[3];
     vec3 normal;
+    float area;
     int m_index;
 };
 
@@ -86,6 +89,7 @@ Triangle get_triangle(int i) {
     r.ver[1] = texelFetch(triangles, i * T_SIZ + 1).xyz;
     r.ver[2] = texelFetch(triangles, i * T_SIZ + 2).xyz;
     r.normal = normalize(cross(r.ver[1] - r.ver[0], r.ver[2] - r.ver[1]));
+    r.area = length(cross(r.ver[1] - r.ver[0], r.ver[2] - r.ver[0])) * 0.5f;
     vec3 u = texelFetch(triangles, i * T_SIZ + 3).xyz;
     vec3 v = texelFetch(triangles, i * T_SIZ + 4).xyz;
     r.uv[0].x = u.x;
@@ -122,7 +126,6 @@ BVHNode get_bvhnode(int i) {
     return r;
 }
 
-
 // intersect
 // ---------------------------------------------- //
 
@@ -151,7 +154,7 @@ Intersect intersect_aabb(Ray ray, vec3 aa, vec3 bb) {
     tmx = min(tmx, max(t1.x, t2.x));
     tmx = min(tmx, max(t1.y, t2.y));
     tmx = min(tmx, max(t1.z, t2.z));
-    if(tmi - 0.01 > tmx) return nointersect;
+    if(tmi > tmx) return nointersect;
     return Intersect(true, ray.ori + ray.dir * tmi, vec3(0), -1, 0, 0, tmi);
 }
 
@@ -218,11 +221,6 @@ Intersect get_intersect(Ray ray) {
 // sample
 // ---------------------------------------------- //
 
-// 三角形面积
-float area(Triangle t) {
-    return length(cross(t.ver[1] - t.ver[0], t.ver[2] - t.ver[1])) / 2;
-}
-
 // 在三角形上均匀采样
 vec3 sample_triangle(Triangle t) {
     float r1 = sqrt(rand());
@@ -230,12 +228,12 @@ vec3 sample_triangle(Triangle t) {
     return t.ver[0] * (1 - r1) + t.ver[1] * r1 * (1 - r2) + t.ver[2] * r1 * r2;
 }
 
-// 在半球面上采样(+y方向)
+// 在半球面上采样(+z方向)
 vec3 sample_hemisphere() {
-    float y = rand();
-    float r = sqrt(1.0 - y * y);
+    float z = rand();
+    float r = sqrt(1.0 - z * z);
     float phi = 2.0 * PI * rand();
-    return vec3(r * cos(phi), y, -r * sin(phi));
+    return vec3(r * cos(phi), r * sin(phi), z);
 }
 
 // 在所有光面上采样
@@ -244,15 +242,15 @@ void sample_light(out vec3 pos, out int t_index, out float pdf) {
     for(int i = 0;i < light_t_num;i++) {
         int id = get_light_t_index(i);
         Triangle t = get_triangle(id);
-        tot_area += area(t);
+        tot_area += t.area;
     }
     float rnd = rand() * tot_area;
     for(int i = 0;i < light_t_num;i++) {
         int id = get_light_t_index(i);
         Triangle t = get_triangle(id);
-        rnd -= area(t);
-        if(rnd < 1e-2) { 
-            pdf = 1.0 / area(t);
+        rnd -= t.area;
+        if(rnd < EPS) {
+            pdf = 1.0 / t.area;
             pos = sample_triangle(t);
             t_index = id;
             return;
@@ -261,21 +259,22 @@ void sample_light(out vec3 pos, out int t_index, out float pdf) {
 }
 
 // 采样出射光（重要性采样
-vec3 sample_direction(Material material, vec3 wi, vec3 normal, out float pdf) {
+vec3 sample_direction(Material material, vec3 wi, vec3 n, out float pdf) {
     // 暂时均匀采样
     vec3 dir = sample_hemisphere();
-    vec3 _y = normalize(normal);
-    vec3 _x = normalize(cross(vec3(0, 1, 0), normal));
-    vec3 _z = normalize(cross(_x, _y));
-    pdf = 1.0 / (2 * PI);
-    return dir.x * _x + dir.y * _y + dir.z * _z;
+    vec3 help = vec3(1, 0, 0);
+    if(abs(n.x) > 0.999) help = vec3(0, 0, 1);
+    vec3 t = normalize(cross(n, help));
+    vec3 b = normalize(cross(n, t));
+    pdf = 0.5 * IVPI;
+    return dir.x * t + dir.y * b + dir.z * n;
 }
 
 // 材质的brdf
 vec3 brdf(Material material, vec3 wi, vec3 wo, vec3 normal) {
     // 暂时不管纹理
     if(dot(wo, normal) < 0 || dot(wi, normal) < 0) return vec3(0); // 反向
-    return material.color / PI;
+    return material.color * IVPI;
 }
 
 // path tracing
@@ -283,26 +282,43 @@ vec3 brdf(Material material, vec3 wi, vec3 wo, vec3 normal) {
 
 vec3 shade(Ray ray) {
 
+//{
 //    Intersect inter1 = get_intersect(ray);
-//    if(inter1.exist) {
-//        Triangle t = get_triangle(inter1.t_index);
-//        Material m = get_material(t.m_index);
-//        return m.color;
-//    } else {
-//        return vec3(0, 0, 0);
-//    }
-
+//    if(!inter1.exist) return vec3(0);
+//    Triangle tr1 = get_triangle(inter1.t_index);
+//    Material m1 = get_material(tr1.m_index);
+//
+//    float pdf;
+//    vec3 light_pos;
+//    int light_t_index = -1;
+//
+//    sample_light(light_pos, light_t_index, pdf);        // 光源采样点
+//    Triangle tr2 = get_triangle(light_t_index);
+//    Material m2 = get_material(tr2.m_index);
+//    vec3 pos = inter1.pos;
+//    vec3 wi = normalize(light_pos - inter1.pos);
+//    vec3 wo = -ray.dir;
+//    vec3 n = inter1.normal;
+//    vec3 ln = tr2.normal;
+//    if(dot(wi, ln) > 0) ln = -ln;
+//
+//    // 直接光
+//    Intersect test = get_intersect(Ray(pos, wi));
+//    if(test.exist && test.t_index == light_t_index) {
+//        return m2.emission;
+//    } else return vec3(0);
+//}
 
     vec3 result = vec3(0);
     vec3 history = vec3(1); // 累乘值
 
-    while(true) {        
+    Intersect inter1 = get_intersect(ray);
+    if(!inter1.exist) return vec3(0);
 
-        Intersect inter1 = get_intersect(ray);
-        if(!inter1.exist) break;
+    Triangle tr1 = get_triangle(inter1.t_index);
+    Material m1 = get_material(tr1.m_index);
 
-        Triangle tr1 = get_triangle(inter1.t_index);
-        Material m1 = get_material(tr1.m_index);
+    while(true) {
 
         // 自发光
         if(m1.is_emit) {
@@ -313,24 +329,24 @@ vec3 shade(Ray ray) {
         float pdf;
         vec3 light_pos;
         int light_t_index = -1;
-        sample_light(light_pos, light_t_index, pdf);        // 光源采样点
 
+        sample_light(light_pos, light_t_index, pdf);        // 光源采样点
         Triangle tr2 = get_triangle(light_t_index);
         Material m2 = get_material(tr2.m_index);
 
         vec3 pos = inter1.pos;
         vec3 wi = normalize(light_pos - inter1.pos);
-        vec3 wo = ray.dir;
+        vec3 wo = -ray.dir;
         vec3 n = inter1.normal;
         vec3 ln = tr2.normal;
         if(dot(wi, ln) > 0) ln = -ln;
 
         // 直接光
         Intersect test = get_intersect(Ray(pos, wi));
-        if(test.exist && length(test.pos - light_pos) < 1e-2) {
+        if(test.exist && test.t_index == light_t_index) {
             vec3 f_r = brdf(m1, wi, wo, n);
-            float dis = length(light_pos - inter1.pos) / 10; //todo
-            vec3 L_dir = m2.emission * f_r * abs(dot(n, wi) * dot(ln, -wi)) / (dis * dis) / pdf;
+            float dis = length(light_pos - inter1.pos);
+            vec3 L_dir = m2.emission * f_r * dot(n, wi) * dot(ln, -wi) / (dis * dis) / pdf;
             result += history * L_dir;
         }
 
@@ -339,11 +355,16 @@ vec3 shade(Ray ray) {
             wi = sample_direction(m1, wo, n, pdf);
             test = get_intersect(Ray(pos, wi));
             if(test.exist) {
-                Material m3 = get_material(get_triangle(test.t_index).m_index);
+                Triangle tr3 = get_triangle(test.t_index);
+                Material m3 = get_material(tr3.m_index);
                 if(!m3.is_emit) {
                     vec3 f_r = brdf(m1, wi, wo, n);
-                    history *= f_r * abs(dot(n, wi)) / pdf / RussianRoulette;
+                    history *= f_r * dot(n, wi) / pdf / RussianRoulette;
+
                     ray = Ray(pos, wi);
+                    inter1 = test;
+                    tr1 = tr3;
+                    m1 = m3;
                 } else break;
             } else break;
         } else break;
@@ -359,15 +380,13 @@ void main() {
     vec3 result = vec3(0);
 
     for(int i = 0;i < SPP;i++) {
-        float px = pixel_x + rand() - 0.5;
-        float py = pixel_y + rand() - 0.5;
-
-        vec3 w_tar = vec3(v2w_mat * vec4(px, py, -dis_z, 1));
+        vec3 w_tar = vec3(v2w_mat * vec4(pixel_x, pixel_y, -dis_z, 1));
         vec3 dir = normalize(w_tar - w_ori);
         Ray ray = Ray(w_ori, dir);
         result += shade(ray);
     }
     result /= SPP;
 
+    result = pow(clamp(result, vec3(0), vec3(1)), vec3(1.0 / 2.2));
     FragColor = vec4(result, 1.0);
 }

@@ -5,8 +5,8 @@
 #include "src/Tool.h"
 using namespace std;
 
-#define SCREEN_W 512
-#define SCREEN_H 512
+#define SCREEN_W 720
+#define SCREEN_H 720
 
 GLFWwindow *window;
 Renderer renderer;
@@ -17,7 +17,7 @@ void mouse_callback(GLFWwindow* window, double xpos, double ypos) {
     static double mouse_lastX = xpos, mouse_lastY = ypos;
     double dx = xpos - mouse_lastX;
     double dy = ypos - mouse_lastY;
-    camera.rotation += vec3(-dy, dx, 0) / 400.0f;
+//    camera.rotation += vec3(-dy, dx, 0) / 400.0f;
     mouse_lastX = xpos;
     mouse_lastY = ypos;
 }
@@ -31,11 +31,14 @@ void update(float dt) {
     }
     renderer.draw(&scene, camera.transform());
 
-    float speed = 50;
-    if(glfwGetKey(window, GLFW_KEY_P)) {
+    static float tot_dt = 0;
+    tot_dt += dt;
+    if(tot_dt > 1) {
+        tot_dt = 0;
         cout << "FPS: " << 1.0 / dt << endl;
     }
 
+    float speed = 50;
     if(glfwGetKey(window, GLFW_KEY_W)){
         camera.position += camera.direction_z() * -speed * dt;
     }
@@ -55,41 +58,37 @@ void update(float dt) {
 }
 
 void init() {
-    glClearColor(0.3f, 0.3f, 0.3f, 1.0f);
     glfwSetCursorPosCallback(window, mouse_callback);
 
     // add object;
     Object *o1 = load_obj("model/cornellbox/left.obj");
     o1->material = new Material;
-    o1->material->color = vec3(0, 0.6, 0.6);
+    o1->material->color = vec3(0.63f, 0.065f, 0.05f);
     scene.objects.push_back(o1);
-
     Object *o2 = load_obj("model/cornellbox/right.obj");
     o2->material = new Material;
-    o2->material->color = vec3(0, 0.6, 0.6);
+    o2->material->color = vec3(0.14f, 0.45f, 0.091f);
     scene.objects.push_back(o2);
-
     Object *o4 = load_obj("model/cornellbox/floor.obj");
     o4->material = new Material;
-    o4->material->color = vec3(0.5, 0.5, 1);
+    o4->material->color = vec3(0.725f, 0.71f, 0.68f);
     scene.objects.push_back(o4);
-
     Object *o5 = load_obj("model/cornellbox/tallbox.obj");
     o5->material = new Material;
-    o5->material->color = vec3(0, 1, 1);
+    o5->material->color = vec3(0.725f, 0.71f, 0.68f);
     scene.objects.push_back(o5);
-
     Object *o6 = load_obj("model/cornellbox/shortbox.obj");
     o6->material = new Material;
-    o6->material->color = vec3(1, 0, 1);
+    o6->material->color = vec3(0.725f, 0.71f, 0.68f);
     scene.objects.push_back(o6);
-
     Object *o3 = load_obj("model/cornellbox/light.obj");
     o3->material = new Material;
     o3->material->is_emit = true;
+    o3->material->emission = (8.0f * vec3(0.747f+0.058f, 0.747f+0.258f, 0.747f) + 15.6f * vec3(0.740f+0.287f,0.740f+0.160f,0.740f) + 18.4f *vec3(0.737f+0.642f,0.737f+0.159f,0.737f));
     scene.objects.push_back(o3);
 
-    camera.position = vec3(300, 300, 0);
+
+    camera.position = vec3(300, 300, -400);
     camera.rotation.y = M_PI;
 
     scene.reload();
