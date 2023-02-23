@@ -7,7 +7,7 @@
 #define INF 1E18
 #define PI 3.1415926
 #define IVPI 0.3183098
-#define EPS 0.0001
+#define EPS 0.001
 
 in float pixel_x;
 in float pixel_y;
@@ -25,7 +25,7 @@ uniform int triangles_num;
 uniform mat4 v2w_mat;
 
 uniform float RussianRoulette = 0.8;
-uniform int SPP = 4;
+uniform int SPP = 2;
 uniform float fov = PI / 3;
 
 uniform int SCREEN_W;
@@ -38,8 +38,8 @@ int stack_h = 0;
 // util
 // ---------------------------------------------- //
 uint seed = uint(
-    uint(pixel_x + SCREEN_W) * uint(1973) +
-    uint(pixel_y + SCREEN_H) * uint(9277) +
+    uint(pixel_x + SCREEN_W / 2) * uint(1973) +
+    uint(pixel_y + SCREEN_H / 2) * uint(9277) +
     uint(frameCounter) * uint(26699)) | uint(1);
 
 uint wang_hash(inout uint seed) {
@@ -143,8 +143,8 @@ struct Intersect {
 };
 const Intersect nointersect = Intersect(false, vec3(0), vec3(0), -1, 0, 0, INF);
 
-/// 若有交点，返回与aabb的第一个交点
-Intersect intersect_aabb(Ray ray, vec3 aa, vec3 bb) {
+/// 检测是否与AABB碰撞，返回最早碰撞时间
+bool intersect_aabb(Ray ray, vec3 aa, vec3 bb, out float t_near) {
     float tmi = 0, tmx = INF;
     vec3 t1 = (aa - ray.ori) / ray.dir;
     vec3 t2 = (bb - ray.ori) / ray.dir;
@@ -154,10 +154,11 @@ Intersect intersect_aabb(Ray ray, vec3 aa, vec3 bb) {
     tmx = min(tmx, max(t1.x, t2.x));
     tmx = min(tmx, max(t1.y, t2.y));
     tmx = min(tmx, max(t1.z, t2.z));
-    if(tmi > tmx) return nointersect;
-    return Intersect(true, ray.ori + ray.dir * tmi, vec3(0), -1, 0, 0, tmi);
+    t_near = tmi;
+    return tmi < tmx + EPS;
 }
 
+/// 返回与triangle的具体碰撞信息
 Intersect intersect_triangle(Ray ray, int i) {
     Triangle tri = get_triangle(i);
 
@@ -170,7 +171,7 @@ Intersect intersect_triangle(Ray ray, int i) {
     float t = dot(S2, E2) * k;
     float u = dot(S1, S) * k;
     float v = dot(S2, ray.dir) * k;
-    if(0 < t && 0 < u && 0 < v && u + v < 1) {
+    if(EPS < t && 0 < u && 0 < v && u + v < 1) {
         vec3 pos = ray.ori + t * ray.dir;
         vec3 nor = tri.normal;
         if(dot(ray.dir, nor) > 0) nor = -nor;
@@ -183,36 +184,27 @@ Intersect intersect_triangle(Ray ray, int i) {
 /// 在场景中的第一个交点
 Intersect get_intersect(Ray ray) {
 
-    BVHNode root = get_bvhnode(0);
-    if(!intersect_aabb(ray, root.aa, root.bb).exist){
-        return nointersect;
-    }
-
+    float t_near = INF, t_tmp;
     Intersect res = nointersect;
+
     stack_h = 0;
     stack[++stack_h] = 0;
-
     while(stack_h > 0) {
         int id = stack[stack_h--];
         BVHNode cur = get_bvhnode(id);
 
-        // 叶子结点
-        if(cur.t_index != -1) {
+        if(cur.t_index != -1) {  // leaf
             Intersect inter = intersect_triangle(ray, cur.t_index);
-            if(inter.exist && inter.t < res.t) res = inter;
+            if(inter.exist && inter.t < t_near){
+                res = inter;
+                t_near = inter.t;
+            }
         } else {
-            BVHNode ls = get_bvhnode(cur.l);
-            BVHNode rs = get_bvhnode(cur.r);
-            Intersect inter1 = intersect_aabb(ray, ls.aa, ls.bb);
-            Intersect inter2 = intersect_aabb(ray, rs.aa, rs.bb);
+            if(!intersect_aabb(ray, cur.aa, cur.bb, t_tmp)) continue;
+            if(t_tmp > t_near) continue;
 
-            // 仅在与包围盒交点小于最优值时 才考虑
-            if(inter1.exist && inter1.t < res.t) {
-                stack[++stack_h] = cur.l;
-            }
-            if(inter2.exist && inter2.t < res.t) {
-                stack[++stack_h] = cur.r;
-            }
+            stack[++stack_h] = cur.l;
+            stack[++stack_h] = cur.r;
         }
     }
     return res;
@@ -282,35 +274,8 @@ vec3 brdf(Material material, vec3 wi, vec3 wo, vec3 normal) {
 
 vec3 shade(Ray ray) {
 
-//{
-//    Intersect inter1 = get_intersect(ray);
-//    if(!inter1.exist) return vec3(0);
-//    Triangle tr1 = get_triangle(inter1.t_index);
-//    Material m1 = get_material(tr1.m_index);
-//
-//    float pdf;
-//    vec3 light_pos;
-//    int light_t_index = -1;
-//
-//    sample_light(light_pos, light_t_index, pdf);        // 光源采样点
-//    Triangle tr2 = get_triangle(light_t_index);
-//    Material m2 = get_material(tr2.m_index);
-//    vec3 pos = inter1.pos;
-//    vec3 wi = normalize(light_pos - inter1.pos);
-//    vec3 wo = -ray.dir;
-//    vec3 n = inter1.normal;
-//    vec3 ln = tr2.normal;
-//    if(dot(wi, ln) > 0) ln = -ln;
-//
-//    // 直接光
-//    Intersect test = get_intersect(Ray(pos, wi));
-//    if(test.exist && test.t_index == light_t_index) {
-//        return m2.emission;
-//    } else return vec3(0);
-//}
-
     vec3 result = vec3(0);
-    vec3 history = vec3(1); // 累乘值
+    vec3 history = vec3(1); // 栈上乘积
 
     Intersect inter1 = get_intersect(ray);
     if(!inter1.exist) return vec3(0);
@@ -330,7 +295,8 @@ vec3 shade(Ray ray) {
         vec3 light_pos;
         int light_t_index = -1;
 
-        sample_light(light_pos, light_t_index, pdf);        // 光源采样点
+        sample_light(light_pos, light_t_index, pdf);        // 光源采样
+
         Triangle tr2 = get_triangle(light_t_index);
         Material m2 = get_material(tr2.m_index);
 
@@ -343,6 +309,8 @@ vec3 shade(Ray ray) {
 
         // 直接光
         Intersect test = get_intersect(Ray(pos, wi));
+//        if(test.t_index == light_t_index) return vec3(1);
+//        else return get_material(get_triangle(test.t_index).m_index).color;
         if(test.exist && test.t_index == light_t_index) {
             vec3 f_r = brdf(m1, wi, wo, n);
             float dis = length(light_pos - inter1.pos);
@@ -353,15 +321,15 @@ vec3 shade(Ray ray) {
         // 间接光
         if(rand() < RussianRoulette) {
             wi = sample_direction(m1, wo, n, pdf);
-            test = get_intersect(Ray(pos, wi));
-            if(test.exist) {
+            ray = Ray(pos, wi);
+            test = get_intersect(ray);
+            if(test.t_index != light_t_index) {
                 Triangle tr3 = get_triangle(test.t_index);
                 Material m3 = get_material(tr3.m_index);
                 if(!m3.is_emit) {
                     vec3 f_r = brdf(m1, wi, wo, n);
                     history *= f_r * dot(n, wi) / pdf / RussianRoulette;
 
-                    ray = Ray(pos, wi);
                     inter1 = test;
                     tr1 = tr3;
                     m1 = m3;

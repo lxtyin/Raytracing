@@ -5,22 +5,13 @@
 #include "src/Tool.h"
 using namespace std;
 
-#define SCREEN_W 720
-#define SCREEN_H 720
+#define SCREEN_W 512
+#define SCREEN_H 512
 
 GLFWwindow *window;
 Renderer renderer;
 Scene scene;
 Object camera;
-
-void mouse_callback(GLFWwindow* window, double xpos, double ypos) {
-    static double mouse_lastX = xpos, mouse_lastY = ypos;
-    double dx = xpos - mouse_lastX;
-    double dy = ypos - mouse_lastY;
-//    camera.rotation += vec3(-dy, dx, 0) / 400.0f;
-    mouse_lastX = xpos;
-    mouse_lastY = ypos;
-}
 
 void update(float dt) {
 
@@ -53,12 +44,14 @@ void update(float dt) {
     }
     if(glfwGetKey(window, GLFW_KEY_SPACE)) camera.position += vec3(0, speed * dt, 0);
     if(glfwGetKey(window, GLFW_KEY_LEFT_SHIFT))  camera.position += vec3(0, -speed * dt, 0);
-
-    if(glfwGetKey(window, GLFW_KEY_ESCAPE)) glfwSetWindowShouldClose(window, GL_TRUE);
+	if(glfwGetKey(window, GLFW_KEY_RIGHT)) camera.rotation += vec3(0, dt, 0);
+	if(glfwGetKey(window, GLFW_KEY_LEFT)) camera.rotation += vec3(0, -dt, 0);
+	if(glfwGetKey(window, GLFW_KEY_UP)) camera.rotation += vec3(-dt, 0, 0);
+	if(glfwGetKey(window, GLFW_KEY_DOWN)) camera.rotation += vec3(dt, 0, 0);
+	if(glfwGetKey(window, GLFW_KEY_ESCAPE)) glfwSetWindowShouldClose(window, GL_TRUE);
 }
 
 void init() {
-    glfwSetCursorPosCallback(window, mouse_callback);
 
     // add object;
     Object *o1 = load_obj("model/cornellbox/left.obj");
@@ -85,8 +78,8 @@ void init() {
     o3->material = new Material;
     o3->material->is_emit = true;
     o3->material->emission = (8.0f * vec3(0.747f+0.058f, 0.747f+0.258f, 0.747f) + 15.6f * vec3(0.740f+0.287f,0.740f+0.160f,0.740f) + 18.4f *vec3(0.737f+0.642f,0.737f+0.159f,0.737f));
+	o3->position = vec3(100, 0, 100);
     scene.objects.push_back(o3);
-
 
     camera.position = vec3(300, 300, -400);
     camera.rotation.y = M_PI;
@@ -127,17 +120,14 @@ int main(int argc, const char* argv[]) {
 
     float last_time = glfwGetTime(), detaTime;
     while(!glfwWindowShouldClose(window)) {
-        //渲染部分
-        //将颜色缓冲clear，即变成背景颜色
-        //将深度缓冲clear，删掉前一帧的深度信息
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        glClear(GL_COLOR_BUFFER_BIT);
 
-        detaTime = glfwGetTime() - last_time;//更新detaTime
+        detaTime = glfwGetTime() - last_time;
         last_time += detaTime;
         update(detaTime);
 
         glfwSwapBuffers(window); //交换两层颜色缓冲
-        glfwPollEvents();//检查有没有发生事件，调用相应回调函数
+        glfwPollEvents();	//检查有没有发生事件，调用相应回调函数
     }
 
     //释放所有资源

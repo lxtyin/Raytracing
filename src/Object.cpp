@@ -25,8 +25,8 @@ mat4 Object::transform() {
                 0, 	 	0,	   	1, 		0,
                 0,   	0,  	0, 		1 };
 
-    // x, y, z;
-    mat4 res = rot_x * rot_y * rot_z * s;
+    // y, x, z;
+    mat4 res = rot_y * rot_x * rot_z * s;
     res[3] = {position, 1};
     return res;
 }

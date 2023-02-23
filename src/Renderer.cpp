@@ -180,7 +180,7 @@ void Renderer::draw(Scene *scene, mat4 view) {
     frame++;
     glUseProgram(shaderProgram);
     glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "v2w_mat"), 1, GL_FALSE, glm::value_ptr(view));
-    glUniform1i(glGetUniformLocation(shaderProgram, "frameCounter"), frame);
+    glUniform1ui(glGetUniformLocation(shaderProgram, "frameCounter"), frame);
 
     glBindVertexArray(VAO);
     glDrawArrays(GL_TRIANGLES, 0, 6);
