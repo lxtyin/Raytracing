@@ -17,7 +17,7 @@ public:
     vector<Triangle> triangles; // 在世界坐标系下表示所有三角形
     BVHNode* bvh_root;
 
-    /// 场景更新时调用
+    /// 场景更新时调用 重构BVH
     void reload();
 };
 

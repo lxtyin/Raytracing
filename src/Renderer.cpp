@@ -10,69 +10,7 @@
 #include <iostream>
 #include <queue>
 
-void Renderer::init() {
-
-    frame = 0;
-    float canvas_data[] = {-1, 1, -1, -1, 1, -1,
-                           1, -1, 1, 1, -1, 1};
-
-    glGenVertexArrays(1, &VAO);
-    glGenBuffers(1, &VBO);
-    glBindVertexArray(VAO);
-    glBindBuffer(GL_ARRAY_BUFFER, VBO);
-    glBufferData(GL_ARRAY_BUFFER, 12 * sizeof(float), canvas_data, GL_STATIC_DRAW);
-
-    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (void*)0);
-    glEnableVertexAttribArray(0);
-
-    glBindVertexArray(0);//unbind VAO
-
-    string vertexShaderCode = read_file("shader/standard.vert");
-    string fragmentShaderCode = read_file("shader/standard.frag");
-    const char *vertexCodePointer = vertexShaderCode.c_str();
-    const char *fragmentCodePointer = fragmentShaderCode.c_str();
-
-    int success;
-    char infoLog[512];
-    //编译上述shader
-    unsigned int vertexShader = glCreateShader(GL_VERTEX_SHADER);
-    glShaderSource(vertexShader, 1, &vertexCodePointer, nullptr);
-    glCompileShader(vertexShader);
-    //编译当然要检查是否成功，后面的也差不多
-    glGetShaderiv(vertexShader, GL_COMPILE_STATUS, &success);
-    if(!success){
-        glGetShaderInfoLog(vertexShader, 512, nullptr, infoLog);
-        std::cerr << "vertexShader compile failed: " << infoLog << std::endl;
-    }
-
-    unsigned int fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
-    glShaderSource(fragmentShader, 1, &fragmentCodePointer, nullptr);
-    glCompileShader(fragmentShader);
-    glGetShaderiv(fragmentShader, GL_COMPILE_STATUS, &success);
-    if(!success){
-        glGetShaderInfoLog(fragmentShader, 512, nullptr, infoLog);
-        std::cerr << "fragmentShader compile failed: " << infoLog << std::endl;
-    }
-
-    //连接，得到一个完整的shaderProgram
-    shaderProgram = glCreateProgram();
-    glAttachShader(shaderProgram, vertexShader);
-    glAttachShader(shaderProgram, fragmentShader);
-    glLinkProgram(shaderProgram);
-    //检查连接是否成功
-    glGetProgramiv(shaderProgram, GL_LINK_STATUS, &success);
-    if(!success){
-        glGetShaderInfoLog(shaderProgram, 512, nullptr, infoLog);
-        std::cerr << "link failed: " << infoLog << std::endl;
-    }
-
-    glUseProgram(shaderProgram);
-
-    glDeleteShader(vertexShader);
-    glDeleteShader(fragmentShader);
-}
-
-void Renderer::load_to_gpu(vector<vec3> &buff, const char *name, int idx) {
+void Renderer::set_buff_toshader(vector<vec3> &buff, const char *name) {
 
     if(shaderProgram == -1) {
         std::cerr << "Renderer: Has not init yet." << std::endl;
@@ -85,26 +23,28 @@ void Renderer::load_to_gpu(vector<vec3> &buff, const char *name, int idx) {
     glBindBuffer(GL_TEXTURE_BUFFER, tbo);
     glBufferData(GL_TEXTURE_BUFFER, buff.size() * 3 * sizeof(float), buff.data(), GL_STATIC_DRAW);
 
-    glActiveTexture(GL_TEXTURE0 + idx);
+    glActiveTexture(GL_TEXTURE0 + tex_n);
     GLuint tex;
     glGenTextures(1, &tex);
     glBindTexture(GL_TEXTURE_BUFFER, tex);
     glTexBuffer(GL_TEXTURE_BUFFER, GL_RGB32F, tbo);
 
-    glUniform1i(glGetUniformLocation(shaderProgram, name), idx);
+    glUniform1i(glGetUniformLocation(shaderProgram, name), tex_n++);
 }
 
 void Renderer::reload_material(Scene *scene) {
-    // <color, emission, (is_emit, 0, 0)> 3x
+    // <color, emission, (is_emit, . 0), (. . .)> 4x
     auto &buff = material_buff;
     buff.clear();
     for(auto *obj: scene->objects) {
         auto *m = obj->material;
         buff.emplace_back(m->color);
         buff.emplace_back(m->emission);
-        buff.emplace_back(m->is_emit, 0, 0);
+        buff.emplace_back(m->is_emit, m->specular, 0);
+        buff.emplace_back(m->roughness, m->metallic, m->subsurface);
+
     }
-    load_to_gpu(buff, "materials", 0);
+    set_buff_toshader(buff, "materials");
 }
 
 void Renderer::reload_triangles(Scene *scene) {
@@ -126,8 +66,8 @@ void Renderer::reload_triangles(Scene *scene) {
         }
         m++;
     }
-    load_to_gpu(buff, "triangles", 1);
-    load_to_gpu(lightindex_buff, "lightindexs", 2);
+    set_buff_toshader(buff, "triangles");
+    set_buff_toshader(lightindex_buff, "lightindexs");
 
     assert(lightindex_buff.size() > 0); // 场景至少需要一个光源
 
@@ -154,7 +94,7 @@ void Renderer::reload_bvhnodes(Scene *scene) {
         buff[index * 3 + 1] = p->bb;
         buff[index * 3 + 2] = {il, ir, it};
     }
-    load_to_gpu(buff, "bvhnodes", 3);
+    set_buff_toshader(buff, "bvhnodes");
 }
 
 void Renderer::reload_scene(Scene *scene) {
@@ -162,29 +102,4 @@ void Renderer::reload_scene(Scene *scene) {
     reload_triangles(scene);
     reload_bvhnodes(scene);
 }
-
-
-void Renderer::set_screen(int w, int h) {
-    glUseProgram(shaderProgram);
-    glUniform1i(glGetUniformLocation(shaderProgram, "SCREEN_W"), w);
-    glUniform1i(glGetUniformLocation(shaderProgram, "SCREEN_H"), h);
-}
-
-void Renderer::draw(Scene *scene, mat4 view) {
-
-    if(shaderProgram == -1) {
-        std::cerr << "Renderer: Has not init yet." << std::endl;
-        return;
-    }
-
-    frame++;
-    glUseProgram(shaderProgram);
-    glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "v2w_mat"), 1, GL_FALSE, glm::value_ptr(view));
-    glUniform1ui(glGetUniformLocation(shaderProgram, "frameCounter"), frame);
-
-    glBindVertexArray(VAO);
-    glDrawArrays(GL_TRIANGLES, 0, 6);
-    glBindVertexArray(0);
-}
-
 

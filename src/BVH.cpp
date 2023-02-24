@@ -35,6 +35,7 @@ BVHNode* BVHNode::build(vector<Triangle*> &triangles) {
             cur->bb = vmax(cur->bb, v);
         }
     }
+    assert(n > 0);
     if(n == 1) {
         cur->isleaf = true;
         cur->triangle = triangles[0];
