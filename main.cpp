@@ -1,4 +1,4 @@
-#include <bits/stdc++.h>
+#include <iostream>
 #include "glad/glad.h"
 #include "glfw/glfw3.h"
 #include "glm/gtc/type_ptr.hpp"
@@ -10,35 +10,44 @@ using namespace std;
 
 GLFWwindow *window;
 Renderer *pass1;
-RenderPass *pass2;
+RenderPass *pass2, *pass3;
 Scene scene;
 Object camera;
+uint skybox;
 
 void update(float dt) {
 
-    static int frame = 1;
-    if(frame == 1) {
-        scene.reload();
-        pass1->reload_scene(&scene);
-    }
+    static uint frame = 1, last_frame_tex = 0;
 
     // 渲染管线
-    static int last_frame = -1;
-
-    glUseProgram(pass1->shaderProgram);
-    glUniformMatrix4fv(glGetUniformLocation(pass1->shaderProgram, "v2w_mat"), 1, GL_FALSE, glm::value_ptr(camera.transform()));
-    glUniform1ui(glGetUniformLocation(pass1->shaderProgram, "frameCounter"), frame++);
-    glUniform1i(glGetUniformLocation(pass1->shaderProgram, "SCREEN_W"), SCREEN_W);
-    glUniform1i(glGetUniformLocation(pass1->shaderProgram, "SCREEN_H"), SCREEN_H);
-    pass1->set_prev_texture(last_frame);
+    pass1->use();
+    {
+        glUniformMatrix4fv(glGetUniformLocation(pass1->shaderProgram, "v2w_mat"), 1, GL_FALSE, glm::value_ptr(camera.transform()));
+        glUniform1ui(glGetUniformLocation(pass1->shaderProgram, "frameCounter"), frame++);
+        glUniform1i(glGetUniformLocation(pass1->shaderProgram, "SCREEN_W"), SCREEN_W);
+        glUniform1i(glGetUniformLocation(pass1->shaderProgram, "SCREEN_H"), SCREEN_H);
+        pass1->bind_texture("last_frame_texture", last_frame_tex);
+        pass1->bind_texture("skybox", skybox, GL_TEXTURE_CUBE_MAP);
+    }
     uint tex1 = pass1->draw();
 
-    glUseProgram(pass2->shaderProgram);
-    glUniform1i(glGetUniformLocation(pass2->shaderProgram, "SCREEN_W"), SCREEN_W);
-    glUniform1i(glGetUniformLocation(pass2->shaderProgram, "SCREEN_H"), SCREEN_H);
-    pass2->set_prev_texture(tex1);
-    last_frame = pass2->draw();
-    //
+    pass2->use();
+    {
+        glUniform1i(glGetUniformLocation(pass2->shaderProgram, "SCREEN_W"), SCREEN_W);
+        glUniform1i(glGetUniformLocation(pass2->shaderProgram, "SCREEN_H"), SCREEN_H);
+        pass2->bind_texture("prev_texture", tex1);
+    }
+    uint tex2 = pass2->draw();
+
+    pass3->use();
+    {
+        glUniform1i(glGetUniformLocation(pass3->shaderProgram, "SCREEN_W"), SCREEN_W);
+        glUniform1i(glGetUniformLocation(pass3->shaderProgram, "SCREEN_H"), SCREEN_H);
+        pass3->bind_texture("prev_texture", tex2);
+    }
+    pass3->draw();
+    last_frame_tex = tex1;
+    //--------
 
     static float tot_dt = 0;
     tot_dt += dt;
@@ -62,49 +71,66 @@ void update(float dt) {
     }
     if(glfwGetKey(window, GLFW_KEY_SPACE)) camera.position += vec3(0, speed * dt, 0);
     if(glfwGetKey(window, GLFW_KEY_LEFT_SHIFT))  camera.position += vec3(0, -speed * dt, 0);
-	if(glfwGetKey(window, GLFW_KEY_RIGHT)) camera.rotation += vec3(0, dt, 0);
-	if(glfwGetKey(window, GLFW_KEY_LEFT)) camera.rotation += vec3(0, -dt, 0);
-	if(glfwGetKey(window, GLFW_KEY_UP)) camera.rotation += vec3(-dt, 0, 0);
-	if(glfwGetKey(window, GLFW_KEY_DOWN)) camera.rotation += vec3(dt, 0, 0);
+	if(glfwGetKey(window, GLFW_KEY_RIGHT)) camera.rotation += vec3(0, dt, 0) * 0.3f;
+	if(glfwGetKey(window, GLFW_KEY_LEFT)) camera.rotation += vec3(0, -dt, 0) * 0.3f;
+	if(glfwGetKey(window, GLFW_KEY_UP)) camera.rotation += vec3(-dt, 0, 0) * 0.3f;
+	if(glfwGetKey(window, GLFW_KEY_DOWN)) camera.rotation += vec3(dt, 0, 0) * 0.3f;
 	if(glfwGetKey(window, GLFW_KEY_ESCAPE)) glfwSetWindowShouldClose(window, GL_TRUE);
 }
 
 void init() {
 
-    pass1 = new Renderer("shader/standard.frag");
-    pass2 = new RenderPass("shader/blur.frag", true);
+    // passes
+    pass1 = new Renderer("shader/test.frag");
+    pass2 = new RenderPass("shader/blur.frag");
+    pass3 = new RenderPass("shader/direct.frag", true);
 
-    // add object;
-    Object *o1 = load_obj("model/cornellbox/left.obj");
-    o1->material = new Material;
-    o1->material->color = vec3(0.8, 0.2, 0.4);
-    scene.objects.push_back(o1);
-    Object *o2 = load_obj("model/cornellbox/right.obj");
-    o2->material = new Material;
-    o2->material->color = vec3(0.14f, 0.45f, 0.091f);
-    scene.objects.push_back(o2);
-    Object *o4 = load_obj("model/cornellbox/floor.obj");
-    o4->material = new Material;
-    o4->material->color = vec3(0.725f, 0.71f, 0.68f);
-    scene.objects.push_back(o4);
-    Object *o5 = load_obj("model/cornellbox/tallbox.obj");
-    o5->material = new Material;
-    o5->material->color = vec3(0.725f, 0.71f, 0.68f);
-    o5->material->roughness = 0.3;
-    o5->material->metallic = 1;
-    scene.objects.push_back(o5);
-    Object *o6 = load_obj("model/cornellbox/shortbox.obj");
-    o6->material = new Material;
-    o6->material->color = vec3(1, 0.2f, 0.68f);
-    scene.objects.push_back(o6);
-    Object *o3 = load_obj("model/cornellbox/light.obj");
-    o3->material = new Material;
-    o3->material->is_emit = true;
-    o3->material->emission =(8.0f * vec3(0.747f+0.058f, 0.747f+0.258f, 0.747f) + 15.6f * vec3(0.740f+0.287f,0.740f+0.160f,0.740f) + 18.4f *vec3(0.737f+0.642f,0.737f+0.159f,0.737f));
-    scene.objects.push_back(o3);
+    // scene;
+    {
+//        Object *o1 = load_obj("model/cornellbox/left.obj")[0];
+//        o1->material = new Material;
+//        o1->material->color = vec3(0.8, 0.0, 0.0);
+//        o1->material->roughness = 0;
+//        o1->material->metallic = 1;
+//        scene.objects.push_back(o1);
+//        Object *o2 = load_obj("model/cornellbox/right.obj")[0];
+//        o2->material = new Material;
+//        o2->material->color = vec3(0.14f, 0.45f, 0.091f);
+//        o2->material->roughness = 0;
+//        o2->material->metallic = 1;
+//        scene.objects.push_back(o2);
+//        Object *o4 = load_obj("model/cornellbox/floor.obj")[0];
+//        o4->material = new Material;
+//        o4->material->color = vec3(0.725f, 0.71f, 0.68f);
+//        scene.objects.push_back(o4);
+//        Object *o5 = load_obj("model/cornellbox/tallbox.obj")[0];
+//        o5->material = new Material;
+//        o5->material->color = vec3(0.725f, 0.71f, 0.68f);
+//        o5->material->roughness = 0;
+//        o5->material->metallic = 1;
+//        scene.objects.push_back(o5);
+//        Object *o6 = load_obj("model/cornellbox/shortbox.obj")[0];
+//        o6->material = new Material;
+//        o6->material->color = vec3(1, 0.2f, 0.68f);
+//        scene.objects.push_back(o6);
+//        Object *o3 = load_obj("model/cornellbox/light.obj")[0];
+//        o3->material = new Material;
+//        o3->material->is_emit = true;
+//        o3->material->emission =(8.0f * vec3(0.747f+0.058f, 0.747f+0.258f, 0.747f) + 15.6f * vec3(0.740f+0.287f,0.740f+0.160f,0.740f) + 18.4f *vec3(0.737f+0.642f,0.737f+0.159f,0.737f));
+//        scene.objects.push_back(o3);
 
-    camera.position = vec3(300, 300, -400);
+        auto vec = load_obj("model/sofa/sofa.obj", "model/sofa/sofa.mtl");
+        vec[0]->scale = vec3(100);
+        scene.add(vec[0]);
+    }
+
+    skybox = load_cubebox("img/sky_px.png", "img/sky_nx.png", "img/sky_py.png",
+                          "img/sky_ny.png", "img/sky_pz.png", "img/sky_nz.png");
+
+    camera.position = vec3(300, 300, -800);
     camera.rotation.y = M_PI;
+    scene.reload();
+    pass1->reload_scene(&scene);
 }
 
 //初始化窗口（采用默认设置）
@@ -132,13 +158,12 @@ int main(int argc, const char* argv[]) {
     window = initWindow();
     //初始化glad
     gladLoadGLLoader((GLADloadproc)glfwGetProcAddress);
+    glDisable(GL_DEPTH_TEST);
 
     init();
 
     float last_time = glfwGetTime(), detaTime;
     while(!glfwWindowShouldClose(window)) {
-        glClear(GL_COLOR_BUFFER_BIT);
-
         detaTime = glfwGetTime() - last_time;
         last_time += detaTime;
         update(detaTime);

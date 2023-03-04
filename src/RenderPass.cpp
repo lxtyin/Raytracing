@@ -67,12 +67,11 @@ RenderPass::RenderPass(const string &frag_shader_path, bool to_screen) {
     glDeleteShader(fragmentShader);
 
     // 帧缓冲
-    if(to_screen) FBO = 0;
+    if(to_screen) FBO = 0, FBO_TEX = 0;
     else{
         glGenFramebuffers(1, &FBO);
-        glBindFramebuffer(GL_FRAMEBUFFER, FBO);
-
         glGenTextures(1, &FBO_TEX);
+        glBindFramebuffer(GL_FRAMEBUFFER, FBO);
         glBindTexture(GL_TEXTURE_2D, FBO_TEX);
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, SCREEN_W, SCREEN_H, 0, GL_RGB, GL_UNSIGNED_BYTE, nullptr);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
@@ -84,31 +83,28 @@ RenderPass::RenderPass(const string &frag_shader_path, bool to_screen) {
         }
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
     }
+
 }
 
-void RenderPass::set_prev_texture(uint tto) {
-    // 0号单元保留用作上一pass
-    glActiveTexture(GL_TEXTURE0 + tex_n);
-    glBindTexture(GL_TEXTURE_2D, tto);
-    glUniform1i(glGetUniformLocation(shaderProgram, "prev_texture"), tex_n++);
+void RenderPass::bind_texture(const char *target, uint tex, int type) {
+    glActiveTexture(GL_TEXTURE0 + tex_unit);
+    glBindTexture(type, tex);
+    glUniform1i(glGetUniformLocation(shaderProgram, target), tex_unit);
+    ++tex_unit;
+    assert(tex_unit < 16);
+}
+
+void RenderPass::use() {
+    glUseProgram(shaderProgram);
+    glBindFramebuffer(GL_FRAMEBUFFER, FBO);
+    glBindVertexArray(VAO);
+    tex_unit = 0;
 }
 
 uint RenderPass::draw() {
-
-    if(shaderProgram == -1) {
-        std::cerr << "RenderPass: Has not init yet." << std::endl;
-        return -1;
-    }
-
-    tex_n = 0;
-
-    glBindFramebuffer(GL_FRAMEBUFFER, FBO);
-    glBindTexture(GL_TEXTURE_2D, FBO_TEX);
-    glBindVertexArray(VAO);
     glDrawArrays(GL_TRIANGLES, 0, 6);
 
-    glBindVertexArray(0);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
-    glBindTexture(GL_TEXTURE_2D, 0);
+    glBindVertexArray(0);
     return FBO_TEX;
 }

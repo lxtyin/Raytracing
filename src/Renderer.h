@@ -14,17 +14,21 @@ class Renderer: public RenderPass {
     vector<vec3> material_buff;
     vector<vec3> triangle_buff;
     vector<vec3> bvhnodes_buff;
-    vector<vec3> lightindex_buff;    // 发光triangle的index <(index, 0, 0)>
+    vector<vec3> lightidx_buff;
+    uint material_texbuff = 0;
+    uint triangle_texbuff = 0;
+    uint bvhnodes_texbuff = 0;
+    uint lightidx_texbuff = 0;
+    int light_t_num, triangle_num;
+
     std::map<Triangle*, int> triangle_index;
 public:
 
     explicit Renderer(const string &frag_shader_path, bool to_screen = false): RenderPass(frag_shader_path, to_screen) {}
 
-    /// 将某buff加载到shader
+    /// 生成texture buffer object
     /// \param buff 要加载的buff
-    /// \param name 加载到哪个sampleBuff上
-    /// \param idx 用的Texture单元
-    void set_buff_toshader(vector<vec3> &buff, const char *name);
+    uint gen_buffer_texture(vector<vec3> &buff);
 
     void reload_material(Scene *scene);
 
@@ -34,6 +38,8 @@ public:
 
     /// 重新将scene中的内容加载到buff
     void reload_scene(Scene *scene);
+
+    uint draw() override;
 };
 
 

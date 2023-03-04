@@ -15,5 +15,5 @@ set(CMAKE_CXX_STANDARD 17)
 
 include_directories(include)
 link_directories(lib)
-add_executable(path_tracing ${SRC_FILES} src/Object.cpp src/Object.h src/Triangle.h src/Material.cpp src/Material.h src/Scene.cpp src/Scene.h src/Renderer.cpp src/Renderer.h src/BVH.cpp src/BVH.h src/Tool.cpp src/Tool.h src/RenderPass.cpp src/RenderPass.h src/Config.h)
+add_executable(path_tracing ${SRC_FILES} )
 target_link_libraries(path_tracing opengl32 glu32 libglfw3.a libzlibstatic.a)

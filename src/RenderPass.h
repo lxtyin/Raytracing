@@ -6,23 +6,30 @@
 #define PATH_TRACING_RENDERPASS_H
 
 #include "Scene.h"
-#include <map>
+#include "glad/glad.h"
 #include <string>
 using std::string;
 using uint = unsigned int;
 
 class RenderPass {
 protected:
-    int tex_n = 0;
-    uint VAO = -1, VBO = -1, FBO = -1, FBO_TEX = -1;
 public:
-    uint shaderProgram = -1;
+    uint tex_unit = 0; // 使用到的纹理单元，0-11，后面的保留用作GL_TEXTURE_BUFFER
+    uint VAO = 0, VBO = 0, FBO = 0, FBO_TEX = 0;
+
+    uint shaderProgram = 0;
 
     explicit RenderPass(const string &frag_shader_path, bool to_screen = false);
 
-    void set_prev_texture(uint id);
+    /// 将texture绑定到对应的uniform sampler变量上
+    /// \param target uniform variable
+    /// \param tex texture id
+    void bind_texture(const char *target, uint tex, int type = GL_TEXTURE_2D);
 
-    uint draw();
+    /// usage：use后设置，然后draw
+    virtual void use();
+
+    virtual uint draw();
 };
 
 

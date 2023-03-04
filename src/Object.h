@@ -14,7 +14,6 @@ class Object {
 public:
     vector<Triangle> triangles;
     Material *material = nullptr;
-
     vec3 position = vec3(0);
     vec3 scale = vec3(1);
     vec3 rotation = vec3(0); // xyz

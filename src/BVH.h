@@ -9,6 +9,8 @@
 #include <vector>
 using std::vector;
 
+#define MAX_TRIANGLES 10002
+
 class BVHNode {
 public:
     vec3 aa, bb;            // x(a[0], b[0]), y(a[1], b[1]), z(a[2], b[2])

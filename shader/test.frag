@@ -19,10 +19,10 @@ out vec4 FragColor;
 
 uniform samplerBuffer materials;
 uniform samplerBuffer triangles;
-uniform samplerBuffer lightindexs;
+uniform samplerBuffer lightidxs;
 uniform samplerBuffer bvhnodes;
 uniform int light_t_num;
-uniform int triangles_num;
+uniform int triangle_num;
 uniform mat4 v2w_mat;
 
 uniform float RussianRoulette = 0.8;
@@ -32,7 +32,8 @@ uniform float fov = PI / 3;
 uniform int SCREEN_W;
 uniform int SCREEN_H;
 uniform uint frameCounter;
-uniform sampler2D prev_texture;
+uniform sampler2D last_frame_texture;
+uniform samplerCube skybox;
 
 int stack[256];
 int stack_h = 0;
@@ -119,7 +120,7 @@ Triangle get_triangle(int i) {
 
 // 获取第i个三角形光源的index
 int get_light_t_index(int i) {
-    return roundint(texelFetch(lightindexs, i).x);
+    return roundint(texelFetch(lightidxs, i).x);
 }
 
 Material get_material(int i) {
@@ -197,6 +198,7 @@ Intersect intersect_triangle(Ray ray, int i) {
         vec3 nor = tri.normal;
         if(dot(ray.dir, nor) > 0) nor = -nor;
         return Intersect(true, pos, nor, i, u, v, t);
+        // 可在此插值
     } else {
         return nointersect;
     }
@@ -215,11 +217,11 @@ Intersect get_intersect(Ray ray) {
         BVHNode cur = get_bvhnode(id);
 
         if(cur.t_index != -1) {  // leaf
-            Intersect inter = intersect_triangle(ray, cur.t_index);
-            if(inter.exist && inter.t < t_near){
-                res = inter;
-                t_near = inter.t;
-            }
+                                 Intersect inter = intersect_triangle(ray, cur.t_index);
+                                 if(inter.exist && inter.t < t_near){
+                                     res = inter;
+                                     t_near = inter.t;
+                                 }
         } else {
             if(!intersect_aabb(ray, cur.aa, cur.bb, t_tmp)) continue;
             if(t_tmp > t_near) continue;
@@ -231,166 +233,20 @@ Intersect get_intersect(Ray ray) {
     return res;
 }
 
-// sample
-// ---------------------------------------------- //
-
-// 在三角形上均匀采样
-vec3 sample_triangle(Triangle t) {
-    float r1 = sqrt(rand());
-    float r2 = rand();
-    return t.ver[0] * (1 - r1) + t.ver[1] * r1 * (1 - r2) + t.ver[2] * r1 * r2;
-}
-
-// 在半球面上采样(+z方向)
-vec3 sample_hemisphere() {
-    float z = rand();
-    float r = sqrt(1.0 - z * z);
-    float phi = 2.0 * PI * rand();
-    return vec3(r * cos(phi), r * sin(phi), z);
-}
-
-// 在所有光面上采样
-void sample_light(out vec3 pos, out int t_index, out float pdf) {
-    float tot_area = 0;
-    for(int i = 0;i < light_t_num;i++) {
-        int id = get_light_t_index(i);
-        Triangle t = get_triangle(id);
-        tot_area += t.area;
-    }
-    float rnd = rand() * tot_area;
-    for(int i = 0;i < light_t_num;i++) {
-        int id = get_light_t_index(i);
-        Triangle t = get_triangle(id);
-        rnd -= t.area;
-        if(rnd < EPS) {
-            pdf = 1.0 / t.area;
-            pos = sample_triangle(t);
-            t_index = id;
-            return;
-        }
-    }
-}
-
-// n = +z
-vec3 to_world(vec3 v, vec3 n) {
-    vec3 help = vec3(1, 0, 0);
-    if(abs(n.x) > 0.999) help = vec3(0, 0, 1);
-    vec3 t = normalize(cross(n, help));
-    vec3 b = normalize(cross(n, t));
-    return v.x * t + v.y * b + v.z * n;
-}
-
-// 采样出射光（重要性采样
-vec3 sample_direction(Material m, vec3 wi, vec3 n, out float pdf) {
-    float alpha2 = max(0.01, m.roughness * m.roughness);
-    float x = rand();
-
-    float cos_theta = sqrt((1. - x) / (x * (alpha2 - 1) + 1));
-    float cos2 = cos_theta * cos_theta;
-    float phi = rand();
-    float r = sqrt(1. - cos2);
-
-    vec3 v = vec3(r * cos(phi), r * sin(phi), cos_theta);
-    pdf = 2. * alpha2 * cos_theta / pow2(cos2 * (alpha2 - 1.) + 1.) / (2 * PI);
-    return to_world(v, n);
-}
-
-
-// brdf
-// ---------------------------------------------- //
-
-vec3 brdf(Material m, vec3 wi, vec3 wo, vec3 nor) {
-
-    vec3 h = normalize(wi + wo);
-    float ndi = dot(nor, wi);
-    float ndo = dot(nor, wo);
-    float ndh = dot(nor, h);
-    float hdi = dot(h, wi);
-    if(ndi < 0 || ndi < 0) return vec3(0); // 反向
-
-//    return 0.7 * m.color * IVPI;
-
-    // diffuse
-    vec3 diffuse = m.color * IVPI;
-
-    // specular
-    float alpha2 = max(0.01, m.roughness * m.roughness);
-    float D = alpha2 / (PI * pow2(ndh * ndh * (alpha2 - 1) + 1));
-    float k = pow2(1 + m.roughness) / 8;
-    float G = 1 / ((1 - k + k / ndi) *  (1 - k + k / ndo));
-    vec3 F0 = mix(vec3(0.04), m.color, m.metallic);
-    vec3 F = F0 + (1 - F0) * pow5(1 - hdi);
-    vec3 specular = D * G * F / (4 * ndi * ndo);
-
-    return mix(diffuse, specular, m.metallic);
-}
-
 // path tracing
 // ---------------------------------------------- //
 
 vec3 shade(Ray ray) {
 
     vec3 result = vec3(0);
-    vec3 history = vec3(1); // 栈上乘积
 
     Intersect inter1 = get_intersect(ray);
-    if(!inter1.exist) return vec3(0);
+    if(!inter1.exist) return vec3(texture(skybox, ray.dir));
 
     Triangle tr1 = get_triangle(inter1.t_index);
     Material m1 = get_material(tr1.m_index);
 
-    while(true) {
-
-        // 自发光
-        if(m1.is_emit) {
-            result += history * m1.emission;
-            break;
-        }
-
-        float pdf;
-        vec3 light_pos;
-        int light_t_index = -1;
-
-        sample_light(light_pos, light_t_index, pdf);        // 光源采样
-
-        Triangle tr2 = get_triangle(light_t_index);
-        Material m2 = get_material(tr2.m_index);
-
-        vec3 pos = inter1.pos;
-        vec3 wi = normalize(light_pos - inter1.pos);
-        vec3 wo = -ray.dir;
-        vec3 n = inter1.normal;
-        vec3 ln = tr2.normal;
-        if(dot(wi, ln) > 0) ln = -ln;
-
-        // 直接光
-        Intersect test = get_intersect(Ray(pos, wi));
-        if(test.exist && test.t_index == light_t_index) {
-            vec3 f_r = brdf(m1, wi, wo, n);
-            float dis = length(light_pos - inter1.pos);
-            vec3 L_dir = m2.emission * f_r * dot(n, wi) * dot(ln, -wi) / (dis * dis) / pdf;
-            result += history * L_dir;
-        }
-
-        // 间接光
-        if(rand() < RussianRoulette) {
-            wi = sample_direction(m1, wo, n, pdf);
-            ray = Ray(pos, wi);
-            test = get_intersect(ray);
-            if(test.exist && test.t_index != light_t_index) {
-                Triangle tr3 = get_triangle(test.t_index);
-                Material m3 = get_material(tr3.m_index);
-                if(!m3.is_emit) {
-                    vec3 f_r = brdf(m1, wi, wo, n);
-                    history *= f_r * dot(n, wi) / pdf / RussianRoulette;
-
-                    inter1 = test;
-                    tr1 = tr3;
-                    m1 = m3;
-                } else break;
-            } else break;
-        } else break;
-    }
+    result = m1.color;
     return result;
 }
 
@@ -401,19 +257,10 @@ void main() {
 
     vec3 result = vec3(0);
 
-    for(int i = 0;i < SPP;i++) {
-        vec3 w_tar = vec3(v2w_mat * vec4(pixel_x, pixel_y, -dis_z, 1));
-        vec3 dir = normalize(w_tar - w_ori);
-        Ray ray = Ray(w_ori, dir);
-        result += shade(ray);
-    }
-    result /= SPP;
+    vec3 w_tar = vec3(v2w_mat * vec4(pixel_x, pixel_y, -dis_z, 1));
+    vec3 dir = normalize(w_tar - w_ori);
+    Ray ray = Ray(w_ori, dir);
+    result = shade(ray);
 
-    result.x = pow(clamp(result.x, 0., 1.), 0.45f);
-    result.y = pow(clamp(result.y, 0., 1.), 0.45f);
-    result.z = pow(clamp(result.z, 0., 1.), 0.45f);
-
-    FragColor = vec4(result, 1.0);
-//    FragColor = mix(texture(prev_texture, tex_uv), vec4(result, 1.0), 0.2);
-    FragColor = mix(texture(prev_texture, tex_uv), vec4(result, 1.0), 1.0 / frameCounter); // 静态渲染
+    FragColor = vec4(result, 1);
 }
