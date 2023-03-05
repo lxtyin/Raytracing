@@ -18,7 +18,10 @@ public:
     BVHNode *ls = nullptr;
     BVHNode *rs = nullptr;
     Triangle *triangle = nullptr;
-    int siz; // 子树节点数
+    int siz = 1; // 子树节点数
+    int depth = 0; // 树最大深度
+
+    float best_cost = 0; // tmp
 
     static BVHNode* build(vector<Triangle*> &triangles);
 };

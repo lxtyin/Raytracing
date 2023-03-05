@@ -308,7 +308,7 @@ vec3 brdf(Material m, vec3 wi, vec3 wo, vec3 nor) {
     float ndo = dot(nor, wo);
     float ndh = dot(nor, h);
     float hdi = dot(h, wi);
-    if(ndi < 0 || ndi < 0) return vec3(0); // 反向
+    if(ndi < 0 || ndo < 0) return vec3(0); // 反向
 
 //    return 0.7 * m.color * IVPI;
 
@@ -422,7 +422,7 @@ void main() {
 
     // mix last frame
     vec4 last_col = clamp(texture(last_frame_texture, tex_uv), vec4(0, 0, 0, 1), vec4(1));
-    FragColor = vec4(result, 1);
+//    FragColor = vec4(result, 1);
 //    FragColor = mix(last_col, vec4(result, 1.0), 0.1);
     FragColor = mix(last_col, vec4(result, 1.0), 1.0 / frameCounter); // 静态渲染
 }

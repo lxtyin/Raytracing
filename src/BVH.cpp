@@ -38,6 +38,7 @@ BVHNode* BVHNode::build(vector<Triangle*> &triangles) {
     assert(n > 0);
     if(n == 1) {
         cur->isleaf = true;
+        cur->depth = 0;
         cur->triangle = triangles[0];
         cur->siz = 1;
         return cur;
@@ -46,7 +47,7 @@ BVHNode* BVHNode::build(vector<Triangle*> &triangles) {
     vector<Triangle*> t[3] = {triangles, triangles, triangles};
 
     int bs_d = 0, bs_i = 0;
-    float bs_cost = 2 * cost(cur->aa, cur->bb); // max possible cost
+    float bs_cost = n * cost(cur->aa, cur->bb); // max possible cost
     for(int d = 0;d < 3;d++) {
         std::sort(t[d].begin(), t[d].end(), [&](Triangle *x, Triangle *y) {
             return x->center[d] < y->center[d];
@@ -94,8 +95,11 @@ BVHNode* BVHNode::build(vector<Triangle*> &triangles) {
         t[bs_d].pop_back();
     }
 
+    cur->best_cost = bs_cost;
+
     cur->ls = build(t[bs_d]);
     cur->rs = build(rt);
     cur->siz = cur->ls->siz + cur->rs->siz + 1;
+    cur->depth = max(cur->ls->depth, cur->rs->depth) + 1;
     return cur;
 }

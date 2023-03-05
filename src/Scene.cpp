@@ -3,6 +3,7 @@
 //
 
 #include "Scene.h"
+#include <iostream>
 
 void Scene::update_triangles() {
     triangles.clear();
@@ -25,6 +26,8 @@ void Scene::reload() {
     vector<Triangle*> tmp;
     for(auto &t: triangles) tmp.push_back(&t);
     bvh_root = BVHNode::build(tmp);
+    std::cout << "BVH size:" << bvh_root->siz << std::endl;
+    std::cout << "BVH depth:" << bvh_root->depth << std::endl;
 }
 
 void Scene::add(Object *obj) {

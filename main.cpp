@@ -56,7 +56,7 @@ void update(float dt) {
         cout << "FPS: " << 1.0 / dt << endl;
     }
 
-    float speed = 50;
+    float speed = 150;
     if(glfwGetKey(window, GLFW_KEY_W)){
         camera.position += camera.direction_z() * -speed * dt;
     }
@@ -71,10 +71,10 @@ void update(float dt) {
     }
     if(glfwGetKey(window, GLFW_KEY_SPACE)) camera.position += vec3(0, speed * dt, 0);
     if(glfwGetKey(window, GLFW_KEY_LEFT_SHIFT))  camera.position += vec3(0, -speed * dt, 0);
-	if(glfwGetKey(window, GLFW_KEY_RIGHT)) camera.rotation += vec3(0, dt, 0) * 0.3f;
-	if(glfwGetKey(window, GLFW_KEY_LEFT)) camera.rotation += vec3(0, -dt, 0) * 0.3f;
-	if(glfwGetKey(window, GLFW_KEY_UP)) camera.rotation += vec3(-dt, 0, 0) * 0.3f;
-	if(glfwGetKey(window, GLFW_KEY_DOWN)) camera.rotation += vec3(dt, 0, 0) * 0.3f;
+	if(glfwGetKey(window, GLFW_KEY_RIGHT)) camera.rotation += vec3(0, dt, 0);
+	if(glfwGetKey(window, GLFW_KEY_LEFT)) camera.rotation += vec3(0, -dt, 0);
+	if(glfwGetKey(window, GLFW_KEY_UP)) camera.rotation += vec3(-dt, 0, 0);
+	if(glfwGetKey(window, GLFW_KEY_DOWN)) camera.rotation += vec3(dt, 0, 0);
 	if(glfwGetKey(window, GLFW_KEY_ESCAPE)) glfwSetWindowShouldClose(window, GL_TRUE);
 }
 
@@ -87,41 +87,37 @@ void init() {
 
     // scene;
     {
-//        Object *o1 = load_obj("model/cornellbox/left.obj")[0];
-//        o1->material = new Material;
-//        o1->material->color = vec3(0.8, 0.0, 0.0);
-//        o1->material->roughness = 0;
-//        o1->material->metallic = 1;
-//        scene.objects.push_back(o1);
-//        Object *o2 = load_obj("model/cornellbox/right.obj")[0];
-//        o2->material = new Material;
-//        o2->material->color = vec3(0.14f, 0.45f, 0.091f);
-//        o2->material->roughness = 0;
-//        o2->material->metallic = 1;
-//        scene.objects.push_back(o2);
-//        Object *o4 = load_obj("model/cornellbox/floor.obj")[0];
-//        o4->material = new Material;
-//        o4->material->color = vec3(0.725f, 0.71f, 0.68f);
-//        scene.objects.push_back(o4);
-//        Object *o5 = load_obj("model/cornellbox/tallbox.obj")[0];
-//        o5->material = new Material;
-//        o5->material->color = vec3(0.725f, 0.71f, 0.68f);
-//        o5->material->roughness = 0;
-//        o5->material->metallic = 1;
-//        scene.objects.push_back(o5);
-//        Object *o6 = load_obj("model/cornellbox/shortbox.obj")[0];
-//        o6->material = new Material;
-//        o6->material->color = vec3(1, 0.2f, 0.68f);
-//        scene.objects.push_back(o6);
-//        Object *o3 = load_obj("model/cornellbox/light.obj")[0];
-//        o3->material = new Material;
-//        o3->material->is_emit = true;
-//        o3->material->emission =(8.0f * vec3(0.747f+0.058f, 0.747f+0.258f, 0.747f) + 15.6f * vec3(0.740f+0.287f,0.740f+0.160f,0.740f) + 18.4f *vec3(0.737f+0.642f,0.737f+0.159f,0.737f));
-//        scene.objects.push_back(o3);
-
-        auto vec = load_obj("model/sofa/sofa.obj", "model/sofa/sofa.mtl");
-        vec[0]->scale = vec3(100);
-        scene.add(vec[0]);
+        Object *o1 = load_obj("model/cornellbox/left.obj")[0];
+        o1->material = new Material;
+        o1->material->color = vec3(0.8, 0.0, 0.0);
+        o1->material->roughness = 0;
+        o1->material->metallic = 1;
+        scene.objects.push_back(o1);
+        Object *o2 = load_obj("model/cornellbox/right.obj")[0];
+        o2->material = new Material;
+        o2->material->color = vec3(0.14f, 0.45f, 0.091f);
+        o2->material->roughness = 0;
+        o2->material->metallic = 1;
+        scene.objects.push_back(o2);
+        Object *o4 = load_obj("model/cornellbox/floor.obj")[0];
+        o4->material = new Material;
+        o4->material->color = vec3(0.725f, 0.71f, 0.68f);
+        scene.objects.push_back(o4);
+        Object *o5 = load_obj("model/cornellbox/tallbox.obj")[0];
+        o5->material = new Material;
+        o5->material->color = vec3(0.725f, 0.71f, 0.68f);
+        o5->material->roughness = 0;
+        o5->material->metallic = 1;
+        scene.objects.push_back(o5);
+        Object *o6 = load_obj("model/cornellbox/shortbox.obj")[0];
+        o6->material = new Material;
+        o6->material->color = vec3(1, 0.2f, 0.68f);
+        scene.objects.push_back(o6);
+        Object *o3 = load_obj("model/cornellbox/light.obj")[0];
+        o3->material = new Material;
+        o3->material->is_emit = true;
+        o3->material->emission =(8.0f * vec3(0.747f+0.058f, 0.747f+0.258f, 0.747f) + 15.6f * vec3(0.740f+0.287f,0.740f+0.160f,0.740f) + 18.4f *vec3(0.737f+0.642f,0.737f+0.159f,0.737f));
+        scene.objects.push_back(o3);
     }
 
     skybox = load_cubebox("img/sky_px.png", "img/sky_nx.png", "img/sky_py.png",
@@ -133,8 +129,8 @@ void init() {
     pass1->reload_scene(&scene);
 }
 
-//初始化窗口（采用默认设置）
-GLFWwindow* initWindow() {
+int main(int argc, const char* argv[]) {
+
     glfwInit();
     //设置各种选项值
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);//主版本号
@@ -142,7 +138,7 @@ GLFWwindow* initWindow() {
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);//使用核心渲染模式
 
     //创建窗口，放入上下文中
-    GLFWwindow* window = glfwCreateWindow(SCREEN_W, SCREEN_H, "My Window", NULL, NULL);
+    window = glfwCreateWindow(SCREEN_W, SCREEN_H, "My Window", NULL, NULL);
     glfwMakeContextCurrent(window);
 
     //openGL本质是一个巨大的状态机，很多内容都是通过设置来完成的
@@ -150,12 +146,7 @@ GLFWwindow* initWindow() {
     //glfwSetCursorPosCallback(window, mouse_callback);
     //设置鼠标模式
     glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
-    return window;
-}
 
-int main(int argc, const char* argv[]) {
-
-    window = initWindow();
     //初始化glad
     gladLoadGLLoader((GLADloadproc)glfwGetProcAddress);
     glDisable(GL_DEPTH_TEST);
