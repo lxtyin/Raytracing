@@ -5,9 +5,14 @@
 #ifndef PATH_TRACING_RENDERER_H
 #define PATH_TRACING_RENDERER_H
 
-#include "Scene.h"
+#include "instance/Scene.h"
 #include "RenderPass.h"
+#include "texture/Texture.h"
 #include <map>
+
+#define M_SIZ 7
+#define T_SIZ 9
+#define B_SIZ 3
 
 class Renderer: public RenderPass {
 
@@ -19,20 +24,22 @@ class Renderer: public RenderPass {
     uint triangle_texbuff = 0;
     uint bvhnodes_texbuff = 0;
     uint lightidx_texbuff = 0;
-    int light_t_num, triangle_num;
+    int light_num, triangle_num, material_num;
+    vector<Texture*> texture_list;
 
     std::map<Triangle*, int> triangle_index;
 public:
 
-    explicit Renderer(const string &frag_shader_path, bool to_screen = false): RenderPass(frag_shader_path, to_screen) {}
+    Renderer(const string &frag_shader_path, bool to_screen = false): RenderPass(frag_shader_path, to_screen) {}
 
-    /// 生成texture buffer object
-    /// \param buff 要加载的buff
+    /**
+     * 生成texture buffer object
+     * @param buff 要加载的buff
+     * @return
+     */
     uint gen_buffer_texture(vector<vec3> &buff);
 
-    void reload_material(Scene *scene);
-
-    void reload_triangles(Scene *scene);
+    void reload_meshes(Scene *scene);
 
     void reload_bvhnodes(Scene *scene);
 

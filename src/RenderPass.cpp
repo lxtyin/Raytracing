@@ -4,7 +4,7 @@
 
 #include "Config.h"
 #include "RenderPass.h"
-#include "Tool.h"
+#include "tool/tool.h"
 #include "glad/glad.h"
 #include <iostream>
 
@@ -73,7 +73,7 @@ RenderPass::RenderPass(const string &frag_shader_path, bool to_screen) {
         glGenTextures(1, &FBO_TEX);
         glBindFramebuffer(GL_FRAMEBUFFER, FBO);
         glBindTexture(GL_TEXTURE_2D, FBO_TEX);
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, SCREEN_W, SCREEN_H, 0, GL_RGB, GL_UNSIGNED_BYTE, nullptr);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, SCREEN_W, SCREEN_H, 0, GL_RGB, GL_FLOAT, nullptr);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, FBO_TEX, 0);

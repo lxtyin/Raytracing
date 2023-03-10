@@ -5,7 +5,7 @@
 #ifndef PATH_TRACING_RENDERPASS_H
 #define PATH_TRACING_RENDERPASS_H
 
-#include "Scene.h"
+#include "instance/Scene.h"
 #include "glad/glad.h"
 #include <string>
 using std::string;
@@ -13,9 +13,9 @@ using uint = unsigned int;
 
 class RenderPass {
 protected:
-public:
-    uint tex_unit = 0; // 使用到的纹理单元，0-11，后面的保留用作GL_TEXTURE_BUFFER
+    uint tex_unit = 0; // 使用到的纹理单元，0-16
     uint VAO = 0, VBO = 0, FBO = 0, FBO_TEX = 0;
+public:
 
     uint shaderProgram = 0;
 

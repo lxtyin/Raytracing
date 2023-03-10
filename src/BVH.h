@@ -5,11 +5,11 @@
 #ifndef PATH_TRACING_BVH_H
 #define PATH_TRACING_BVH_H
 
-#include "Triangle.h"
+#include "instance/Triangle.h"
 #include <vector>
 using std::vector;
 
-#define MAX_TRIANGLES 10002
+#define MAX_TRIANGLES 1000002
 
 class BVHNode {
 public:
@@ -20,8 +20,6 @@ public:
     Triangle *triangle = nullptr;
     int siz = 1; // 子树节点数
     int depth = 0; // 树最大深度
-
-    float best_cost = 0; // tmp
 
     static BVHNode* build(vector<Triangle*> &triangles);
 };

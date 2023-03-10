@@ -1,7 +1,7 @@
 
 #version 330 core
 
-#define M_SIZ 4    // 一个material占的vec3数量
+#define M_SIZ 6    // 一个material占的vec3数量
 #define T_SIZ 6    // 一个triangle占的vec3数量
 #define B_SIZ 3    // 一个bvhnode占的vec3数量
 #define INF 1E18
@@ -11,7 +11,7 @@
 
 in float pixel_x;
 in float pixel_y;
-in vec2 tex_uv;
+in vec2 screen_uv;
 out vec4 FragColor;
 
 // memory
@@ -28,12 +28,14 @@ uniform mat4 v2w_mat;
 uniform float RussianRoulette = 0.8;
 uniform int SPP = 1;
 uniform float fov = PI / 3;
+uniform bool fast_shade = true; // 仅渲染diffuse_color
 
 uniform int SCREEN_W;
 uniform int SCREEN_H;
 uniform uint frameCounter;
 uniform sampler2D last_frame_texture;
 uniform samplerCube skybox;
+uniform sampler2D texture_list[16];
 
 int stack[256];
 int stack_h = 0;
@@ -83,14 +85,21 @@ struct Triangle {
 };
 
 struct Material {
-    vec3 color;
+    vec3 base_color;
     vec3 emission;
     bool is_emit;
-
-    float specular;     // 镜面光强度
-    float roughness;    // 粗糙度 [0, 1]
-    float metallic;     // 金属度 缩减漫反射 [0, 1]
+    float metallic;
+    float roughness;
+    float specular;
+    float specular_tint;
+    float sheen;
+    float sheenTint;
     float subsurface;
+    float clearcoat;
+    float clearcoat_gloss;
+    float anisotropic;
+
+    int diffuse_map_idx;
 };
 
 struct BVHNode {
@@ -125,15 +134,24 @@ int get_light_t_index(int i) {
 
 Material get_material(int i) {
     Material r;
-    r.color = texelFetch(materials, i * M_SIZ).xyz;
+    r.base_color = texelFetch(materials, i * M_SIZ).xyz;
     r.emission = texelFetch(materials, i * M_SIZ + 1).xyz;
     vec3 tmp = texelFetch(materials, i * M_SIZ + 2).xyz;
     r.is_emit = tmp.x != 0;
-    r.specular = tmp.y;
-    tmp = texelFetch(materials, i * M_SIZ + 3).xyz;
-    r.roughness = tmp.x;
     r.metallic = tmp.y;
-    r.subsurface = tmp.z;
+    r.roughness = tmp.z;
+    tmp = texelFetch(materials, i * M_SIZ + 3).xyz;
+    r.specular = tmp.x;
+    r.specular_tint = tmp.y;
+    r.sheen = tmp.z;
+    tmp = texelFetch(materials, i * M_SIZ + 4).xyz;
+    r.sheenTint = tmp.x;
+    r.subsurface = tmp.y;
+    r.clearcoat = tmp.z;
+    tmp = texelFetch(materials, i * M_SIZ + 5).xyz;
+    r.clearcoat_gloss = tmp.x;
+    r.anisotropic = tmp.y;
+    r.diffuse_map_idx = int(tmp.z);
     return r;
 }
 
@@ -146,6 +164,14 @@ BVHNode get_bvhnode(int i) {
     r.r = roundint(tmp.y);
     r.t_index = roundint(tmp.z);
     return r;
+}
+
+// material accessor
+// ---------------------------------------------- //
+
+vec3 get_diffuse_color(Material m, vec2 uv) {
+    if(m.diffuse_map_idx == -1) return m.base_color;
+    return vec3(texture(texture_list[m.diffuse_map_idx], uv));
 }
 
 // intersect
@@ -301,7 +327,9 @@ vec3 sample_direction(Material m, vec3 wi, vec3 n, out float pdf) {
 // brdf
 // ---------------------------------------------- //
 
-vec3 brdf(Material m, vec3 wi, vec3 wo, vec3 nor) {
+
+
+vec3 brdf(Material m, vec3 wi, vec3 wo, vec3 nor, vec2 uv) {
 
     vec3 h = normalize(wi + wo);
     float ndi = dot(nor, wi);
@@ -310,17 +338,18 @@ vec3 brdf(Material m, vec3 wi, vec3 wo, vec3 nor) {
     float hdi = dot(h, wi);
     if(ndi < 0 || ndo < 0) return vec3(0); // 反向
 
-//    return 0.7 * m.color * IVPI;
+    // interpolation
+    vec3 m_base_color = get_diffuse_color(m, uv);
 
     // diffuse
-    vec3 diffuse = m.color * IVPI;
+    vec3 diffuse = m_base_color * IVPI;
 
     // specular
     float alpha2 = max(0.01, m.roughness * m.roughness);
     float D = alpha2 / (PI * pow2(ndh * ndh * (alpha2 - 1) + 1));
     float k = pow2(1 + m.roughness) / 8;
     float G = 1 / ((1 - k + k / ndi) *  (1 - k + k / ndo));
-    vec3 F0 = mix(vec3(0.04), m.color, m.metallic);
+    vec3 F0 = mix(vec3(0.04), m_base_color, m.metallic);
     vec3 F = F0 + (1 - F0) * pow5(1 - hdi);
     vec3 specular = D * G * F / (4 * ndi * ndo);
 
@@ -340,6 +369,12 @@ vec3 shade(Ray ray) {
 
     Triangle tr1 = get_triangle(inter1.t_index);
     Material m1 = get_material(tr1.m_index);
+
+    if(fast_shade) {
+        vec2 uv = tr1.uv[0] * (1 - inter1.u - inter1.v) +
+        tr1.uv[1] * inter1.u + tr1.uv[2] * inter1.v;
+        return get_diffuse_color(m1, uv);
+    }
 
     while(true) {
 
@@ -362,13 +397,15 @@ vec3 shade(Ray ray) {
         vec3 wi = normalize(light_pos - inter1.pos);
         vec3 wo = -ray.dir;
         vec3 n = inter1.normal;
+        vec2 uv = tr1.uv[0] * (1 - inter1.u - inter1.v) +
+                  tr1.uv[1] * inter1.u + tr1.uv[2] * inter1.v;
         vec3 ln = tr2.normal;
         if(dot(wi, ln) > 0) ln = -ln;
 
         // 直接光
         Intersect test = get_intersect(Ray(pos, wi));
         if(test.exist && test.t_index == light_t_index) {
-            vec3 f_r = brdf(m1, wi, wo, n);
+            vec3 f_r = brdf(m1, wi, wo, n, uv);
             float dis = length(light_pos - inter1.pos);
             vec3 L_dir = m2.emission * f_r * dot(n, wi) * dot(ln, -wi) / (dis * dis) / pdf;
             result += history * L_dir;
@@ -387,7 +424,7 @@ vec3 shade(Ray ray) {
                 Triangle tr3 = get_triangle(test.t_index);
                 Material m3 = get_material(tr3.m_index);
                 if(!m3.is_emit) {
-                    vec3 f_r = brdf(m1, wi, wo, n);
+                    vec3 f_r = brdf(m1, wi, wo, n, uv);
                     history *= f_r * dot(n, wi) / pdf / RussianRoulette;
 
                     inter1 = test;
@@ -416,13 +453,15 @@ void main() {
     result /= SPP;
 
     // gamma矫正
-    result.x = pow(clamp(result.x, 0., 1.), 0.45f);
-    result.y = pow(clamp(result.y, 0., 1.), 0.45f);
-    result.z = pow(clamp(result.z, 0., 1.), 0.45f);
+    result.x = pow(clamp(result.x, 0., 1.), 0.43f);
+    result.y = pow(clamp(result.y, 0., 1.), 0.43f);
+    result.z = pow(clamp(result.z, 0., 1.), 0.43f);
 
     // mix last frame
-    vec4 last_col = clamp(texture(last_frame_texture, tex_uv), vec4(0, 0, 0, 1), vec4(1));
-//    FragColor = vec4(result, 1);
+    vec4 last_col = clamp(texture(last_frame_texture, screen_uv), vec4(0, 0, 0, 1), vec4(1));
+
+    FragColor = vec4(result, 1);
 //    FragColor = mix(last_col, vec4(result, 1.0), 0.1);
+    if(!fast_shade)
     FragColor = mix(last_col, vec4(result, 1.0), 1.0 / frameCounter); // 静态渲染
 }

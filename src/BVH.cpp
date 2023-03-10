@@ -95,8 +95,6 @@ BVHNode* BVHNode::build(vector<Triangle*> &triangles) {
         t[bs_d].pop_back();
     }
 
-    cur->best_cost = bs_cost;
-
     cur->ls = build(t[bs_d]);
     cur->rs = build(rt);
     cur->siz = cur->ls->siz + cur->rs->siz + 1;
