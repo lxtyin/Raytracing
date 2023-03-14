@@ -39,25 +39,30 @@ void update(float dt) {
 
         pass1->bind_texture("last_frame_texture", last_frame_tex);
         pass1->bind_texture("skybox", skybox->TTO);
+        pass1->bind_texture("skybox_samplecache", skybox->sample_cache_tto);
+        glUniform1i(glGetUniformLocation(pass1->shaderProgram, "SKY_W"), skybox->width);
+        glUniform1i(glGetUniformLocation(pass1->shaderProgram, "SKY_H"), skybox->height);
     }
-    uint tex1 = pass1->draw();
+    pass1->draw();
 
 //    pass2->use();
 //    {
 //        glUniform1i(glGetUniformLocation(pass2->shaderProgram, "SCREEN_W"), SCREEN_W);
 //        glUniform1i(glGetUniformLocation(pass2->shaderProgram, "SCREEN_H"), SCREEN_H);
-//        pass2->bind_texture("prev_texture", tex1);
+//        pass2->bind_texture("prev_color", pass1->attach_textures[0]);
+//        pass2->bind_texture("prev_albedo", pass1->attach_textures[1]);
+//        pass2->bind_texture("prev_normal", pass1->attach_textures[2]);
 //    }
-//    uint tex2 = pass2->draw();
+//    pass2->draw();
 
     pass3->use();
     {
         glUniform1i(glGetUniformLocation(pass3->shaderProgram, "SCREEN_W"), SCREEN_W);
         glUniform1i(glGetUniformLocation(pass3->shaderProgram, "SCREEN_H"), SCREEN_H);
-        pass3->bind_texture("prev_texture", tex1);
+        pass3->bind_texture("prev_texture", pass1->attach_textures[0]);
     }
     pass3->draw();
-    last_frame_tex = tex1;
+    last_frame_tex = pass1->attach_textures[0];
     //--------
 
     static float tot_dt = 0;
@@ -92,9 +97,9 @@ void update(float dt) {
 void init() {
 
     // passes
-    pass1 = new Renderer("shader/disney.frag");
-    pass2 = new RenderPass("shader/blur.frag");
-    pass3 = new RenderPass("shader/direct.frag", true);
+    pass1 = new Renderer("shader/disney.frag", 3);
+    pass2 = new RenderPass("shader/blur.frag", 1);
+    pass3 = new RenderPass("shader/direct.frag", 0, true);
 
     scene = new Scene;
     camera = new Instance;
@@ -102,23 +107,24 @@ void init() {
         Instance *o1 = Loader::load_model("model/casa_obj.glb");
         o1->transform.rotation = vec3(M_PI / 2, 0, 0);
         scene->add_child(o1);
-//        Instance *o2 = Loader::load_model("model/light.obj");
-//        o2->get_child(0)->meshes[0]->material->roughness = 0.5;
-//        o2->transform.scale = vec3(50);
-//        o2->transform.position = vec3(0, -50, 0);
-//        scene->add_child(o2);
 
         Instance *light= Loader::load_model("model/light.obj");
         light->transform.scale = vec3(3, 3, 3);
-        light->transform.position = vec3(0, 40, 40);
-        light->transform.rotation = vec3(-M_PI / 3, 0, 0);
-        light->get_child(0)->meshes[0]->material->emission = vec3(190);
+        light->transform.position = vec3(0, 100, 0);
+        light->get_child(0)->meshes[0]->material->emission = vec3(100);
         light->get_child(0)->meshes[0]->material->is_emit = true;
         scene->add_child(light);
 
+//        Instance *light2= Loader::load_model("model/light.obj");
+//        light2->transform.scale = vec3(3, 3, 3);
+//        light2->transform.position = vec3(-40, 80, 40);
+//        light2->get_child(0)->meshes[0]->material->emission = vec3(450);
+//        light2->get_child(0)->meshes[0]->material->is_emit = true;
+//        scene->add_child(light2);
+
     }
 
-    skybox = new HDRTexture("img/rustig_koppie_puresky_4k.hdr");
+    skybox = new HDRTexture("img/table_mountain_2_puresky_1k.hdr");
 
     camera->transform.rotation.y = M_PI;
     camera->transform.position = vec3(1, 1, 1);

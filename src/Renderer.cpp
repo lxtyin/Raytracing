@@ -107,7 +107,7 @@ void Renderer::reload_scene(Scene *scene) {
     reload_bvhnodes(scene);
 }
 
-uint Renderer::draw() {
+void Renderer::draw() {
     glUniform1i(glGetUniformLocation(shaderProgram, "light_t_num"), light_num);
     glUniform1i(glGetUniformLocation(shaderProgram, "triangle_num"), triangle_num);
     bind_texture("materials", material_texbuff, GL_TEXTURE_BUFFER);
@@ -117,6 +117,6 @@ uint Renderer::draw() {
     for(int i = 0;i < texture_list.size();i++) {
         bind_texture(str_format("texture_list[%d]", i).c_str(), texture_list[i]->TTO);
     }
-    return RenderPass::draw();
+    RenderPass::draw();
 }
 

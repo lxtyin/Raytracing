@@ -8,8 +8,7 @@
 #include "glad/glad.h"
 #include <iostream>
 
-RenderPass::RenderPass(const string &frag_shader_path, bool to_screen) {
-
+void RenderPass::init_canvas() {
     // 方形屏幕
     float canvas_data[] = {-1, 1, -1, -1, 1, -1,
                            1, -1, 1, 1, -1, 1};
@@ -24,6 +23,9 @@ RenderPass::RenderPass(const string &frag_shader_path, bool to_screen) {
     glEnableVertexAttribArray(0);
 
     glBindVertexArray(0);//unbind VAO
+}
+
+void RenderPass::init_shader(const string &frag_shader_path) {
 
     // 生成shader
     string vertexShaderCode = read_file("shader/fullscreen.vert");
@@ -65,25 +67,37 @@ RenderPass::RenderPass(const string &frag_shader_path, bool to_screen) {
 
     glDeleteShader(vertexShader);
     glDeleteShader(fragmentShader);
+}
 
-    // 帧缓冲
-    if(to_screen) FBO = 0, FBO_TEX = 0;
-    else{
-        glGenFramebuffers(1, &FBO);
-        glGenTextures(1, &FBO_TEX);
+void RenderPass::init_attachment(int attach_num, bool to_screen) {
+
+    if(attach_num == 0) return;
+    if(to_screen) FBO = 0; // FBO_TEX = 0;
+    else glGenFramebuffers(1, &FBO);
+
+    attachments.resize(attach_num);
+    attach_textures.resize(attach_num, 0);
+    for(int i = 0;i < attach_num;i++) {
+        attachments[i] = GL_COLOR_ATTACHMENT0 + i;
+        glGenTextures(1, &attach_textures[i]);
         glBindFramebuffer(GL_FRAMEBUFFER, FBO);
-        glBindTexture(GL_TEXTURE_2D, FBO_TEX);
+        glBindTexture(GL_TEXTURE_2D, attach_textures[i]);
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, SCREEN_W, SCREEN_H, 0, GL_RGB, GL_FLOAT, nullptr);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, FBO_TEX, 0);
-
-        if(glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
-            std::cerr << "RenderPass: framebuffer uncompleted." << std::endl;
-        }
-        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        glFramebufferTexture2D(GL_FRAMEBUFFER, attachments[i], GL_TEXTURE_2D, attach_textures[i], 0);
     }
 
+    if(glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
+        std::cerr << "RenderPass: framebuffer uncompleted." << std::endl;
+    }
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+}
+
+RenderPass::RenderPass(const string &frag_shader_path, int attach_num, bool to_screen) {
+    init_canvas();
+    init_shader(frag_shader_path);
+    init_attachment(attach_num, to_screen);
 }
 
 void RenderPass::bind_texture(const char *target, uint tex, int type) {
@@ -98,13 +112,16 @@ void RenderPass::use() {
     glUseProgram(shaderProgram);
     glBindFramebuffer(GL_FRAMEBUFFER, FBO);
     glBindVertexArray(VAO);
+    if(!attachments.empty()) {
+        glDrawBuffers(attachments.size(), attachments.data());
+    }
     tex_unit = 0;
 }
 
-uint RenderPass::draw() {
+void RenderPass::draw() {
     glDrawArrays(GL_TRIANGLES, 0, 6);
 
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     glBindVertexArray(0);
-    return FBO_TEX;
 }
+

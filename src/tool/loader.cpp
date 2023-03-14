@@ -56,6 +56,9 @@ namespace Loader{
         if(AI_SUCCESS == mat->Get(AI_MATKEY_SPECULAR_FACTOR, res)){
             result->specular = res;
         }
+//        if(AI_SUCCESS == mat->Get(AI_MATKEY_REFRACTI, res)){
+//            result->index_of_refraction = res;
+//        }
 
         if(AI_SUCCESS == mat->Get(AI_MATKEY_COLOR_EMISSIVE, color)){
             result->emission = vec3(color.r, color.g, color.b);

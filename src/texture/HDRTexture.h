@@ -13,6 +13,9 @@ public:
     int width;
     int height;
     int channel;
+
+    uint sample_cache_tto; /** < 对HDR贴图重要性采样的cache tto > **/
+
     HDRTexture(const string &imagePath);
 };
 

@@ -30,7 +30,8 @@ class Renderer: public RenderPass {
     std::map<Triangle*, int> triangle_index;
 public:
 
-    Renderer(const string &frag_shader_path, bool to_screen = false): RenderPass(frag_shader_path, to_screen) {}
+    Renderer(const string &frag_shader_path, int attach_num = 0, bool to_screen = false):
+        RenderPass(frag_shader_path, attach_num, to_screen) {}
 
     /**
      * 生成texture buffer object
@@ -46,7 +47,7 @@ public:
     /// 重新将scene中的内容加载到buff
     void reload_scene(Scene *scene);
 
-    uint draw() override;
+    void draw() override;
 };
 
 

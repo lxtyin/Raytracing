@@ -14,22 +14,31 @@ using uint = unsigned int;
 class RenderPass {
 protected:
     uint tex_unit = 0; // 使用到的纹理单元，0-16
-    uint VAO = 0, VBO = 0, FBO = 0, FBO_TEX = 0;
+    uint VAO = 0, VBO = 0, FBO = 0;
+
+    void init_canvas();
+    void init_attachment(int attach_num, bool to_screen);
+    void init_shader(const string &frag_shader_path);
+
 public:
 
+    vector<uint> attachments;
+    vector<uint> attach_textures;
     uint shaderProgram = 0;
 
-    explicit RenderPass(const string &frag_shader_path, bool to_screen = false);
+    explicit RenderPass(const string &frag_shader_path, int attach_num = 0, bool to_screen = false);
 
-    /// 将texture绑定到对应的uniform sampler变量上
-    /// \param target uniform variable
-    /// \param tex texture id
+    /** 将texture绑定到对应的uniform sampler变量上
+     * \param target uniform variable
+     * \param tex texture id
+     */
     void bind_texture(const char *target, uint tex, int type = GL_TEXTURE_2D);
 
-    /// usage：use后设置，然后draw
+    /**
+     * Useage: 先use，传入uniform变量，再draw
+     */
     virtual void use();
-
-    virtual uint draw();
+    virtual void draw();
 };
 
 
