@@ -97,7 +97,7 @@ void update(float dt) {
 void init() {
 
     // passes
-    pass1 = new Renderer("shader/disney.frag", 3);
+    pass1 = new Renderer("shader/disney_old.frag", 3);
     pass2 = new RenderPass("shader/blur.frag", 1);
     pass3 = new RenderPass("shader/direct.frag", 0, true);
 
@@ -109,9 +109,9 @@ void init() {
         scene->add_child(o1);
 
         Instance *light= Loader::load_model("model/light.obj");
-        light->transform.scale = vec3(3, 3, 3);
+        light->transform.scale = vec3(30, 30, 30);
         light->transform.position = vec3(0, 100, 0);
-        light->get_child(0)->meshes[0]->material->emission = vec3(100);
+        light->get_child(0)->meshes[0]->material->emission = vec3(1);
         light->get_child(0)->meshes[0]->material->is_emit = true;
         scene->add_child(light);
 

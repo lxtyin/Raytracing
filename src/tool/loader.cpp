@@ -62,9 +62,9 @@ namespace Loader{
 
         if(AI_SUCCESS == mat->Get(AI_MATKEY_COLOR_EMISSIVE, color)){
             result->emission = vec3(color.r, color.g, color.b);
-            if(glm::length(result->emission) > 1) {
-                result->is_emit = true;
-            }
+//            if(glm::length(result->emission) > 1) {
+//                result->is_emit = true;
+//            }
         }
         if(AI_SUCCESS == mat->Get(AI_MATKEY_TEXTURE(aiTextureType_DIFFUSE_ROUGHNESS, 0), str)) {
 //            result->roughness_map = processImage(str.C_Str(), scene);
@@ -73,6 +73,8 @@ namespace Loader{
         if(AI_SUCCESS == mat->Get(AI_MATKEY_TEXTURE(aiTextureType_METALNESS, 0), str)) {
 //            result->metalness_map = processImage(str.C_Str(), scene);
             std::cout << "metalness_map" << std::endl;
+            result->metallic = 0.7;
+            result->roughness = 0.1;
         }
         if(AI_SUCCESS == mat->Get(AI_MATKEY_TEXTURE(aiTextureType_NORMALS, 0), str)){
 //            result->normal_map = processImage(str.C_Str(), scene);

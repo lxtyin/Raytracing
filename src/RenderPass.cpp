@@ -105,7 +105,7 @@ void RenderPass::bind_texture(const char *target, uint tex, int type) {
     glBindTexture(type, tex);
     glUniform1i(glGetUniformLocation(shaderProgram, target), tex_unit);
     ++tex_unit;
-    assert(tex_unit < 16);
+    assert(tex_unit < 32);
 }
 
 void RenderPass::use() {

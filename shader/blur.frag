@@ -24,8 +24,8 @@ void main() {
 
     float mean = 0, sigma = 0;
 
-    for(int i = -2;i <= 2;i++) {
-        for (int j = -2;j <= 2; j++) {
+    for(int i = -1;i <= 1;i++) {
+        for (int j = -1;j <= 1; j++) {
             vec2 uv2 = screen_uv + vec2(i * 1.0 / SCREEN_W, j * 1.0 / SCREEN_H);
             vec3 p_color = texture(prev_color, uv2).xyz;
             mean += length(p_color);
@@ -37,8 +37,8 @@ void main() {
 
     float totw = 0;
     vec3 res = vec3(0);
-    for(int i = -2;i <= 2;i++){
-        for(int j = -2;j <= 2;j++){
+    for(int i = -1;i <= 1;i++){
+        for(int j = -1;j <= 1;j++){
             vec2 uv2 = screen_uv + vec2(i * 1.0 / SCREEN_W, j * 1.0 / SCREEN_H);
 
             vec3 p_color = texture(prev_color, uv2).xyz;

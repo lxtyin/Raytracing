@@ -183,8 +183,8 @@ Material get_material(int i) {
     r.metalness_map_idx = int(tmp.x);
     r.roughness_map_idx = int(tmp.y);
     r.normal_map_idx = int(tmp.z);
-    r.index_of_refraction = 1.05;
-    r.spec_trans = 0.5;
+    r.index_of_refraction = 1.2;
+    r.spec_trans = 0.8;
     return r;
 }
 
@@ -415,18 +415,17 @@ float fresnel(float cosI, float etaI, float etaT) {
 // L(in), N(same direction with L), V(out)
 vec3 btdf(Material m, vec3 L, vec3 V, vec3 N, vec2 uv, float ior1, float ior2) {
 
-    if(L == -V) return vec3(100, 0, 0);
-
     float NdotL = dot(N, L);
     float NdotV = dot(N, V);
-    if(NdotL <= 0 || NdotV >= 0) return vec3(0);
+    if(NdotL * NdotV >= 0) return vec3(0);
     float eta = ior2 / ior1;
     vec3 H = -normalize(L + eta * V);
-    if(any(isnan(H))) return vec3(0);
+    if(dot(L, H) <= 0) H = -H;
+    if(L == -V) H = L;
     float NdotH = dot(N, H);
     float LdotH = dot(L, H);
     float VdotH = dot(V, H);
-    if(LdotH <= 0 || VdotH >= 0) return vec3(0);
+    if(LdotH * VdotH > 0) return vec3(0);
 
     float m_roughness = get_roughness(m, uv);
     float m_metallic = get_metallic(m, uv);
@@ -465,7 +464,7 @@ vec3 brdf(Material m, vec3 L, vec3 V, vec3 N, vec2 uv) {
     float FL = pow5(1 - NdotL), FV = pow5(1 - NdotV);
     float Fd90 = 0.5 + 2 * LdotH*LdotH * m_roughness;
     float Fd = mix(1.0, Fd90, FL) * mix(1.0, Fd90, FV);
-    vec3 diffuse = IVPI * Fd * Cdlin;
+    vec3 diffuse = IVPI * Fd * Cdlin * (1 - m.spec_trans);
 
     // subsurface
 //    float Fss90 = LdotH * LdotH * m_roughness;
@@ -507,68 +506,47 @@ vec3 shade(Ray ray) {
         }
 
         float pdf;
-        vec3 light_pos;
-        int light_t_index = -1;
-
-        sample_light(light_pos, light_t_index, pdf);        // 光源采样
-
-        Triangle tr2 = get_triangle(light_t_index);
-        Material m2 = get_material(tr2.m_index);
-
         vec3 pos = inter1.pos;
-        vec3 wi = normalize(light_pos - inter1.pos);
         vec3 wo = -ray.dir;
         vec3 outn = inter1.normal;                      // 指向物体外的法线
         vec3 sidn = dot(outn, wo) > 0 ? outn : -outn;   // 与wo同向的法线
         vec2 uv = tr1.uv[0] * (1 - inter1.u - inter1.v) +
                   tr1.uv[1] * inter1.u + tr1.uv[2] * inter1.v;
 
-        // 直接光
-        Intersect test = get_intersect(Ray(pos, wi));
-        if(test.exist && test.t_index == light_t_index) {
-            vec3 ln = test.normal;
-            if(dot(wi, ln) > 0) ln = -ln;
-            vec3 f_r = brdf(m1, wo, wi, sidn, uv);
-            float dis = length(light_pos - inter1.pos);
-            vec3 L_dir = m2.emission * f_r * dot(sidn, wi) * dot(ln, -wi) / (dis * dis) / pdf;
-            result += history * L_dir;
+        vec3 wi = importance_sample_skybox(pdf);
+
+        vec3 f_r;
+        if(dot(wi, sidn) < 0) {
+            float eta = dot(outn, wi) < 0 ? 1.0 : m1.index_of_refraction;
+            f_r = btdf(m1, wi, wo, -sidn, uv, 1.0 + m1.index_of_refraction - eta, eta);
+        } else {
+            f_r = brdf(m1, wi, wo, sidn, uv);
+        }
+        float w2a = (2 * PI * PI * sqrt(1.0 - wi.y * wi.y)) / (SKY_H * SKY_W); // 积分域转换项
+        pdf /= w2a;
+
+        ray = Ray(pos, wi);
+        inter1 = get_intersect(ray);
+
+        if(!inter1.exist) {
+            vec3 L = get_background_color(wi) * f_r * abs(dot(sidn, wi)) / pdf;
+            result += history * L;
+            break;
+        } else {
+            if(rand() < RussianRoulette) {
+
+                //                    vec3 wi = simple_sample(wo, sidn, pdf);
+
+                // 对反射方向重要性采样
+                //            wi = importance_sample(m1, wo, n, uv, pdf);
+
+                history *= f_r * abs(dot(sidn, wi)) / pdf / RussianRoulette;
+
+                tr1 = get_triangle(inter1.t_index);
+                m1 = get_material(tr1.m_index);
+            } else break;
         }
 
-        // 间接光
-        if(rand() < RussianRoulette) {
-
-            // 对环境贴图重要性采样
-//            wi = simple_sample(wo, sidn, pdf);
-            wi = importance_sample_skybox(pdf);
-            vec3 f_r;
-            if(dot(wi, sidn) < 0) {
-                float eta = dot(outn, wi) < 0 ? 1.0 : m1.index_of_refraction;
-                f_r = btdf(m1, wi, wo, -sidn, uv, 1.0 + m1.index_of_refraction - eta, eta);
-            } else f_r = brdf(m1, wi, wo, sidn, uv);
-            float w2a = (2 * PI * PI * sqrt(1.0 - wi.y * wi.y)) / (SKY_H * SKY_W); // 积分域转换项
-            history *= f_r * abs(dot(sidn, wi)) * w2a / pdf / RussianRoulette;
-
-            // 对反射方向重要性采样
-//            wi = importance_sample(m1, wo, n, uv, pdf);
-//            ray = Ray(pos, wi);
-//            vec3 f_r = brdf(m1, wi, wo, n, uv);
-//            history *= f_r * dot(n, wi) / pdf / RussianRoulette;
-
-            ray = Ray(pos, wi);
-            Intersect test = get_intersect(ray);
-            if(!test.exist) {
-                result += history * get_background_color(wi);
-                break;
-            }
-
-            Triangle tr3 = get_triangle(test.t_index);
-            Material m3 = get_material(tr3.m_index);
-            if(!m3.is_emit) {
-                inter1 = test;
-                tr1 = tr3;
-                m1 = m3;
-            } else break;
-        } else break;
     }
     return result;
 }
