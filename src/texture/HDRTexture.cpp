@@ -26,7 +26,6 @@ HDRTexture::HDRTexture(const string &imagePath) {
     vector spdf(height, vector<double>(width));
     float *cache = new float[width * height * 3];
 
-    double sum = 0;
     for(int i = 0;i < height;i++) {
         for(int j = 0;j < width;j++) {
             vec3 col {
@@ -35,7 +34,7 @@ HDRTexture::HDRTexture(const string &imagePath) {
                     hdrRes.cols[(i * width + j) * 3 + 2]
             };
             pdf[i][j] = col[0] * 0.2 + col[1] * 0.7 + col[2] * 0.1;
-            sum += pdf[i][j];
+            Light_SUM += pdf[i][j];
         }
     }
     double FY[height];
@@ -51,11 +50,11 @@ HDRTexture::HDRTexture(const string &imagePath) {
         for(int j = 0;j < width;j++) {
             double u = (float)i / height;
             double v = (float)j / width;
-            int Y = std::lower_bound(FY, FY + height, u * sum) - FY;
+            int Y = std::lower_bound(FY, FY + height, u * Light_SUM) - FY;
             int X = std::lower_bound(spdf[Y].begin(), spdf[Y].end(), v * spdf[Y][width - 1]) - spdf[Y].begin();
             cache[(i * width + j) * 3 + 0] = (float)X / width;
             cache[(i * width + j) * 3 + 1] = (float)Y / height;
-            cache[(i * width + j) * 3 + 2] = pdf[Y][X] / sum;
+            cache[(i * width + j) * 3 + 2] = pdf[Y][X] / Light_SUM;
         }
     }
 

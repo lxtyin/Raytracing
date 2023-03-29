@@ -13,6 +13,7 @@ public:
     int width;
     int height;
     int channel;
+    double Light_SUM; // 亮度总和
 
     uint sample_cache_tto; /** < 对HDR贴图重要性采样的cache tto > **/
 

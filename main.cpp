@@ -19,6 +19,24 @@ Scene *scene;
 Instance *camera;
 HDRTexture* skybox;
 
+void mouse_callback(GLFWwindow* window, double xpos, double ypos) {
+    static double mouse_lastX = xpos, mouse_lastY = ypos;
+    static int mouse_button = GLFW_RELEASE;
+    int nw_button = glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_1);
+    if(mouse_button == GLFW_RELEASE && nw_button == GLFW_PRESS) {
+        mouse_lastX = xpos, mouse_lastY = ypos;
+    }
+    mouse_button = nw_button;
+    if(mouse_button == GLFW_PRESS) {
+        double dx = xpos - mouse_lastX;
+        double dy = ypos - mouse_lastY;
+        camera->transform.rotation += vec3(0, dx * 0.01, 0);
+        camera->transform.rotation += vec3(dy * 0.01, 0, 0);
+        mouse_lastX = xpos;
+        mouse_lastY = ypos;
+    }
+}
+
 void update(float dt) {
 
     static uint frame = 1, last_frame_tex = 0;
@@ -40,6 +58,7 @@ void update(float dt) {
         pass1->bind_texture("last_frame_texture", last_frame_tex);
         pass1->bind_texture("skybox", skybox->TTO);
         pass1->bind_texture("skybox_samplecache", skybox->sample_cache_tto);
+        glUniform1f(glGetUniformLocation(pass1->shaderProgram, "skybox_Light_SUM"), skybox->Light_SUM);
         glUniform1i(glGetUniformLocation(pass1->shaderProgram, "SKY_W"), skybox->width);
         glUniform1i(glGetUniformLocation(pass1->shaderProgram, "SKY_H"), skybox->height);
     }
@@ -87,17 +106,13 @@ void update(float dt) {
     }
     if(glfwGetKey(window, GLFW_KEY_SPACE)) camera->transform.position += vec3(0, speed * dt, 0);
     if(glfwGetKey(window, GLFW_KEY_LEFT_SHIFT))  camera->transform.position += vec3(0, -speed * dt, 0);
-	if(glfwGetKey(window, GLFW_KEY_RIGHT)) camera->transform.rotation += vec3(0, dt, 0);
-	if(glfwGetKey(window, GLFW_KEY_LEFT)) camera->transform.rotation += vec3(0, -dt, 0);
-	if(glfwGetKey(window, GLFW_KEY_UP)) camera->transform.rotation += vec3(-dt, 0, 0);
-	if(glfwGetKey(window, GLFW_KEY_DOWN)) camera->transform.rotation += vec3(dt, 0, 0);
 	if(glfwGetKey(window, GLFW_KEY_Q)) glfwSetWindowShouldClose(window, GL_TRUE);
 }
 
 void init() {
 
     // passes
-    pass1 = new Renderer("shader/disney_old.frag", 3);
+    pass1 = new Renderer("shader/disney.frag", 3);
     pass2 = new RenderPass("shader/blur.frag", 1);
     pass3 = new RenderPass("shader/direct.frag", 0, true);
 
@@ -150,6 +165,8 @@ int main(int argc, const char* argv[]) {
     //glfwSetCursorPosCallback(window, mouse_callback);
     //设置鼠标模式
     glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+
+    glfwSetCursorPosCallback(window, mouse_callback);
 
     //初始化glad
     gladLoadGLLoader((GLADloadproc)glfwGetProcAddress);

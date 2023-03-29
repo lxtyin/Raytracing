@@ -332,7 +332,6 @@ vec3 sample_lightface(vec3 pos, out int t_index, out float pdf) {
         Triangle t = get_triangle(id);
         tot_area += t.area;
     }
-    pdf = 1.0 / tot_area;
     float rnd = rand() * tot_area;
     for(int i = 0;i < light_t_num;i++) {
         int id = get_light_t_index(i);
@@ -343,7 +342,7 @@ vec3 sample_lightface(vec3 pos, out int t_index, out float pdf) {
             sample_triangle(t, light_pos, light_normal);
             vec3 dir = normalize(light_pos - pos);
             float dis = length(light_pos - pos);
-            pdf /= abs(dot(light_normal, dir)) / (dis * dis);
+            pdf = 1.0 / t.area / (abs(dot(light_normal, dir)) / (dis * dis));
             t_index = id;
             return dir;
         }
@@ -552,14 +551,13 @@ vec3 shade(Ray ray) {
         // 间接光
         if(rand() < RussianRoulette) {
 
-            vec3 h = importance_sample_GTR2(m1, uv, pdf);
-
-            wi = reflect(-wo, to_world(h, nor));
+//            vec3 h = importance_sample_GTR2(m1, uv, pdf);
+//            wi = reflect(-wo, to_world(h, nor));
 
 //            wi = simple_sample(pdf);
 //            wi = to_world(wi, nor);
 
-//            wi = importance_sample_skybox(pdf);
+            wi = importance_sample_skybox(pdf);
 
             vec3 f_r = bxdf(m1, wi, wo, nor, uv);
 
@@ -574,7 +572,7 @@ vec3 shade(Ray ray) {
             history *= f_r * abs(dot(nor, wi)) / pdf / RussianRoulette;
             Triangle tr3 = get_triangle(test.t_index);
             Material m3 = get_material(tr3.m_index);
-            if(!m3.is_emit) {
+            if(test.t_index != light_t_index) {
                 inter1 = test;
                 tr1 = tr3;
                 m1 = m3;
