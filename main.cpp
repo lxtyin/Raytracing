@@ -91,7 +91,7 @@ void update(float dt) {
 	if(glfwGetKey(window, GLFW_KEY_LEFT)) camera->transform.rotation += vec3(0, -dt, 0);
 	if(glfwGetKey(window, GLFW_KEY_UP)) camera->transform.rotation += vec3(-dt, 0, 0);
 	if(glfwGetKey(window, GLFW_KEY_DOWN)) camera->transform.rotation += vec3(dt, 0, 0);
-	if(glfwGetKey(window, GLFW_KEY_ESCAPE)) glfwSetWindowShouldClose(window, GL_TRUE);
+	if(glfwGetKey(window, GLFW_KEY_Q)) glfwSetWindowShouldClose(window, GL_TRUE);
 }
 
 void init() {

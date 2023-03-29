@@ -587,7 +587,7 @@ void main() {
     // mix last frame
     vec3 last_col = texture(last_frame_texture, screen_uv).xyz;
 
-//    color_out = vec4(result, 1.0);
-    color_out = vec4(mix(last_col, result, 1.0 / frameCounter), 1); // 所有帧混合
+    color_out = vec4(result, 1.0);
+//    color_out = vec4(mix(last_col, result, 1.0 / frameCounter), 1); // 所有帧混合
 //    color_out = vec4(mix(last_col, result, 0.2), 1); // 所有帧混合
 }
