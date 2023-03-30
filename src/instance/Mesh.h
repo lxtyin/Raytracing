@@ -12,6 +12,7 @@ using std::vector;
 
 class Mesh {
 public:
+    string name = "A Mesh";
     vector<Triangle> triangles;    /**< triangles in local space >**/
     Material* material;        /**< material resource. */
 };

@@ -3,7 +3,7 @@
 */
 #version 330 core
 
-#define M_SIZ 7    // 一个material占的vec3数量
+#define M_SIZ 8    // 一个material占的vec3数量
 #define T_SIZ 9    // 一个triangle占的vec3数量
 #define B_SIZ 3    // 一个bvhnode占的vec3数量
 #define INF 1E18
@@ -179,14 +179,16 @@ Material get_material(int i) {
     tmp = texelFetch(materials, i * M_SIZ + 5).xyz;
     r.clearcoat_gloss = tmp.x;
     r.anisotropic = tmp.y;
-    r.diffuse_map_idx = int(tmp.z);
+    r.index_of_refraction = tmp.z;
     tmp = texelFetch(materials, i * M_SIZ + 6).xyz;
+    r.spec_trans = tmp.x;
+
+    r.diffuse_map_idx = int(tmp.z);
+    tmp = texelFetch(materials, i * M_SIZ + 7).xyz;
     r.metalness_map_idx = int(tmp.x);
     r.roughness_map_idx = int(tmp.y);
     r.normal_map_idx = int(tmp.z);
 
-    r.index_of_refraction = 1.33;
-    r.spec_trans = 0.7;
     return r;
 }
 
@@ -274,7 +276,6 @@ Intersect intersect_triangle(Ray ray, int i) {
     if(RAY_EPS < t && 0 < u && 0 < v && u + v < 1) {
         vec3 pos = ray.ori + t * ray.dir;
         vec3 nor = normalize(tri.normal[0] * (1 - u - v) + tri.normal[1] * u + tri.normal[2] * v);
-        //        if(dot(ray.dir, nor) > 0) nor = -nor;
         return Intersect(true, pos, nor, i, u, v, t);
     } else {
         return nointersect;
@@ -362,7 +363,7 @@ float spherical_sample_pdf() {
 }
 
 // D项 半法线 重要性采样 半球面
-vec3 GTR2_sample(Material m, vec2 uv, vec3 nor, out float pdf) {
+vec3 GTR2_sample(Material m, vec2 uv, vec3 nor) {
     float m_roughness = get_roughness(m, uv);
     float alpha2 = max(0.01, m_roughness * m_roughness);
     float x = rand();
@@ -372,7 +373,6 @@ vec3 GTR2_sample(Material m, vec2 uv, vec3 nor, out float pdf) {
     float phi = rand() * 2 * PI;
     float r = sqrt(1. - cos2);
 
-    pdf = 2. * alpha2 * cos_theta / pow2(cos2 * (alpha2 - 1.) + 1.) / (2 * PI);
     vec3 h = normalize(vec3(r * cos(phi), r * sin(phi), cos_theta));
     return to_world(h, nor);
 }
@@ -433,7 +433,7 @@ float fresnel(float cosI, float etaI, float etaT) {
 
 // L(in), N(same direction with L), V(out)
 vec3 btdf(Material m, vec3 L, vec3 V, vec3 N, vec2 uv, float ior1, float ior2) {
-
+    if(m.spec_trans < EPS) return vec3(0);
     float NdotL = dot(N, L);
     float NdotV = dot(N, V);
     if(NdotL <= 0 || NdotV >= 0) return vec3(0);
@@ -447,8 +447,6 @@ vec3 btdf(Material m, vec3 L, vec3 V, vec3 N, vec2 uv, float ior1, float ior2) {
 
     float m_roughness = get_roughness(m, uv);
     float m_metallic = get_metallic(m, uv);
-    m_roughness = 0.1;
-    m_metallic = 0.5;
 
     vec3 m_transmission = sqrt(get_diffuse_color(m, uv)) * m.spec_trans;
 
@@ -554,15 +552,18 @@ vec3 shade(Ray ray) {
         // IBL
         if(rand() < RussianRoulette) {
 
-            vec3 h = GTR2_sample(m1, uv, nor, pdf);
-            vec3 wi = reflect(-wo, h);      // 反射方向
-//            float eta = 1.0 / m1.index_of_refraction;
-//            if(dot(wo, nor) < 0) eta = 1.0 / eta;
-//            wi = reflect(-wo, h, eta); // 折射方向
-//            pdf = GTR2_sample_pdf(m1, uv, nor, h);
+            vec3 h = GTR2_sample(m1, uv, nor);
+            pdf = GTR2_sample_pdf(m1, uv, nor, h);
+//            vec3 wi = reflect(-wo, h * sign(dot(wo, h)));      // 反射方向
+//            pdf /= 4 * abs(dot(h, wi));
 
-            //            wi = simple_sample(pdf);
-            //            wi = to_world(wi, nor);
+            float eta = 1.0 / m1.index_of_refraction;
+            if(dot(wo, h) < 0) eta = 1.0 / eta;
+            vec3 wi = refract(-wo, h, eta); // 折射方向
+//            pdf /= 4 * abs(dot(h, wi));
+
+//            vec3 wi = spherical_sample();
+//            pdf = spherical_sample_pdf();
 
 //            vec3 wi = skybox_sample();
 //            pdf = skybox_sample_pdf(wi);

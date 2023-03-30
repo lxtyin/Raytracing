@@ -10,6 +10,8 @@
 
 class Material {
 public:
+    string name = "A Material";
+
     vec3 base_color = vec3(1, 0, 1);
     vec3 emission = vec3(100);
     bool is_emit = false;
@@ -23,11 +25,18 @@ public:
     float clearcoat = 0;
     float clearcoat_gloss = 0;
     float anisotropic = 0;
+    float index_of_refraction = 1;
+    float spec_trans = 0;
 
     Texture *diffuse_map = nullptr;
     Texture *metalness_map = nullptr;
     Texture *roughness_map = nullptr;
     Texture *normal_map = nullptr;
+
+    /**
+     * Insert this material into current image gui.
+     */
+    void insert_gui();
 };
 
 

@@ -20,6 +20,8 @@ public:
     vector<Mesh> world_meshes;    /**< meshes in world space >**/
     BVHNode* bvh_root = nullptr;
 
+    explicit Scene(const string &nm);
+
     /**
      * refatch all meshes an reload bvh
      */

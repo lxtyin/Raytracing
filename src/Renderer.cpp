@@ -57,7 +57,8 @@ void Renderer::reload_meshes(Scene *scene) {
         material_buff.emplace_back(m->is_emit, m->metallic, m->roughness);
         material_buff.emplace_back(m->specular, m->specular_tint, m->sheen);
         material_buff.emplace_back(m->sheen_tint, m->subsurface, m->clearcoat);
-        material_buff.emplace_back(m->clearcoat_gloss, m->anisotropic, diffuse_map_idx);
+        material_buff.emplace_back(m->clearcoat_gloss, m->anisotropic, m->index_of_refraction);
+        material_buff.emplace_back(m->spec_trans, 0, diffuse_map_idx);
         material_buff.emplace_back(metalness_map_idx, roughness_map_idx, normal_map_idx);
         for(auto &t: mesh.triangles) {
             for(auto & v : t.vertex) triangle_buff.emplace_back(v);

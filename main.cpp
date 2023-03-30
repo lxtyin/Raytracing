@@ -7,11 +7,13 @@
 #include "src/tool/tool.h"
 #include "src/Config.h"
 #include "src/tool/loader.h"
-#include "src/texture/CubeBox.h"
-#include "src/texture/Texture.h"
 #include "src/texture/HDRTexture.h"
+#include "imgui/imgui.h"
+#include "imgui/backend/imgui_impl_glfw.h"
+#include "imgui/backend/imgui_impl_opengl3.h"
 using namespace std;
 
+// 一些状态 ------
 GLFWwindow *window;
 Renderer *pass1;
 RenderPass *pass2, *pass3;
@@ -19,10 +21,13 @@ Scene *scene;
 Instance *camera;
 HDRTexture* skybox;
 
+// ----
+
+
 void mouse_callback(GLFWwindow* window, double xpos, double ypos) {
     static double mouse_lastX = xpos, mouse_lastY = ypos;
     static int mouse_button = GLFW_RELEASE;
-    int nw_button = glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_1);
+    int nw_button = glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_2);
     if(mouse_button == GLFW_RELEASE && nw_button == GLFW_PRESS) {
         mouse_lastX = xpos, mouse_lastY = ypos;
     }
@@ -49,6 +54,7 @@ void update(float dt) {
         glUniform1i(glGetUniformLocation(pass1->shaderProgram, "SCREEN_W"), SCREEN_W);
         glUniform1i(glGetUniformLocation(pass1->shaderProgram, "SCREEN_H"), SCREEN_H);
         if(glfwGetKey(window, GLFW_KEY_R)) {
+            pass1->reload_meshes(scene);
             glUniform1i(glGetUniformLocation(pass1->shaderProgram, "fast_shade"), false);
         } else {
             frame = 1;
@@ -116,7 +122,7 @@ void init() {
     pass2 = new RenderPass("shader/blur.frag", 1);
     pass3 = new RenderPass("shader/direct.frag", 0, true);
 
-    scene = new Scene;
+    scene = new Scene("Scene");
     camera = new Instance;
     {
         Instance *o1 = Loader::load_model("model/casa_obj.glb");
@@ -151,40 +157,65 @@ void init() {
 int main(int argc, const char* argv[]) {
 
     glfwInit();
-    //设置各种选项值
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);//主版本号
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);//次版本号
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);//使用核心渲染模式
 
     //创建窗口，放入上下文中
     window = glfwCreateWindow(SCREEN_W, SCREEN_H, "My Window", NULL, NULL);
+    glfwSetWindowPos(window, 500, 200);
     glfwMakeContextCurrent(window);
-
-    //openGL本质是一个巨大的状态机，很多内容都是通过设置来完成的
-    //注册回调函数
-    //glfwSetCursorPosCallback(window, mouse_callback);
-    //设置鼠标模式
+    glfwSwapInterval(1); // Enable vsync
     glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
-
     glfwSetCursorPosCallback(window, mouse_callback);
 
     //初始化glad
     gladLoadGLLoader((GLADloadproc)glfwGetProcAddress);
     glDisable(GL_DEPTH_TEST);
 
+    IMGUI_CHECKVERSION();
+    ImGui::CreateContext();
+    ImGuiIO& io = ImGui::GetIO(); (void)io;
+    io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
+    ImGui::StyleColorsDark();
+    ImGui_ImplGlfw_InitForOpenGL(window, true);
+    ImGui_ImplOpenGL3_Init("#version 130");
+
     init();
 
+    bool show_imgui = true;
     float last_time = glfwGetTime(), detaTime;
     while(!glfwWindowShouldClose(window)) {
         detaTime = glfwGetTime() - last_time;
         last_time += detaTime;
+        glfwPollEvents();	//检查有没有发生事件，调用相应回调函数
+
         update(detaTime);
 
+        ImGui_ImplOpenGL3_NewFrame();
+        ImGui_ImplGlfw_NewFrame();
+        ImGui::NewFrame();
+
+//        ImGui::ShowDemoWindow(&show_imgui);
+        if (show_imgui) {
+            ImGui::Begin("Editor", &show_imgui);
+            scene->insert_gui();
+            ImGui::End();
+        }
+
+        ImGui::Render();
+        int display_w, display_h;
+        glfwGetFramebufferSize(window, &display_w, &display_h);
+        glViewport(0, 0, display_w, display_h);
+        ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+
         glfwSwapBuffers(window); //交换两层颜色缓冲
-        glfwPollEvents();	//检查有没有发生事件，调用相应回调函数
     }
 
-    //释放所有资源
+    //释放资源
+    ImGui_ImplOpenGL3_Shutdown();
+    ImGui_ImplGlfw_Shutdown();
+    ImGui::DestroyContext();
     glfwTerminate();
     return 0;
 }

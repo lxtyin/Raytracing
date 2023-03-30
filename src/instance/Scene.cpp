@@ -33,3 +33,5 @@ void Scene::reload() {
     std::cout << "BVH depth:" << bvh_root->depth << std::endl;
 }
 
+Scene::Scene(const string &nm): Instance(nm, nullptr) {}
+

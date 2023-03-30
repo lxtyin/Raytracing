@@ -39,6 +39,7 @@ namespace Loader{
 
 	Material* processMaterial(aiMaterial *mat, const aiScene *scene){
         Material* result = new Material;
+        result->name = mat->GetName().C_Str();
 
 		// 获取各项属性
 		aiColor3D color;
@@ -88,6 +89,7 @@ namespace Loader{
 
 	Mesh* processMesh(aiMesh *mesh, const aiScene *scene) {
 		Mesh *result = new Mesh;
+        result->name = mesh->mName.C_Str();
 
         vector<vec3> vertexs;
         vector<vec2> uvs;
@@ -121,6 +123,7 @@ namespace Loader{
 
 	Instance* processNode(aiNode *node, const aiScene *scene) {
 		Instance *cur = new Instance;
+        cur->name = node->mName.C_Str();
 
 		aiVector3D position, rotation, scale;
 		node->mTransformation.Decompose(scale, rotation, position);
