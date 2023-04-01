@@ -19,5 +19,5 @@ set(CMAKE_CXX_STANDARD 17)
 
 include_directories(include)
 link_directories(lib)
-add_executable(path_tracing ${SRC_FILES} src/texture/SimpleTexture.cpp src/texture/SimpleTexture.h src/texture/CubeBox.cpp src/texture/CubeBox.h src/texture/HDRTexture.cpp src/texture/HDRTexture.h)
+add_executable(path_tracing ${SRC_FILES})
 target_link_libraries(path_tracing opengl32 glu32 libglfw3.a libzlibstatic.a libassimp.dll.a)

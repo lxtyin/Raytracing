@@ -14,6 +14,8 @@ void Material::insert_gui() {
 
         ImGui::SliderFloat("Roughness", &roughness, 0, 1);
         ImGui::SliderFloat("Metallic", &metallic, 0, 1);
+		ImGui::SliderFloat("Specular", &specular, 0, 1);
+		ImGui::SliderFloat("SpecularTint", &specular_tint, 0, 1);
         ImGui::SliderFloat("IndexOfRefraction", &index_of_refraction, 1, 3);
         ImGui::SliderFloat("SpecTrans", &spec_trans, 0, 1);
         
