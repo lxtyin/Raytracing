@@ -86,6 +86,16 @@ vec3 powv(vec3 v, float n) {
     return vec3(pow(v.x, n), pow(v.y, n), pow(v.z, n));
 }
 
+// Inside Normal
+vec3 refract(vec3 I, vec3 N, float eta) {
+    float c1 = dot(N, -I);
+    float s1 = sqrt(1 - c1 * c1);
+    float s2 = s1 / eta;
+    if(s2 < 0 || s2 > 1) return vec3(0); // full reflect
+    float c2 = sqrt(1 - s2 * s2);
+    return -N * c2 + (I + N * c1) / eta;
+}
+
 // v原先在n = +z下表示
 vec3 to_world(vec3 v, vec3 n) {
     vec3 help = vec3(1, 0, 0);
@@ -226,7 +236,7 @@ float get_metallic(Material m, vec2 uv) {
 }
 float get_roughness(Material m, vec2 uv) {
     if(m.roughness_map_idx == -1) return max(0.01f, m.roughness);
-    return max(0.01f, texture(texture_list[m.roughness_map_idx], uv).x);
+    return max(0.001f, texture(texture_list[m.roughness_map_idx], uv).x);
 }
 
 // intersect
@@ -484,7 +494,7 @@ vec3 btdf(Material m, vec3 L, vec3 V, vec3 N, vec2 uv, float ior1, float ior2) {
     float Gs = smithG_GGX(abs(NdotL), m_roughness);
     Gs *= smithG_GGX(abs(NdotV), m_roughness);
 
-    vec3 refraction = abs((LdotH * VdotH * pow2(eta) * Gs * iFs * Ds * m_transmission)
+    vec3 refraction = abs((LdotH * VdotH * pow2(eta) * Ds * m_transmission) // ignore F and G tmporary
     / (NdotV * NdotL * pow2(sqrtDenom)));
 
     return refraction;
@@ -576,41 +586,35 @@ vec3 shade(Ray ray) {
         tr1.uv[1] * isect.u + tr1.uv[2] * isect.v;
 
         // IBL
+        vec3 wi = skybox_sample(pdf);
+        Intersect tsect = get_intersect(Ray(pos, wi));
+        if(!tsect.exist) {
+            vec3 f_r = bxdf(m1, wi, wo, nor, uv);
+            vec3 recv_col = get_background_color(wi) * f_r * abs(dot(nor, wi)) / pdf;
+            result += history * recv_col;
+        }
+
+        // indirect light
         if(rand() < RussianRoulette) {
 
             // Multiple Sampling
 
-//            vec3 wi = skybox_sample(pdf);
-//            vec3 wi = reflect_sample(m1, uv, wo, nor, pdf);
-            vec3 wi = refract_sample(m1, uv, wo, nor, pdf);
-            if(pdf < 0) return vec3(100, 0, 0);
-
-//            vec3 wi;
-//            if(rand() < 0.5) {
-//                if(rand() < m1.spec_trans) {
-//                    wi = refract_sample(m1, uv, wo, nor, pdf);
-//                    if(wi == vec3(0, 0, 0)) break;
-//                } else {
-//                    wi = reflect_sample(m1, uv, wo, nor, pdf);
-//                }
-//            } else {
-//                wi = skybox_sample(pdf);
-//            }
+            if(rand() < m1.spec_trans) {
+                wi = refract_sample(m1, uv, wo, nor, pdf);
+                if(pdf < 0) break;
+            } else {
+                wi = reflect_sample(m1, uv, wo, nor, pdf);
+            }
 
             vec3 f_r = bxdf(m1, wi, wo, nor, uv);
 
-            ray = Ray(pos, wi);
-            Intersect test = get_intersect(ray);
-            if(!test.exist) {
-                vec3 recv_col = get_background_color(wi) * f_r * abs(dot(nor, wi)) / pdf / RussianRoulette;
-                result += history * recv_col;
-                break;
-            }
+            tsect = get_intersect(Ray(pos, wi));
+            if(!tsect.exist) break;
 
             history *= f_r * abs(dot(nor, wi)) / pdf / RussianRoulette;
-            tr1 = get_triangle(test.t_index);
+            tr1 = get_triangle(tsect.t_index);
             m1 = get_material(tr1.m_index);
-            isect = test;
+            isect = tsect;
         } else break;
     }
     return result;

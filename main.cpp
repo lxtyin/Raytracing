@@ -145,7 +145,7 @@ void init() {
 
     }
 
-    skybox = new HDRTexture("img/table_mountain_2_puresky_1k.hdr");
+    skybox = new HDRTexture("img/kloofendal_48d_partly_cloudy_puresky_2k.hdr");
 
     camera->transform.rotation.y = M_PI;
     camera->transform.position = vec3(1, 1, 1);

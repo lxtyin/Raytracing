@@ -12,7 +12,7 @@ void Material::insert_gui() {
         ImGui::ColorEdit3("Base Color", col1);
         base_color = {col1[0], col1[1], col1[2]};
 
-        ImGui::SliderFloat("Roughness", &roughness, 0, 1);
+        ImGui::SliderFloat("Roughness", &roughness, 0.001, 1);
         ImGui::SliderFloat("Metallic", &metallic, 0, 1);
 		ImGui::SliderFloat("Specular", &specular, 0, 1);
 		ImGui::SliderFloat("SpecularTint", &specular_tint, 0, 1);
