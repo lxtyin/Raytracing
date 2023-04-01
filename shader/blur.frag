@@ -5,6 +5,8 @@ uniform int SCREEN_H;
 uniform sampler2D prev_color;
 uniform sampler2D prev_albedo;
 uniform sampler2D prev_normal;
+uniform sampler2D last_frame_texture;
+uniform uint frameCounter;
 
 in vec2 screen_uv;
 out vec4 FragColor;
@@ -18,6 +20,7 @@ float len22(vec2 x) {
 
 void main() {
 
+    // blur
     vec3 color = texture(prev_color, screen_uv).xyz;
     vec3 normal = texture(prev_normal, screen_uv).xyz;
     vec3 albedo = texture(prev_albedo, screen_uv).xyz;
@@ -54,5 +57,20 @@ void main() {
     }
     if(totw == 0) res = color;
     else res /= totw;
+
+    // avoid seldom black Hole
+    if(any(isnan(res))) res = vec3(0);
+
+    // tone mapping
+    res = res / (res + 1);
+
+    // gamma correct
+    res.x = pow(res.x, 0.45f);
+    res.y = pow(res.y, 0.45f);
+    res.z = pow(res.z, 0.45f);
+
+    // mix last frame
+    vec3 last_col = texture(last_frame_texture, screen_uv).xyz;
+    res = mix(last_col, res, 1.0 / frameCounter);
     FragColor = vec4(res, 1);
 }

@@ -26,6 +26,7 @@ public:
     vector<uint> attach_textures;
     uint shaderProgram = 0;
 
+	// set attach_num = 0 when to_screen is true, or there's inexplicable bug.
     explicit RenderPass(const string &frag_shader_path, int attach_num = 0, bool to_screen = false);
 
     /** 将texture绑定到对应的uniform sampler变量上

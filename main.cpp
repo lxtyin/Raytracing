@@ -44,51 +44,52 @@ void mouse_callback(GLFWwindow* window, double xpos, double ypos) {
 
 void update(float dt) {
 
-    static uint frame = 1, last_frame_tex = 0;
+    static uint frame = 0, last_frame_tex = 0;
+	frame++;
 
     // 渲染管线
     pass1->use();
     {
+		if(glfwGetKey(window, GLFW_KEY_R)) {
+			pass1->reload_meshes(scene);
+			glUniform1i(glGetUniformLocation(pass1->shaderProgram, "fast_shade"), false);
+		} else {
+			frame = 1;
+			glUniform1i(glGetUniformLocation(pass1->shaderProgram, "fast_shade"), true);
+		}
+
+		pass1->bind_texture("skybox", skybox->TTO);
+		pass1->bind_texture("skybox_samplecache", skybox->sample_cache_tto);
         glUniformMatrix4fv(glGetUniformLocation(pass1->shaderProgram, "v2w_mat"), 1, GL_FALSE, glm::value_ptr(camera->matrix_to_global()));
-        glUniform1ui(glGetUniformLocation(pass1->shaderProgram, "frameCounter"), frame++);
         glUniform1i(glGetUniformLocation(pass1->shaderProgram, "SCREEN_W"), SCREEN_W);
         glUniform1i(glGetUniformLocation(pass1->shaderProgram, "SCREEN_H"), SCREEN_H);
-        if(glfwGetKey(window, GLFW_KEY_R)) {
-            pass1->reload_meshes(scene);
-            glUniform1i(glGetUniformLocation(pass1->shaderProgram, "fast_shade"), false);
-        } else {
-            frame = 1;
-            glUniform1i(glGetUniformLocation(pass1->shaderProgram, "fast_shade"), true);
-        }
-
-        pass1->bind_texture("last_frame_texture", last_frame_tex);
-        pass1->bind_texture("skybox", skybox->TTO);
-        pass1->bind_texture("skybox_samplecache", skybox->sample_cache_tto);
+		glUniform1ui(glGetUniformLocation(pass1->shaderProgram, "frameCounter"), frame);
         glUniform1f(glGetUniformLocation(pass1->shaderProgram, "skybox_Light_SUM"), skybox->Light_SUM);
         glUniform1i(glGetUniformLocation(pass1->shaderProgram, "SKY_W"), skybox->width);
         glUniform1i(glGetUniformLocation(pass1->shaderProgram, "SKY_H"), skybox->height);
     }
     pass1->draw();
 
-//    pass2->use();
-//    {
-//        glUniform1i(glGetUniformLocation(pass2->shaderProgram, "SCREEN_W"), SCREEN_W);
-//        glUniform1i(glGetUniformLocation(pass2->shaderProgram, "SCREEN_H"), SCREEN_H);
-//        pass2->bind_texture("prev_color", pass1->attach_textures[0]);
-//        pass2->bind_texture("prev_albedo", pass1->attach_textures[1]);
-//        pass2->bind_texture("prev_normal", pass1->attach_textures[2]);
-//    }
-//    pass2->draw();
+    pass2->use();
+    {
+        glUniform1i(glGetUniformLocation(pass2->shaderProgram, "SCREEN_W"), SCREEN_W);
+        glUniform1i(glGetUniformLocation(pass2->shaderProgram, "SCREEN_H"), SCREEN_H);
+		glUniform1ui(glGetUniformLocation(pass2->shaderProgram, "frameCounter"), frame);
+		pass2->bind_texture("last_frame_texture", last_frame_tex);
+        pass2->bind_texture("prev_color", pass1->attach_textures[0]);
+        pass2->bind_texture("prev_albedo", pass1->attach_textures[1]);
+        pass2->bind_texture("prev_normal", pass1->attach_textures[2]);
+    }
+    pass2->draw();
+	last_frame_tex = pass2->attach_textures[0];
 
     pass3->use();
     {
-        glUniform1i(glGetUniformLocation(pass3->shaderProgram, "SCREEN_W"), SCREEN_W);
-        glUniform1i(glGetUniformLocation(pass3->shaderProgram, "SCREEN_H"), SCREEN_H);
-        pass3->bind_texture("prev_texture", pass1->attach_textures[0]);
+		pass3->bind_texture("prev_texture", pass2->attach_textures[0]);
     }
     pass3->draw();
-    last_frame_tex = pass1->attach_textures[0];
-    //--------
+
+    //--------------------------------------
 
     static float tot_dt = 0;
     tot_dt += dt;
@@ -127,12 +128,25 @@ void init() {
     {
         Instance *o1 = Loader::load_model("model/casa_obj.glb");
         o1->transform.rotation = vec3(M_PI / 2, 0, 0);
-        scene->add_child(o1);
+
+		// pre setting
+		Material *m1 = o1->get_child(0)->get_child(1)->meshes[0]->material;
+		m1->roughness = 0.001;
+		m1->metallic = 1;
+		m1->index_of_refraction = 1.25;
+		m1->spec_trans = 1;
+		Material *m2 = o1->get_child(0)->get_child(3)->meshes[0]->material;
+		m2->roughness = 0.001;
+		m2->metallic = 0.6;
+		m2->index_of_refraction = 1.01;
+		m2->spec_trans = 0.5;
+
+		scene->add_child(o1);
 
         Instance *light= Loader::load_model("model/light.obj");
         light->transform.scale = vec3(30, 30, 30);
         light->transform.position = vec3(0, 100, 0);
-        light->get_child(0)->meshes[0]->material->emission = vec3(1);
+        light->get_child(0)->meshes[0]->material->emission = vec3(5);
         light->get_child(0)->meshes[0]->material->is_emit = true;
         scene->add_child(light);
 

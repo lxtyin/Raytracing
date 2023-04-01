@@ -1,3 +1,3 @@
 在shader上写的path tracing
 
-仍在施工&优化
+![](http://lxtyin.ac.cn/img/RayTracing/3.1.png)

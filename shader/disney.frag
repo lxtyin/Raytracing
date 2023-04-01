@@ -30,7 +30,7 @@ uniform int triangle_num;
 uniform mat4 v2w_mat;
 
 uniform float RussianRoulette = 0.9;
-uniform int SPP = 1;
+uniform int SPP = 3;
 uniform float fov = PI / 3;
 uniform bool fast_shade = true; // 仅渲染diffuse_color
 
@@ -377,7 +377,7 @@ vec3 spherical_sample(out float pdf) {
 // D项 半法线 重要性采样 半球面
 vec3 GTR2_sample_h(Material m, vec2 uv, vec3 nor, out float pdf) {
     float m_roughness = get_roughness(m, uv);
-    float alpha2 = max(0.01, m_roughness * m_roughness);
+    float alpha2 = m_roughness * m_roughness;
     float x = rand();
 
     float cos_theta = sqrt((1. - x) / (x * (alpha2 - 1) + 1));
@@ -653,10 +653,5 @@ void main() {
     for(int i = 0;i < SPP;i++) result += shade(ray);
     result /= SPP;
 
-    // mix last frame
-    vec3 last_col = texture(last_frame_texture, screen_uv).xyz;
-
-//        color_out = vec4(result, 1.0);
-    color_out = vec4(mix(last_col, result, 1.0 / frameCounter), 1); // 所有帧混合
-    //    color_out = vec4(mix(last_col, result, 0.2), 1); // 所有帧混合
+    color_out = vec4(result, 1.0);
 }
