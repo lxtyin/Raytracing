@@ -3,6 +3,7 @@
 //
 
 #include "tool.h"
+#include "../Config.h"
 #include "stb_image.h"
 #include "glad/glad.h"
 #include <fstream>

@@ -8,8 +8,9 @@
 using std::string;
 using std::vector;
 using uint = unsigned int;
+using uchar = unsigned char;
 
-//纹理对象，一张图片
+//纹理对象，一张图片，可以是各种类型
 class Texture{
 public:
     uint TTO;

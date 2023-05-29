@@ -7,17 +7,20 @@
 
 #include "Texture.h"
 
+// 简单图片
 class SimpleTexture: public Texture {
     void load();
 public:
     int width;
     int height;
     int channel;
-    vector<uint> data;
+    vector<uchar> data;
 
     explicit SimpleTexture(const string &imagePath);
 
-    SimpleTexture(int width, int height, int channel, vector<uint> &data);
+    SimpleTexture(int width, int height, int channel, vector<uchar> &data);
+
+	void savephoto(const string &path);
 };
 
 

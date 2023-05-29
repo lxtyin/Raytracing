@@ -14,7 +14,7 @@ namespace Loader{
 	//loading directory
 	string directory;
 
-	Texture* processImage(const string &name, const aiScene *scene){
+	SimpleTexture* processImage(const string &name, const aiScene *scene){
 		int width, height, channel;
 		if(name[0] == '*'){
 			// embedded texture
@@ -26,7 +26,7 @@ namespace Loader{
 				&height,
 				&channel, 0);
 
-			vector<uint> data(width * height * channel);
+			vector<uchar> data(width * height * channel);
 			memcpy(data.data(), buff, data.size());
 			stbi_image_free(buff);
 			return new SimpleTexture(width, height, channel, data);
@@ -68,17 +68,13 @@ namespace Loader{
 //            }
         }
         if(AI_SUCCESS == mat->Get(AI_MATKEY_TEXTURE(aiTextureType_DIFFUSE_ROUGHNESS, 0), str)) {
-//            result->roughness_map = processImage(str.C_Str(), scene);
-            std::cout << "roughness_map" << std::endl;
+            result->roughness_map = processImage(str.C_Str(), scene);
         }
         if(AI_SUCCESS == mat->Get(AI_MATKEY_TEXTURE(aiTextureType_METALNESS, 0), str)) {
-//            result->metalness_map = processImage(str.C_Str(), scene);
-            std::cout << "metalness_map" << std::endl;
-            result->metallic = 0.7;
-            result->roughness = 0.1;
+            result->metalness_map = processImage(str.C_Str(), scene);
         }
         if(AI_SUCCESS == mat->Get(AI_MATKEY_TEXTURE(aiTextureType_NORMALS, 0), str)){
-//            result->normal_map = processImage(str.C_Str(), scene);
+            result->normal_map = processImage(str.C_Str(), scene);
         }
         if(AI_SUCCESS == mat->Get(AI_MATKEY_TEXTURE(aiTextureType_BASE_COLOR, 0), str)){
             result->diffuse_map = processImage(str.C_Str(), scene);

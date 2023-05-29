@@ -1,9 +1,7 @@
-/*
-    This version samples directional light by light_triangle_index.
-*/
+
 #version 330 core
 
-#define M_SIZ 7    // 一个material占的vec3数量
+#define M_SIZ 8    // 一个material占的vec3数量
 #define T_SIZ 9    // 一个triangle占的vec3数量
 #define B_SIZ 3    // 一个bvhnode占的vec3数量
 #define INF 1E18
@@ -16,10 +14,9 @@ in float pixel_x;
 in float pixel_y;
 in vec2 screen_uv;
 
-layout(location = 0) out vec4 color_out;
-layout(location = 1) out vec4 albedo_out;
-layout(location = 2) out vec4 normal_out;
-
+layout(location = 0) out vec3 color_out;
+layout(location = 1) out vec3 albedo_out;
+layout(location = 2) out vec3 normal_out;
 
 // memory
 // ---------------------------------------------- //
@@ -32,20 +29,20 @@ uniform int light_t_num;
 uniform int triangle_num;
 uniform mat4 v2w_mat;
 
-uniform float RussianRoulette = 0.8;
+uniform float RussianRoulette = 0.9;
 uniform int SPP = 1;
 uniform float fov = PI / 3;
 uniform bool fast_shade = true; // 仅渲染diffuse_color
 
 uniform int SCREEN_W;
 uniform int SCREEN_H;
-uniform uint frameCounter;
-uniform sampler2D last_frame_texture;
+uniform sampler2D texture_list[25];
 uniform sampler2D skybox;
 uniform sampler2D skybox_samplecache;
-uniform sampler2D texture_list[25];
+uniform float skybox_Light_SUM;
 uniform int SKY_W;
 uniform int SKY_H;
+uniform uint frameCounter;
 
 // math
 // ---------------------------------------------- //
@@ -53,9 +50,9 @@ int stack[256];
 int stack_h = 0;
 
 uint seed = uint(
-    uint(pixel_x + SCREEN_W / 2) * uint(1973) +
-    uint(pixel_y + SCREEN_H / 2) * uint(9277) +
-    uint(frameCounter) * uint(26699)) | uint(1);
+uint(pixel_x + SCREEN_W / 2) * uint(1973) +
+uint(pixel_y + SCREEN_H / 2) * uint(9277) +
+uint(frameCounter) * uint(26699)) | uint(1);
 
 uint wang_hash(inout uint seed) {
     seed = uint(seed ^ uint(61)) ^ uint(seed >> uint(16));
@@ -71,10 +68,12 @@ float rand() {
 }
 
 int roundint(float x) {
-    if(x < 0) return int(x - 0.5);
-    else return int(x + 0.5);
+    float b = step(x, 0);
+    return int(x - b + 0.5);
 }
-
+float len2(vec3 x) {
+    return x.x * x.x + x.y * x.y + x.z * x.z;
+}
 float pow2(float x) {
     return x * x;
 }
@@ -84,6 +83,16 @@ float pow5(float x) {
 }
 vec3 powv(vec3 v, float n) {
     return vec3(pow(v.x, n), pow(v.y, n), pow(v.z, n));
+}
+
+// Inside Normal
+vec3 refract(vec3 I, vec3 N, float eta) {
+    float c1 = dot(N, -I);
+    float s1 = sqrt(1 - c1 * c1);
+    float s2 = s1 / eta;
+    if(s2 < 0 || s2 > 1) return vec3(0); // full reflect
+    float c2 = sqrt(1 - s2 * s2);
+    return -N * c2 + (I + N * c1) / eta;
 }
 
 // v原先在n = +z下表示
@@ -120,7 +129,7 @@ struct Material {
     float clearcoat;
     float clearcoat_gloss;
     float anisotropic;
-    float index_of_refraction;
+    float index_of_refraction; // assert No adjacent transparent objects
     float spec_trans;
 
     int diffuse_map_idx;
@@ -180,14 +189,16 @@ Material get_material(int i) {
     tmp = texelFetch(materials, i * M_SIZ + 5).xyz;
     r.clearcoat_gloss = tmp.x;
     r.anisotropic = tmp.y;
-    r.diffuse_map_idx = int(tmp.z);
+    r.index_of_refraction = max(1.0001, tmp.z); // correct
     tmp = texelFetch(materials, i * M_SIZ + 6).xyz;
+    r.spec_trans = tmp.x;
+
+    r.diffuse_map_idx = int(tmp.z);
+    tmp = texelFetch(materials, i * M_SIZ + 7).xyz;
     r.metalness_map_idx = int(tmp.x);
     r.roughness_map_idx = int(tmp.y);
     r.normal_map_idx = int(tmp.z);
 
-    r.index_of_refraction = 1.33;
-    r.spec_trans = 0.7;
     return r;
 }
 
@@ -214,17 +225,23 @@ vec3 get_background_color(vec3 v) {
     return res; // hdr不需要grammar矫正
 }
 
-vec3 get_diffuse_color(Material m, vec2 uv) {
+vec3 get_diffuse_color(in Material m, vec2 uv) {
     if(m.diffuse_map_idx == -1) return m.base_color;
     return powv(texture(texture_list[m.diffuse_map_idx], uv).rgb, 2.2f);
 }
-float get_metallic(Material m, vec2 uv) {
+float get_metallic(in Material m, vec2 uv) {
     if(m.metalness_map_idx == -1) return m.metallic;
     return texture(texture_list[m.metalness_map_idx], uv).x;
 }
-float get_roughness(Material m, vec2 uv) {
+float get_roughness(in Material m, vec2 uv) {
     if(m.roughness_map_idx == -1) return max(0.01f, m.roughness);
-    return max(0.01f, texture(texture_list[m.roughness_map_idx], uv).x);
+    return max(0.001f, texture(texture_list[m.roughness_map_idx], uv).x);
+}
+
+// 参数中u，v为重心坐标，输出为纹理映射（uv）的插值
+vec2 interpolate_uv(in Triangle tr1, float u, float v) {
+    return tr1.uv[0] * (1 - u - v) +
+    tr1.uv[1] * u + tr1.uv[2] * v;
 }
 
 // intersect
@@ -275,7 +292,6 @@ Intersect intersect_triangle(Ray ray, int i) {
     if(RAY_EPS < t && 0 < u && 0 < v && u + v < 1) {
         vec3 pos = ray.ori + t * ray.dir;
         vec3 nor = normalize(tri.normal[0] * (1 - u - v) + tri.normal[1] * u + tri.normal[2] * v);
-//        if(dot(ray.dir, nor) > 0) nor = -nor;
         return Intersect(true, pos, nor, i, u, v, t);
     } else {
         return nointersect;
@@ -315,14 +331,14 @@ Intersect get_intersect(Ray ray) {
 // ---------------------------------------------- //
 
 // 在三角形上均匀采样
-void sample_triangle(Triangle t, out vec3 position, out vec3 normal) {
+void sample_triangle(in Triangle t, out vec3 position, out vec3 normal) {
     float r1 = sqrt(rand());
     float r2 = rand();
     normal = t.normal[0] * (1 - r1) + t.normal[1] * r1 * (1 - r2) + t.normal[2] * r1 * r2;
     position = t.ver[0] * (1 - r1) + t.ver[1] * r1 * (1 - r2) + t.ver[2] * r1 * r2;
 }
 
-/// 在所有光面上采样
+/// 在所有光面上采样 [unused]
 /// in pos 当前位置，用于修改处理pdf
 /// out t_index 采样到的发光三角形id
 vec3 sample_lightface(vec3 pos, out int t_index, out float pdf) {
@@ -351,7 +367,7 @@ vec3 sample_lightface(vec3 pos, out int t_index, out float pdf) {
 }
 
 // 球面均匀采样
-vec3 simple_sample(out float pdf) {
+vec3 spherical_sample(out float pdf) {
     float z = rand() * 2 - 1;
     float r = max(0.0, sqrt(1.0 - z * z));
     float phi = 2 * PI * rand();
@@ -360,23 +376,23 @@ vec3 simple_sample(out float pdf) {
     return wo;
 }
 
-// D项 半法线 重要性采样 半球面采样
-vec3 importance_sample_GTR2(Material m, vec2 uv, out float pdf) {
+// D项 半法线 重要性采样 半球面
+vec3 GTR2_sample_h(in Material m, vec2 uv, vec3 nor, out float pdf) {
     float m_roughness = get_roughness(m, uv);
-    float alpha2 = max(0.01, m_roughness * m_roughness);
+    float alpha2 = m_roughness * m_roughness;
     float x = rand();
 
     float cos_theta = sqrt((1. - x) / (x * (alpha2 - 1) + 1));
     float cos2 = cos_theta * cos_theta;
-    float phi = rand();
+    float phi = rand() * 2 * PI;
     float r = sqrt(1. - cos2);
-
-    vec3 h = normalize(vec3(r * cos(phi), r * sin(phi), cos_theta));
     pdf = 2. * alpha2 * cos_theta / pow2(cos2 * (alpha2 - 1.) + 1.) / (2 * PI);
-    return h;
+    vec3 h = normalize(vec3(r * cos(phi), r * sin(phi), cos_theta));
+    return to_world(h, nor);
 }
+
 // 环境光重要性采样 全球面上采样
-vec3 importance_sample_skybox(out float pdf) {
+vec3 skybox_sample(out float pdf) {
     float x = rand();
     float y = rand();
     vec3 samp = texture(skybox_samplecache, vec2(x, y)).xyz;
@@ -389,13 +405,37 @@ vec3 importance_sample_skybox(out float pdf) {
     return wi;
 }
 
+// 反射光重要性采样
+vec3 reflect_sample(in Material m, vec2 uv, vec3 wo, vec3 nor, out float pdf) {
+    float _pdf;
+    vec3 h = GTR2_sample_h(m, uv, nor, _pdf);
+    vec3 wi = reflect(-wo, h * sign(dot(wo, h)));
+    pdf = _pdf / 4 * abs(dot(h, wi));
+    return wi;
+}
+// 折射光重要性采样
+vec3 refract_sample(in Material m, vec2 uv, vec3 wo, vec3 nor, out float pdf) {
+    float _pdf;
+    vec3 h = GTR2_sample_h(m, uv, nor, _pdf);
+    float eta = m.index_of_refraction;
+    if(dot(h, wo) < 0) eta = 1. / eta;
+    h *= sign(dot(wo, h));
+    vec3 wi = refract(-wo, h, eta);
+    if(length(wi) < EPS) {
+        pdf = -1;
+        return vec3(0);
+    }
+    pdf = _pdf * eta * eta * abs(dot(wi, h)) / len2(wo + eta * wi);
+    return wi;
+}
+
 // bxdf
 // ---------------------------------------------- //
 
-float smithG_GGX(float NdotV, float a) {
-    float a2 = a * a;
+float smithG_GGX(float NdotV, float roughness) {
+    float a2 = pow2(pow2(0.5 + roughness / 2));
     float b = NdotV*NdotV;
-    return 1 / (NdotV + sqrt(a2 + b - a2*b));
+    return 2.0f * b / (NdotV + sqrt(a2 + b - a2*b));
 }
 float GTR2(float NdotH, float a) {
     float a2 = a * a;
@@ -415,8 +455,8 @@ float fresnel(float cosI, float etaI, float etaT) {
 }
 
 // L(in), N(same direction with L), V(out)
-vec3 btdf(Material m, vec3 L, vec3 V, vec3 N, vec2 uv, float ior1, float ior2) {
-
+vec3 btdf(in Material m, vec3 L, vec3 V, vec3 N, vec2 uv, float ior1, float ior2) {
+    if(m.spec_trans < EPS) return vec3(0);
     float NdotL = dot(N, L);
     float NdotV = dot(N, V);
     if(NdotL <= 0 || NdotV >= 0) return vec3(0);
@@ -430,8 +470,6 @@ vec3 btdf(Material m, vec3 L, vec3 V, vec3 N, vec2 uv, float ior1, float ior2) {
 
     float m_roughness = get_roughness(m, uv);
     float m_metallic = get_metallic(m, uv);
-    m_roughness = 0.1;
-    m_metallic = 0.5;
 
     vec3 m_transmission = sqrt(get_diffuse_color(m, uv)) * m.spec_trans;
 
@@ -442,13 +480,13 @@ vec3 btdf(Material m, vec3 L, vec3 V, vec3 N, vec2 uv, float ior1, float ior2) {
     float Gs = smithG_GGX(abs(NdotL), m_roughness);
     Gs *= smithG_GGX(abs(NdotV), m_roughness);
 
-    vec3 refraction = abs((LdotH * VdotH * pow2(eta) * Gs * iFs * Ds * m_transmission)
+    vec3 refraction = abs((LdotH * VdotH * pow2(eta) * Ds * m_transmission) // ignore F and G tmporary
     / (NdotV * NdotL * pow2(sqrtDenom)));
 
     return refraction;
 }
 
-vec3 brdf(Material m, vec3 L, vec3 V, vec3 N, vec2 uv) {
+vec3 brdf(in Material m, vec3 L, vec3 V, vec3 N, vec2 uv) {
     vec3 H = normalize(L + V);
     float NdotL = dot(N, L);
     float NdotV = dot(N, V);
@@ -490,7 +528,7 @@ vec3 brdf(Material m, vec3 L, vec3 V, vec3 N, vec2 uv) {
 }
 
 // 在m上，L方向入射，V方向出射，面法向为N（指向外），纹理坐标uv
-vec3 bxdf(Material m, vec3 L, vec3 V, vec3 N, vec2 uv) {
+vec3 bxdf(in Material m, vec3 L, vec3 V, vec3 N, vec2 uv) {
     vec3 LN = dot(L, N) > 0 ? N : -N;
     if(dot(V, LN) >= 0) {
         return brdf(m, L, V, LN, uv);
@@ -508,75 +546,72 @@ vec3 bxdf(Material m, vec3 L, vec3 V, vec3 N, vec2 uv) {
 // path tracing
 // ---------------------------------------------- //
 
-vec3 shade(Ray ray) {
+vec3 shade(Ray ray, Intersect first_isect) {
 
     vec3 result = vec3(0);
     vec3 history = vec3(1); // 栈上乘积
 
-    Intersect inter1 = get_intersect(ray);
-    if(!inter1.exist) return get_background_color(ray.dir);
+    Intersect isect = first_isect;
+    if(!isect.exist) return get_background_color(ray.dir);
 
-    Triangle tr1 = get_triangle(inter1.t_index);
+    Triangle tr1 = get_triangle(isect.t_index);
     Material m1 = get_material(tr1.m_index);
 
-    while(true) {
+    for(int dep = 0; true; dep++) {
 
-        // 自发光
         if(m1.is_emit) {
             result += history * m1.emission;
             break;
         }
 
         float pdf;
-        int light_t_index = -1;
-
-        vec3 pos = inter1.pos;
-        vec3 wi = sample_lightface(pos, light_t_index, pdf); // 光源采样
+        vec3 wi;
+        vec3 pos = isect.pos;
         vec3 wo = -ray.dir;
-        vec3 nor = inter1.normal;                      // 指向物体外的法线
-        vec2 uv = tr1.uv[0] * (1 - inter1.u - inter1.v) +
-                  tr1.uv[1] * inter1.u + tr1.uv[2] * inter1.v;
+        vec3 nor = isect.normal;                      // 指向物体外的法线
+        vec2 uv = tr1.uv[0] * (1 - isect.u - isect.v) +
+        tr1.uv[1] * isect.u + tr1.uv[2] * isect.v;
 
-        Triangle tr2 = get_triangle(light_t_index);
-        Material m2 = get_material(tr2.m_index);
+        // 积分策略：球面拆分为天空和其他部分，分别进行多重重要性采样
 
-        // 直接光
-        Intersect test = get_intersect(Ray(pos, wi));
-        if(test.exist && test.t_index == light_t_index) {
+        // light from skybox(IBL)
+        if(rand() < 0.5) {
+            wi = skybox_sample(pdf);
+        } else {
+            if(rand() < m1.spec_trans) {
+                wi = refract_sample(m1, uv, wo, nor, pdf);
+            } else {
+                wi = reflect_sample(m1, uv, wo, nor, pdf);
+            }
+        }
+
+        Intersect tsect = get_intersect(Ray(pos, wi));
+        if(pdf > 0 && !tsect.exist) {
             vec3 f_r = bxdf(m1, wi, wo, nor, uv);
-            vec3 recv_col = m2.emission * f_r * abs(dot(nor, wi)) / pdf;
+            vec3 recv_col = get_background_color(wi) * f_r * abs(dot(nor, wi)) / pdf;
             result += history * recv_col;
         }
 
-        // 间接光
+        // indirect light
         if(rand() < RussianRoulette) {
 
-//            vec3 h = importance_sample_GTR2(m1, uv, pdf);
-//            wi = reflect(-wo, to_world(h, nor));
-
-//            wi = simple_sample(pdf);
-//            wi = to_world(wi, nor);
-
-            wi = importance_sample_skybox(pdf);
+            // Multiple Sampling
+            if(rand() < m1.spec_trans) {
+                wi = refract_sample(m1, uv, wo, nor, pdf);
+            } else {
+                wi = reflect_sample(m1, uv, wo, nor, pdf);
+            }
+            if(pdf <= 0) break;
 
             vec3 f_r = bxdf(m1, wi, wo, nor, uv);
 
-            ray = Ray(pos, wi);
-            Intersect test = get_intersect(ray);
-            if(!test.exist) {
-                vec3 recv_col = get_background_color(wi) * f_r * abs(dot(nor, wi)) / pdf / RussianRoulette;
-                result += history * recv_col;
-                break;
-            }
+            tsect = get_intersect(Ray(pos, wi));
+            if(!tsect.exist) break;
 
             history *= f_r * abs(dot(nor, wi)) / pdf / RussianRoulette;
-            Triangle tr3 = get_triangle(test.t_index);
-            Material m3 = get_material(tr3.m_index);
-            if(test.t_index != light_t_index) {
-                inter1 = test;
-                tr1 = tr3;
-                m1 = m3;
-            } else break;
+            tr1 = get_triangle(tsect.t_index);
+            m1 = get_material(tr1.m_index);
+            isect = tsect;
         } else break;
     }
     return result;
@@ -591,34 +626,29 @@ void main() {
     Ray ray = Ray(w_ori, dir);
 
     // 预设
-    albedo_out = vec4(1, 1, 1, 1);
-    normal_out = vec4(1, 1, 1, 1);
-    Intersect inter1 = get_intersect(ray);
-    if(!inter1.exist) {
-        color_out = vec4(get_background_color(ray.dir), 1);
+    albedo_out = vec3(1, 1, 1);
+    normal_out = vec3(1, 1, 1);
+    Intersect isect = get_intersect(ray);
+    if(!isect.exist) {
+        color_out = get_background_color(ray.dir);
         return;
     }
 
-    Triangle tr1 = get_triangle(inter1.t_index);
+    Triangle tr1 = get_triangle(isect.t_index);
     Material m1 = get_material(tr1.m_index);
-    vec2 uv = tr1.uv[0] * (1 - inter1.u - inter1.v) +
-            tr1.uv[1] * inter1.u + tr1.uv[2] * inter1.v;
-    albedo_out = vec4(get_diffuse_color(m1, uv), 1);
-    normal_out = vec4(inter1.normal, 1);
+    vec2 uv = tr1.uv[0] * (1 - isect.u - isect.v) +
+    tr1.uv[1] * isect.u + tr1.uv[2] * isect.v;
+    albedo_out = get_diffuse_color(m1, uv);
+    normal_out = isect.normal;
 
     if(fast_shade) {
-        color_out = vec4(get_diffuse_color(m1, uv), 1);
+        color_out = get_diffuse_color(m1, uv);
         return;
     }
 
     vec3 result = vec3(0);
-    for(int i = 0;i < SPP;i++) result += shade(ray);
+    for(int i = 0;i < SPP;i++) result += shade(ray, isect);
     result /= SPP;
 
-    // mix last frame
-    vec3 last_col = texture(last_frame_texture, screen_uv).xyz;
-
-//    color_out = vec4(result, 1.0);
-    color_out = vec4(mix(last_col, result, 1.0 / frameCounter), 1); // 所有帧混合
-//    color_out = vec4(mix(last_col, result, 0.2), 1); // 所有帧混合
+    color_out = result;
 }

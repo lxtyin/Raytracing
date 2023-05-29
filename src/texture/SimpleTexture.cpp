@@ -4,6 +4,7 @@
 
 #include "SimpleTexture.h"
 #include <iostream>
+#include <opencv2/opencv.hpp>
 
 
 void SimpleTexture::load() {
@@ -47,8 +48,26 @@ SimpleTexture::SimpleTexture(const string &imagePath) {
     load();
 }
 
-SimpleTexture::SimpleTexture(int w, int h, int c, vector<uint> &d):
+SimpleTexture::SimpleTexture(int w, int h, int c, vector<uchar> &d):
         width(w), height(h), channel(c){
     data = move(d);
     load();
+}
+
+void SimpleTexture::savephoto(const string& path) {
+	int format, convert = 0;
+	if(channel == 1) format = CV_8U;
+	if(channel == 3) format = CV_8UC3, convert = cv::COLOR_RGB2BGR;
+	if(channel == 4) format = CV_8UC4, convert = cv::COLOR_RGBA2BGRA;
+	cv::Mat img(width, height, format);
+	memcpy(img.data, data.data(), width * height * channel);
+
+	cv::Mat fliped, cvted;
+	cv::flip(img, fliped, 0);
+	if(!convert) {
+		cv::imwrite(path, fliped);
+	} else {
+		cv::cvtColor(fliped, cvted, convert);
+		cv::imwrite(path, cvted);
+	}
 }

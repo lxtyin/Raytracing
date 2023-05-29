@@ -16,8 +16,11 @@ file(GLOB SRC_FILES
         )
 
 set(CMAKE_CXX_STANDARD 17)
+set(OpenCV_DIR D:/OpenCV)
+FIND_PACKAGE(OpenCV REQUIRED)
+
 
 include_directories(include)
 link_directories(lib)
-add_executable(path_tracing ${SRC_FILES})
-target_link_libraries(path_tracing opengl32 glu32 libglfw3.a libzlibstatic.a libassimp.dll.a)
+add_executable(path_tracing ${SRC_FILES} src/tool/exglfw.h src/tool/json.hpp NerfCreator.h)
+target_link_libraries(path_tracing opengl32 glu32 libglfw3.a libzlibstatic.a libassimp.dll.a ${OpenCV_LIBS})

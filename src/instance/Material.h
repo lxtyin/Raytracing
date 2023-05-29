@@ -6,7 +6,7 @@
 #define PATH_TRACING_MATERIAL_H
 
 #include "Triangle.h"
-#include "../texture/Texture.h"
+#include "../texture/SimpleTexture.h"
 
 class Material {
 public:
@@ -28,10 +28,10 @@ public:
     float index_of_refraction = 1;
     float spec_trans = 0;
 
-    Texture *diffuse_map = nullptr;
-    Texture *metalness_map = nullptr;
-    Texture *roughness_map = nullptr;
-    Texture *normal_map = nullptr;
+    SimpleTexture *diffuse_map = nullptr;
+    SimpleTexture *metalness_map = nullptr;
+    SimpleTexture *roughness_map = nullptr;
+	SimpleTexture *normal_map = nullptr;
 
     /**
      * Insert this material into current image gui.

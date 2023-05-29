@@ -1,6 +1,6 @@
 #include <iostream>
 #include "glad/glad.h"
-#include "glfw/glfw3.h"
+#include "src/tool/exglfw.h"
 #include "glm/gtc/type_ptr.hpp"
 #include "src/RenderPass.h"
 #include "src/Renderer.h"
@@ -11,18 +11,20 @@
 #include "imgui/imgui.h"
 #include "imgui/backend/imgui_impl_glfw.h"
 #include "imgui/backend/imgui_impl_opengl3.h"
+#include "NerfCreator.h"
 using namespace std;
 
 // 一些状态 ------
 GLFWwindow *window;
 Renderer *pass1;
-RenderPass *pass2, *pass3;
+RenderPass *pass_mix, *pass_cp, *pass_fw, *pass_fh;
 Scene *scene;
 Instance *camera;
 HDRTexture* skybox;
+NerfCreator nerfCreator;
+bool show_imgui = true;
 
 // ----
-
 
 void mouse_callback(GLFWwindow* window, double xpos, double ypos) {
     static double mouse_lastX = xpos, mouse_lastY = ypos;
@@ -44,14 +46,14 @@ void mouse_callback(GLFWwindow* window, double xpos, double ypos) {
 
 void update(float dt) {
 
-    static uint frame = 0, last_frame_tex = 0;
+    static uint frame = 0, last_frame_hdr = 0;
 	frame++;
 
     // 渲染管线
+	// ---------------------------------------
     pass1->use();
     {
 		if(glfwGetKey(window, GLFW_KEY_R)) {
-			pass1->reload_meshes(scene);
 			glUniform1i(glGetUniformLocation(pass1->shaderProgram, "fast_shade"), false);
 		} else {
 			frame = 1;
@@ -63,54 +65,77 @@ void update(float dt) {
         glUniformMatrix4fv(glGetUniformLocation(pass1->shaderProgram, "v2w_mat"), 1, GL_FALSE, glm::value_ptr(camera->matrix_to_global()));
         glUniform1i(glGetUniformLocation(pass1->shaderProgram, "SCREEN_W"), SCREEN_W);
         glUniform1i(glGetUniformLocation(pass1->shaderProgram, "SCREEN_H"), SCREEN_H);
+		glUniform1i(glGetUniformLocation(pass1->shaderProgram, "SPP"), Config::SPP);
 		glUniform1ui(glGetUniformLocation(pass1->shaderProgram, "frameCounter"), frame);
         glUniform1f(glGetUniformLocation(pass1->shaderProgram, "skybox_Light_SUM"), skybox->Light_SUM);
-        glUniform1i(glGetUniformLocation(pass1->shaderProgram, "SKY_W"), skybox->width);
+		glUniform1f(glGetUniformLocation(pass1->shaderProgram, "fov"), SCREEN_FOV);
+		glUniform1i(glGetUniformLocation(pass1->shaderProgram, "SKY_W"), skybox->width);
         glUniform1i(glGetUniformLocation(pass1->shaderProgram, "SKY_H"), skybox->height);
     }
     pass1->draw();
 
-    pass2->use();
+	pass_mix->use();
     {
-        glUniform1i(glGetUniformLocation(pass2->shaderProgram, "SCREEN_W"), SCREEN_W);
-        glUniform1i(glGetUniformLocation(pass2->shaderProgram, "SCREEN_H"), SCREEN_H);
-		glUniform1ui(glGetUniformLocation(pass2->shaderProgram, "frameCounter"), frame);
-		pass2->bind_texture("last_frame_texture", last_frame_tex);
-        pass2->bind_texture("prev_color", pass1->attach_textures[0]);
-        pass2->bind_texture("prev_albedo", pass1->attach_textures[1]);
-        pass2->bind_texture("prev_normal", pass1->attach_textures[2]);
+		glUniform1ui(glGetUniformLocation(pass_mix->shaderProgram, "frameCounter"), frame);
+		glUniform1i(glGetUniformLocation(pass_mix->shaderProgram, "is_mix_frame"), Config::is_mix_frame);
+		pass_mix->bind_texture("last_mixed_frame", last_frame_hdr);
+        pass_mix->bind_texture("prevpass_color", pass1->attach_textures[0]);
     }
-    pass2->draw();
-	last_frame_tex = pass2->attach_textures[0];
+    pass_mix->draw();
+	last_frame_hdr = pass_mix->attach_textures[1];
 
-    pass3->use();
+	pass_fw->use();
     {
-		pass3->bind_texture("prev_texture", pass2->attach_textures[0]);
+		glUniform1i(glGetUniformLocation(pass_fw->shaderProgram, "SCREEN_W"), SCREEN_W);
+		glUniform1i(glGetUniformLocation(pass_fw->shaderProgram, "SCREEN_H"), SCREEN_H);
+		glUniform1i(glGetUniformLocation(pass_fw->shaderProgram, "is_filter_enabled"), Config::is_filter_enabled);
+		pass_fw->bind_texture("prevpass_color", pass_mix->attach_textures[0]);
+		pass_fw->bind_texture("prevpass_albedo", pass1->attach_textures[1]);
+		pass_fw->bind_texture("prevpass_normal", pass1->attach_textures[2]);
     }
-    pass3->draw();
+    pass_fw->draw();
+
+	pass_fh->use();
+	{
+		glUniform1i(glGetUniformLocation(pass_fh->shaderProgram, "SCREEN_W"), SCREEN_W);
+		glUniform1i(glGetUniformLocation(pass_fh->shaderProgram, "SCREEN_H"), SCREEN_H);
+		glUniform1i(glGetUniformLocation(pass_fh->shaderProgram, "is_filter_enabled"), Config::is_filter_enabled);
+		pass_fh->bind_texture("prevpass_color", pass_fw->attach_textures[0]);
+		pass_fh->bind_texture("prevpass_albedo", pass1->attach_textures[1]);
+		pass_fh->bind_texture("prevpass_normal", pass1->attach_textures[2]);
+	}
+	pass_fh->draw();
 
     //--------------------------------------
 
-    static float tot_dt = 0;
-    tot_dt += dt;
-    if(tot_dt > 1) {
-        tot_dt = 0;
-        cout << "FPS: " << 1.0 / dt << endl;
-    }
+	if(glfwGetKeyDown(window, GLFW_KEY_E)) {
+		show_imgui = show_imgui ^ 1;
+		pass1->reload_meshes(scene);
+	}
+	// Output camera pose
+	if(glfwGetKeyDown(window, GLFW_KEY_P)) {
+		Transform t = camera->transform;
+		cout << "Camera pose:\n";
+		cout << "Position: " << t.position;
+		cout << "Rotation: " << t.rotation;
+	}
 
-    float speed = 50;
-    if(glfwGetKey(window, GLFW_KEY_W)){
-        camera->transform.position += camera->transform.direction_z() * -speed * dt;
-    }
-    if(glfwGetKey(window, GLFW_KEY_S)){
-        camera->transform.position += camera->transform.direction_z() * speed * dt;
-    }
-    if(glfwGetKey(window, GLFW_KEY_D)){
-        camera->transform.position += camera->transform.direction_x() * speed * dt;
-    }
-    if(glfwGetKey(window, GLFW_KEY_A)){
-        camera->transform.position += camera->transform.direction_x() * -speed * dt;
-    }
+	// screen shot for nerf.
+	if(glfwGetKeyDown(window, GLFW_KEY_T)) nerfCreator.screenshot(camera);
+	if(glfwGetKeyDown(window, GLFW_KEY_Y) || glfwGetKeyDown(window, GLFW_KEY_Q)) nerfCreator.writejson();
+
+    float speed = 10;
+    if(glfwGetKey(window, GLFW_KEY_W)) camera->transform.position += camera->transform.direction_z() * -speed * dt;
+    if(glfwGetKey(window, GLFW_KEY_S)) camera->transform.position += camera->transform.direction_z() * speed * dt;
+    if(glfwGetKey(window, GLFW_KEY_D)) camera->transform.position += camera->transform.direction_x() * speed * dt;
+    if(glfwGetKey(window, GLFW_KEY_A)) camera->transform.position += camera->transform.direction_x() * -speed * dt;
+
+	if(glfwGetKey(window, GLFW_KEY_LEFT)) camera->transform.rotation += vec3(0, -1, 0) * dt;
+	if(glfwGetKey(window, GLFW_KEY_RIGHT)) camera->transform.rotation += vec3(0, 1, 0) * dt;
+	if(glfwGetKey(window, GLFW_KEY_UP)) camera->transform.rotation += vec3(-1, 0, 0) * dt;
+	if(glfwGetKey(window, GLFW_KEY_DOWN)) camera->transform.rotation += vec3(1, 0, 0) * dt;
+
+
     if(glfwGetKey(window, GLFW_KEY_SPACE)) camera->transform.position += vec3(0, speed * dt, 0);
     if(glfwGetKey(window, GLFW_KEY_LEFT_SHIFT))  camera->transform.position += vec3(0, -speed * dt, 0);
 	if(glfwGetKey(window, GLFW_KEY_Q)) glfwSetWindowShouldClose(window, GL_TRUE);
@@ -120,15 +145,16 @@ void init() {
 
     // passes
     pass1 = new Renderer("shader/disney.frag", 3);
-    pass2 = new RenderPass("shader/blur.frag", 1);
-    pass3 = new RenderPass("shader/direct.frag", 0, true);
+    pass_mix = new RenderPass("shader/mixAndMap.frag", 2);
+	pass_cp = new RenderPass("shader/fireflyClamp.frag", 1);
+    pass_fw = new RenderPass("shader/filter_w.frag", 1);
+	pass_fh = new RenderPass("shader/filter_h.frag", 0, true);
 
     scene = new Scene("Scene");
     camera = new Instance;
     {
         Instance *o1 = Loader::load_model("model/casa_obj.glb");
         o1->transform.rotation = vec3(M_PI / 2, 0, 0);
-
 		// pre setting
 		Material *m1 = o1->get_child(0)->get_child(1)->meshes[0]->material;
 		m1->roughness = 0.001;
@@ -140,30 +166,24 @@ void init() {
 		m2->metallic = 0.6;
 		m2->index_of_refraction = 1.01;
 		m2->spec_trans = 0.5;
-
 		scene->add_child(o1);
 
-        Instance *light= Loader::load_model("model/light.obj");
-        light->transform.scale = vec3(30, 30, 30);
-        light->transform.position = vec3(0, 100, 0);
-        light->get_child(0)->meshes[0]->material->emission = vec3(5);
-        light->get_child(0)->meshes[0]->material->is_emit = true;
-        scene->add_child(light);
+//		Instance *o2 = Loader::load_model("model/stylized_mailbox_sketchfabweeklychallenge.glb");
+//		o2->transform.rotation = vec3(M_PI / 2, M_PI, 0);
+//		o2->transform.scale = vec3(30, 30, 30);
+//		scene->add_child(o2);
 
-//        Instance *light2= Loader::load_model("model/light.obj");
-//        light2->transform.scale = vec3(3, 3, 3);
-//        light2->transform.position = vec3(-40, 80, 40);
-//        light2->get_child(0)->meshes[0]->material->emission = vec3(450);
-//        light2->get_child(0)->meshes[0]->material->is_emit = true;
-//        scene->add_child(light2);
-
+//        Instance *light= Loader::load_model("model/light.obj");
+//        light->transform.scale = vec3(30, 30, 30);
+//        light->transform.position = vec3(0, 100, 0);
+//        light->get_child(0)->meshes[0]->material->emission = vec3(5);
+//        light->get_child(0)->meshes[0]->material->is_emit = true;
+//        scene->add_child(light);
     }
 
-    skybox = new HDRTexture("img/kloofendal_48d_partly_cloudy_puresky_2k.hdr");
+    skybox = new HDRTexture("hdrs/kloofendal_48d_partly_cloudy_puresky_2k.hdr");
 
     camera->transform.rotation.y = M_PI;
-    camera->transform.position = vec3(1, 1, 1);
-    camera->transform.rotation = vec3(0, -M_PI / 3, 0);
     scene->reload();
     pass1->reload_scene(scene);
 }
@@ -197,8 +217,8 @@ int main(int argc, const char* argv[]) {
 
     init();
 
-    bool show_imgui = true;
     float last_time = glfwGetTime(), detaTime;
+	float fps = 60, counter_time = 0;
     while(!glfwWindowShouldClose(window)) {
         detaTime = glfwGetTime() - last_time;
         last_time += detaTime;
@@ -210,15 +230,23 @@ int main(int argc, const char* argv[]) {
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
 
+		counter_time += detaTime;
+		if(counter_time > 1) {
+			counter_time = 0;
+			fps = 1.0 / detaTime;
+		}
+
 //        ImGui::ShowDemoWindow(&show_imgui);
         if (show_imgui) {
             ImGui::Begin("Editor", &show_imgui);
+			ImGui::Text(str_format("FPS: %.2f", fps).c_str());
+			Config::insert_gui();
             scene->insert_gui();
             ImGui::End();
         }
-
         ImGui::Render();
-        int display_w, display_h;
+
+		int display_w, display_h;
         glfwGetFramebufferSize(window, &display_w, &display_h);
         glViewport(0, 0, display_w, display_h);
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());

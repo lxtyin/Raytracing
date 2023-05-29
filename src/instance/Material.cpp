@@ -24,11 +24,28 @@ void Material::insert_gui() {
             ImGui::ColorEdit3("Emission", col1);
             emission = {col1[0], col1[1], col1[2]};
         }
-        if(diffuse_map) {
-            ImGui::Text("Diffuse map Exists");
-        }
+		if(diffuse_map) {
+			ImGui::Text("Diffuse map");
+			ImGui::SameLine();
+			if(ImGui::Button("Save diffuse map")) diffuse_map->savephoto(name + "_diffuse_map.jpg");
+		}
+		if(metalness_map) {
+			ImGui::Text("Metalness map Exists");
+			ImGui::SameLine();
+			if(ImGui::Button("Save metalness map")) metalness_map->savephoto(name + "_metalness_map.jpg");
+		}
+		if(roughness_map) {
+			ImGui::Text("Roughness map Exists");
+			ImGui::SameLine();
+			if(ImGui::Button("Save roughness map")) roughness_map->savephoto(name + "_roughness_map.jpg");
+		}
+		if(normal_map) {
+			ImGui::Text("Normal map Exists");
+			ImGui::SameLine();
+			if(ImGui::Button("Save normal map")) normal_map->savephoto(name + "_normal_map.jpg");
+		}
 
-        ImGui::TreePop();
+		ImGui::TreePop();
     }
 
 }
