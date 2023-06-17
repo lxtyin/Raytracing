@@ -17,6 +17,7 @@ in vec2 screen_uv;
 layout(location = 0) out vec3 color_out;
 layout(location = 1) out vec3 albedo_out;
 layout(location = 2) out vec3 normal_out;
+layout(location = 2) out vec3 worldpos_out;
 
 // memory
 // ---------------------------------------------- //
@@ -717,6 +718,7 @@ void main() {
     normal_out = vec3(1, 1, 1);
     Intersect isect = get_intersect(ray);
     if(!isect.exist) {
+        worldpos_out = ray.dir * 10000;
         color_out = get_background_color(ray.dir);
         return;
     }
@@ -724,6 +726,7 @@ void main() {
     Triangle tr1 = get_triangle(isect.t_index);
     Material m1 = get_material(tr1.m_index);
     vec2 uv = interpolate_uv(tr1, isect.u, isect.v);
+    worldpos_out = isect.pos;
     albedo_out = get_diffuse_color(m1, uv);
     normal_out = isect.normal;
 

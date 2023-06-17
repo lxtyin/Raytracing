@@ -34,7 +34,7 @@ void main() {
 
     int r = 16;
     // copy parameter from games202.
-    float m_sigmaCoord = 8.0f;
+    float m_sigmaCoord = 4.0f;
     float m_sigmaColor = 0.6;
     float m_sigmaNormal = 0.1;
     float sigma_color2 =  2 * m_sigmaColor * m_sigmaColor;

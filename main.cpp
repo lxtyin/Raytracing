@@ -144,7 +144,7 @@ void update(float dt) {
 void init() {
 
     // passes
-    pass1 = new Renderer("shader/disney.frag", 3);
+    pass1 = new Renderer("shader/disney.frag", 4);
     pass_mix = new RenderPass("shader/mixAndMap.frag", 2);
 	pass_cp = new RenderPass("shader/fireflyClamp.frag", 1);
     pass_fw = new RenderPass("shader/filter_w.frag", 1);
@@ -168,11 +168,6 @@ void init() {
 		m2->spec_trans = 0.5;
 		scene->add_child(o1);
 
-//		Instance *o2 = Loader::load_model("model/stylized_mailbox_sketchfabweeklychallenge.glb");
-//		o2->transform.rotation = vec3(M_PI / 2, M_PI, 0);
-//		o2->transform.scale = vec3(30, 30, 30);
-//		scene->add_child(o2);
-
 //        Instance *light= Loader::load_model("model/light.obj");
 //        light->transform.scale = vec3(30, 30, 30);
 //        light->transform.position = vec3(0, 100, 0);
@@ -181,9 +176,11 @@ void init() {
 //        scene->add_child(light);
     }
 
-    skybox = new HDRTexture("hdrs/kloofendal_48d_partly_cloudy_puresky_2k.hdr");
+	skybox = new HDRTexture("hdrs/kloofendal_48d_partly_cloudy_puresky_2k.hdr");
 
     camera->transform.rotation.y = M_PI;
+	camera->transform.position = vec3(-10.1444, 3.76839, 18.4049);
+	camera->transform.rotation = vec3(0.26, 6.92161, 0);
     scene->reload();
     pass1->reload_scene(scene);
 }

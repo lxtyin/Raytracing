@@ -7,8 +7,8 @@
 
 #include "imgui/imgui.h"
 
-#define SCREEN_W 256
-#define SCREEN_H 256
+#define SCREEN_W 512
+#define SCREEN_H 512
 #define SCREEN_FOV (M_PI / 3)
 
 class Config {

@@ -68,10 +68,10 @@ namespace Loader{
 //            }
         }
         if(AI_SUCCESS == mat->Get(AI_MATKEY_TEXTURE(aiTextureType_DIFFUSE_ROUGHNESS, 0), str)) {
-            result->roughness_map = processImage(str.C_Str(), scene);
+//            result->roughness_map = processImage(str.C_Str(), scene);
         }
         if(AI_SUCCESS == mat->Get(AI_MATKEY_TEXTURE(aiTextureType_METALNESS, 0), str)) {
-            result->metalness_map = processImage(str.C_Str(), scene);
+//            result->metalness_map = processImage(str.C_Str(), scene);
         }
         if(AI_SUCCESS == mat->Get(AI_MATKEY_TEXTURE(aiTextureType_NORMALS, 0), str)){
             result->normal_map = processImage(str.C_Str(), scene);
