@@ -17,7 +17,7 @@ in vec2 screen_uv;
 layout(location = 0) out vec3 color_out;
 layout(location = 1) out vec3 albedo_out;
 layout(location = 2) out vec3 normal_out;
-layout(location = 2) out vec3 worldpos_out;
+layout(location = 3) out vec3 worldpos_out;
 
 // memory
 // ---------------------------------------------- //
