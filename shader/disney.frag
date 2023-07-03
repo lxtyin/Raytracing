@@ -17,7 +17,7 @@ in vec2 screen_uv;
 layout(location = 0) out vec3 color_out;
 layout(location = 1) out vec3 albedo_out;
 layout(location = 2) out vec3 normal_out;
-layout(location = 2) out vec3 worldpos_out;
+layout(location = 3) out vec3 worldpos_out;
 
 // memory
 // ---------------------------------------------- //
@@ -37,6 +37,9 @@ uniform bool fast_shade = true; // 仅渲染diffuse_color
 
 uniform int SCREEN_W;
 uniform int SCREEN_H;
+uniform sampler2D last_frame;
+uniform sampler2D last_worldpos;
+uniform mat4 back_proj;
 uniform sampler2D texture_list[25];
 uniform sampler2D skybox;
 uniform sampler2D skybox_samplecache;
@@ -434,6 +437,7 @@ vec3 skybox_sample(out float pdf) {
     float r = cos(phi);
     vec3 wi = vec3(r * cos(theta), sin(phi), r * sin(theta));
     float w2a = (2 * PI * PI * sqrt(1.0 - wi.y * wi.y)) / (SKY_H * SKY_W); // 积分域转换项
+    if(w2a == 0) w2a = SKY_W * PI / SKY_H; // 极点情况
     pdf = samp.z / w2a;
     return wi;
 }
@@ -441,8 +445,8 @@ float skybox_sample_pdf(vec3 v) {
     vec3 l = get_background_color(v);
     float lw = (l.x * 0.2 + l.y * 0.7 + l.z * 0.1) / skybox_Light_SUM;
     float w2a = (2 * PI * PI * sqrt(1.0 - v.y * v.y)) / (SKY_H * SKY_W); // 积分域转换项
-    float pdf = lw / w2a;
-    return pdf;
+    if(w2a == 0) w2a = SKY_W * PI / SKY_H; // 极点情况
+    return lw / w2a;
 }
 
 // 对于反射和折射采样来说，由于是先对h采样再求反射/折射方向，会采样到一些不合法方向（全反射等）。
@@ -599,7 +603,6 @@ vec3 brdf(in Material m, vec2 uv, vec3 L, vec3 V, vec3 N) {
 
     vec3 specular = Gs * Fs * Ds / (4 * NdotV * NdotL);
 
-    // 菲涅尔项已经蕴含了金属度
     return diffuse * (1 - m_metallic) + specular;
 }
 
@@ -622,7 +625,7 @@ vec3 bxdf(in Material m, vec2 uv, vec3 L, vec3 V, vec3 outN) {
 // path tracing
 // ---------------------------------------------- //
 
-vec3 shade(Ray ray, Intersect first_isect) {
+vec3 shade(Ray ray, in Intersect first_isect) {
 
     vec3 result = vec3(0);
     vec3 history = vec3(1); // 栈上乘积
@@ -646,6 +649,7 @@ vec3 shade(Ray ray, Intersect first_isect) {
         vec3 wo = -ray.dir;
         vec3 nor = isect.normal;                      // 指向物体外的法线
         vec2 uv = interpolate_uv(tr1, isect.u, isect.v);
+        Intersect tsect;
 
         // 积分策略：球面拆分为天空和其他部分，分别进行多重重要性采样
 
@@ -662,17 +666,22 @@ vec3 shade(Ray ray, Intersect first_isect) {
                 MIP_w = 2.0 / (1.0 - m1.spec_trans);
             }
         }
-        float Spdf = skybox_sample_pdf(wi) +
-                refract_sample_pdf(m1, uv, wo, nor, wi) +
-                reflect_sample_pdf(m1, uv, wo, nor, wi);
-        MIP_w *= pdf / Spdf;
+        if(pdf > 0) {
+            float Spdf = skybox_sample_pdf(wi) +
+            refract_sample_pdf(m1, uv, wo, nor, wi) +
+            reflect_sample_pdf(m1, uv, wo, nor, wi);
 
-        Intersect tsect = get_intersect(Ray(pos, wi));
-        if(pdf > 0 && !tsect.exist) {
-            vec3 f_r = bxdf(m1, uv, wi, wo, nor) * MIP_w;
-            vec3 recv_col = get_background_color(wi) * f_r * abs(dot(nor, wi)) / pdf;
-            result += history * recv_col;
+            MIP_w *= pdf / Spdf;
+            if(isnan(MIP_w)) return vec3(1000, 0, 0);
+
+            tsect = get_intersect(Ray(pos, wi));
+            if(!tsect.exist) {
+                vec3 f_r = bxdf(m1, uv, wi, wo, nor) * MIP_w;
+                vec3 recv_col = get_background_color(wi) * f_r * abs(dot(nor, wi)) / pdf;
+                result += history * recv_col;
+            }
         }
+
 
         // indirect light
         if(rand() < RussianRoulette) {
@@ -718,7 +727,8 @@ void main() {
     normal_out = vec3(1, 1, 1);
     Intersect isect = get_intersect(ray);
     if(!isect.exist) {
-        worldpos_out = ray.dir * 10000;
+        worldpos_out = vec3(10000);
+
         color_out = get_background_color(ray.dir);
         return;
     }
@@ -726,7 +736,6 @@ void main() {
     Triangle tr1 = get_triangle(isect.t_index);
     Material m1 = get_material(tr1.m_index);
     vec2 uv = interpolate_uv(tr1, isect.u, isect.v);
-    worldpos_out = isect.pos;
     albedo_out = get_diffuse_color(m1, uv);
     normal_out = isect.normal;
 
@@ -735,15 +744,33 @@ void main() {
         return;
     }
 
-    vec3 result = vec3(0);
-    float cnt = 0;
-    for(int i = 0;i < SPP;i++) {
-        if(length(result) < 0.1) {
-            result += shade(ray, isect);
-            cnt++;
+    vec3 result = shade(ray, isect);
+    if(any(isnan(result))) result = vec3(0, 0, 0); // Minimal probability
+
+    vec3 wpos = isect.pos;
+    worldpos_out = wpos;
+
+//    static mix frame.
+    vec3 last_col = texture(last_frame, screen_uv).xyz;
+    result = mix(last_col, result, 1.0 / frameCounter);
+    color_out = result;
+    return;
+
+    // motion vector
+    vec4 Hcoord = back_proj * vec4(wpos, 1); // homogeneous coordinates
+    vec2 last_xy = Hcoord.xy / Hcoord.w;
+    if(0. < last_xy.x && last_xy.x < 1. && 0. < last_xy.y && last_xy.y < 1.) {
+        vec3 _wpos = texture(last_worldpos, last_xy).xyz;
+        if(length(wpos - _wpos) < 1) {
+            vec3 last_col = texture(last_frame, last_xy).xyz;
+            result = mix(last_col, result, 0.2);
+            color_out = result;
+            return;
         }
     }
-    result /= cnt;
+
+    for(int i = 1;i < SPP;i++) result += shade(ray, isect);
+    result /= SPP;
 
     color_out = result;
 }
