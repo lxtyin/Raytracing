@@ -28,3 +28,21 @@ string read_file(const string &path){
     return res;
 }
 
+string read_shader(const string& path) {
+	string text = read_file(path);
+	std::istringstream iss(text);
+	string result = "";
+	char c;
+	while(iss.get(c)) {
+		if(c == '#') {
+			string s;
+			iss >> s;
+			if(s == "include") {
+				iss >> s;
+				result += read_shader(s);
+			} else result += "#" + s;
+		} else result.push_back(c);
+	}
+	return result;
+}
+

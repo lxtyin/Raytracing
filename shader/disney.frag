@@ -4,11 +4,8 @@
 #define M_SIZ 8    // 一个material占的vec3数量
 #define T_SIZ 9    // 一个triangle占的vec3数量
 #define B_SIZ 3    // 一个bvhnode占的vec3数量
-#define INF 1E18
-#define PI 3.1415926
-#define IVPI 0.3183098
-#define EPS 0.0001
-#define RAY_EPS 0.01
+
+#include shader/basic/math
 
 in float pixel_x;
 in float pixel_y;
@@ -19,6 +16,7 @@ layout(location = 1) out vec3 albedo_out;
 layout(location = 2) out vec3 normal_out;
 layout(location = 3) out vec3 worldpos_out;
 
+
 // memory
 // ---------------------------------------------- //
 
@@ -28,6 +26,7 @@ uniform samplerBuffer lightidxs;
 uniform samplerBuffer bvhnodes;
 uniform int light_t_num;
 uniform int triangle_num;
+
 uniform mat4 v2w_mat;
 
 uniform float RussianRoulette = 0.9;
@@ -48,10 +47,6 @@ uniform int SKY_W;
 uniform int SKY_H;
 uniform uint frameCounter;
 
-// math
-// ---------------------------------------------- //
-int stack[256];
-int stack_h = 0;
 
 uint seed = uint(
 uint(pixel_x + SCREEN_W / 2) * uint(1973) +
@@ -71,53 +66,11 @@ float rand() {
     return float(wang_hash(seed)) / 4294967296.0;
 }
 
-//uint sobel_V[3][32] = {
-//2147483648, 1073741824, 536870912, 268435456, 134217728, 67108864, 33554432, 16777216, 8388608, 4194304, 2097152, 1048576, 524288, 262144, 131072, 65536, 32768, 16384, 8192, 4096, 2048, 1024, 512, 256, 128, 64, 32, 16, 8, 4, 2, 1,
-//2147483648, 3221225472, 2684354560, 4026531840, 2281701376, 3422552064, 2852126720, 4278190080, 2155872256, 3233808384, 2694840320, 4042260480, 2290614272, 3435921408, 2863267840, 4294901760, 2147516416, 3221274624, 2684395520, 4026593280, 2281736192, 3422604288, 2852170240, 4278255360, 2155905152, 3233857728, 2694881440, 4042322160, 2290649224, 3435973836, 2863311530, 4294967295,
-//2147483648, 3221225472, 1610612736, 2415919104, 3892314112, 1543503872, 2382364672, 3305111552, 1753219072, 2629828608, 3999268864, 1435500544, 2154299392, 3231449088, 1626210304, 2421489664, 3900735488, 1556135936, 2388680704, 3314585600, 1751705600, 2627492864, 4008611328, 1431684352, 2147543168, 3221249216, 1610649184, 2415969680, 3892340840, 1543543964, 2382425838, 3305133397
-//};
-//uint sobel(uint i, uint d) {
-//    uint r = 0;
-//    for(int j = 0;i > 0;j++) {
-//        if((i & 1u) == 1) r ^= sobel_V[d][j];
-//        i >>= 1;
-//    }
-//    return r;
-//}
-//
-//// [0, 1)
-//uint seed =
-//float rand() {
-//
-//}
 
-int roundint(float x) {
-    float b = step(x, 0);
-    return int(x - b + 0.5);
-}
-float len2(vec3 x) {
-    return x.x * x.x + x.y * x.y + x.z * x.z;
-}
-float pow2(float x) {
-    return x * x;
-}
-float pow5(float x) {
-    float x2 = x * x;
-    return x2 * x2 * x;
-}
-vec3 powv(vec3 v, float n) {
-    return vec3(pow(v.x, n), pow(v.y, n), pow(v.z, n));
-}
-
-// N(same direction with I)
-vec3 refract(vec3 I, vec3 N, float eta) {
-    float c1 = dot(N, -I);
-    float s1 = sqrt(1 - c1 * c1);
-    float s2 = s1 / eta;
-    if(s2 >= 1) return vec3(0); // full reflect
-    float c2 = sqrt(1 - s2 * s2);
-    return -N * c2 + (I + N * c1) / eta;
-}
+// math
+// ---------------------------------------------- //
+int stack[256];
+int stack_h = 0;
 
 // v原先在n = +z下表示
 vec3 to_world(vec3 v, vec3 n) {
@@ -462,14 +415,14 @@ vec3 reflect_sample(in Material m, vec2 uv, vec3 wo, vec3 outN, out float pdf) {
         return vec3(0);
     }
     vec3 wi = reflect(-wo, h);
-    pdf = _pdf / 4 * abs(dot(h, wi));
+    pdf = _pdf / (4 * dot(h, wi));
     return wi;
 }
 float reflect_sample_pdf(in Material m, vec2 uv, vec3 wo, vec3 outN, vec3 wi) {
     vec3 N = outN * sign(dot(outN, wo));
     vec3 h = normalize(wi + wo);
     float _pdf = GTR2_sample_pdf(m, uv, N, h);
-    return _pdf / 4 * abs(dot(h, wi));
+    return _pdf / (4 * dot(h, wi));
 }
 
 // 折射光重要性采样
@@ -512,10 +465,9 @@ float refract_sample_pdf(in Material m, vec2 uv, vec3 wo, vec3 outN, vec3 wi) {
 // bxdf
 // ---------------------------------------------- //
 
-float smithG_GGX(float NdotV, float roughness) {
-    float a2 = pow2(pow2(0.5 + roughness / 2));
-    float b = NdotV*NdotV;
-    return 2.0f * b / (NdotV + sqrt(a2 + b - a2*b));
+float SchlickGGX(float NdotV, float roughness) {
+    float k = pow2(roughness + 1) / 8;
+    return NdotV / (NdotV * (1 - k) + k);
 }
 float GTR2(float NdotH, float a) {
     float a2 = a * a;
@@ -557,8 +509,8 @@ vec3 btdf(in Material m, vec2 uv, vec3 L, vec3 V, vec3 N, float ior1, float ior2
     float Ds = GTR2(NdotH, m_roughness);
     float iFs = 1 - fresnel(LdotH, ior1, ior2);
     if(iFs <= 0) return vec3(0); // 全反射
-    float Gs = smithG_GGX(abs(NdotL), m_roughness);
-    Gs *= smithG_GGX(abs(NdotV), m_roughness);
+    float Gs = SchlickGGX(abs(NdotL), m_roughness);
+    Gs *= SchlickGGX(abs(NdotV), m_roughness);
 
     vec3 refraction = abs((LdotH * VdotH * pow2(eta) * Ds * m_transmission) // ignore F and G tmporary
     / (NdotV * NdotL * pow2(sqrtDenom)));
@@ -598,8 +550,8 @@ vec3 brdf(in Material m, vec2 uv, vec3 L, vec3 V, vec3 N) {
     // specular
     float Ds = GTR2(NdotH, m_roughness);
     vec3 Fs = SchlickFresnel(Cspec0, LdotH);
-    float Gs = smithG_GGX(NdotL, m_roughness);
-    Gs *= smithG_GGX(NdotV, m_roughness);
+    float Gs = SchlickGGX(NdotL, m_roughness);
+    Gs *= SchlickGGX(NdotV, m_roughness);
 
     vec3 specular = Gs * Fs * Ds / (4 * NdotV * NdotL);
 

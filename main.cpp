@@ -18,7 +18,7 @@ using namespace std;
 // 一些状态 ------
 GLFWwindow *window;
 Renderer *pass1;
-RenderPass *pass_mix, *pass_cp, *pass_fw, *pass_fh;
+RenderPass *pass_mix, *pass_fw, *pass_fh;
 Scene *scene;
 Camera *camera;
 HDRTexture* skybox;
@@ -154,17 +154,16 @@ void update(float dt) {
 void init() {
 
     // passes
-    pass1 = new Renderer("shader/disney.frag", 4);
-    pass_mix = new RenderPass("shader/mixAndMap.frag", 1);
-	pass_cp = new RenderPass("shader/fireflyClamp.frag", 1);
-    pass_fw = new RenderPass("shader/filter_w.frag", 1);
-	pass_fh = new RenderPass("shader/filter_h.frag", 0, true);
+    pass1    = new Renderer("shader/disney.frag", 4);
+    pass_mix = new RenderPass("shader/postprocessing/mixAndMap.frag", 1);
+    pass_fw  = new RenderPass("shader/postprocessing/filter_w.frag", 1);
+	pass_fh  = new RenderPass("shader/postprocessing/filter_h.frag", 0, true);
 
     scene = new Scene("Scene");
     camera = new Camera(M_PI / 3);
 
     {
-        Instance *o1 = Loader::load_model("model/casa_obj.glb");
+        Instance *o1 = AssimpLoader::load_model("model/casa_obj.glb");
         o1->transform.rotation = vec3(-M_PI / 2, 0, 0);
 		// pre setting
 		Material *m1 = o1->get_child(0)->get_child(1)->meshes[0]->material;

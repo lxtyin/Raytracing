@@ -9,7 +9,7 @@ using namespace std;
 const float INTERVAL = 0.2; //水平间距
 const float HISCALE = 0.02; //高度比例
 
-namespace Loader{
+namespace AssimpLoader{
 
 	//loading directory
 	string directory;

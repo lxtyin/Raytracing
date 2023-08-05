@@ -28,8 +28,8 @@ void RenderPass::init_canvas() {
 void RenderPass::init_shader(const string &frag_shader_path) {
 
     // 生成shader
-    string vertexShaderCode = read_file("shader/fullscreen.vert");
-    string fragmentShaderCode = read_file(frag_shader_path);
+    string vertexShaderCode = read_shader("shader/basic/fullscreen.vert");
+    string fragmentShaderCode = read_shader(frag_shader_path);
     const char *vertexCodePointer = vertexShaderCode.c_str();
     const char *fragmentCodePointer = fragmentShaderCode.c_str();
 

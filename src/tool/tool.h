@@ -15,3 +15,4 @@ inline string str_format(const char* fmt, T... args) {
 
 string read_file(const string &path);
 
+string read_shader(const string &path);
