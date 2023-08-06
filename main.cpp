@@ -154,7 +154,7 @@ void update(float dt) {
 void init() {
 
     // passes
-    pass1    = new Renderer("shader/disney.frag", 4);
+    pass1    = new Renderer("shader/pathtracing.frag", 4);
     pass_mix = new RenderPass("shader/postprocessing/mixAndMap.frag", 1);
     pass_fw  = new RenderPass("shader/postprocessing/filter_w.frag", 1);
 	pass_fh  = new RenderPass("shader/postprocessing/filter_h.frag", 0, true);

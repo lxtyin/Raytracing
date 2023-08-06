@@ -72,6 +72,26 @@ float rand() {
 int stack[256];
 int stack_h = 0;
 
+struct Coord {
+    vec3 s, t, n;
+};
+
+Coord create_coord(vec3 n) {
+    Coord f;
+    if(abs(n.z) > 1 - EPS) f.s = cross(n, vec3(1, 0, 0));
+    else f.s = cross(n, vec3(0, 0, 1));
+    f.t = cross(n, f.s);
+    f.n = n;
+    return f;
+}
+
+vec3 to_world(in Coord f, vec3 v) {
+    return v.x * f.s + v.y * f.t + v.z * f.n;
+}
+vec3 to_local(in Coord f, vec3 v) {
+    return vec3(dot(v, f.s), dot(v, f.t), dot(v, f.n));
+}
+
 // v原先在n = +z下表示
 vec3 to_world(vec3 v, vec3 n) {
     vec3 help = vec3(1, 0, 0);
@@ -357,9 +377,8 @@ float spherical_sample_pdf() {
 }
 
 // D项 半法线 重要性采样 半球面
-vec3 GTR2_sample_h(in Material m, vec2 uv, vec3 nor, out float pdf) {
-    float m_roughness = get_roughness(m, uv);
-    float alpha2 = m_roughness * m_roughness;
+vec3 GTR2_sample_h(float roughness, out float pdf) {
+    float alpha2 = roughness * roughness;
     float x = rand();
 
     float cos_theta = sqrt((1. - x) / (x * (alpha2 - 1) + 1));
@@ -368,13 +387,12 @@ vec3 GTR2_sample_h(in Material m, vec2 uv, vec3 nor, out float pdf) {
     float r = sqrt(1. - cos2);
     pdf = 2. * alpha2 * cos_theta / pow2(cos2 * (alpha2 - 1.) + 1.) / (2 * PI);
     vec3 h = normalize(vec3(r * cos(phi), r * sin(phi), cos_theta));
-    return to_world(h, nor);
+    return h;
 }
-float GTR2_sample_pdf(in Material m, vec2 uv, vec3 nor, vec3 h) {
-    float cos_theta = abs(dot(h, nor));
+float GTR2_sample_pdf(float roughness, vec3 h) {
+    float cos_theta = h.z;
     if(cos_theta < 0) return 0;
-    float m_roughness = get_roughness(m, uv);
-    float alpha2 = m_roughness * m_roughness;
+    float alpha2 = roughness * roughness;
     float cos2 = cos_theta * cos_theta;
     float pdf = 2. * alpha2 * cos_theta / pow2(cos2 * (alpha2 - 1.) + 1.) / (2 * PI);
     return pdf;
@@ -406,95 +424,76 @@ float skybox_sample_pdf(vec3 v) {
 // 对这种采样结果，用pdf = -1，wi = (0, 0, 0)进行标注
 
 // 反射光重要性采样
-vec3 reflect_sample(in Material m, vec2 uv, vec3 wo, vec3 outN, out float pdf) {
-    vec3 N = outN * sign(dot(outN, wo));
-    float _pdf;
-    vec3 h = GTR2_sample_h(m, uv, N, _pdf);
-    if(dot(h, wo) < 0) {
-        pdf = -1;
-        return vec3(0);
-    }
-    vec3 wi = reflect(-wo, h);
-    pdf = _pdf / (4 * dot(h, wi));
-    return wi;
-}
-float reflect_sample_pdf(in Material m, vec2 uv, vec3 wo, vec3 outN, vec3 wi) {
-    vec3 N = outN * sign(dot(outN, wo));
-    vec3 h = normalize(wi + wo);
-    float _pdf = GTR2_sample_pdf(m, uv, N, h);
-    return _pdf / (4 * dot(h, wi));
-}
-
-// 折射光重要性采样
-vec3 refract_sample(in Material m, vec2 uv, vec3 wo, vec3 outN, out float pdf) {
-    float eta = m.index_of_refraction;
-    if(dot(outN, wo) < 0) eta = 1. / eta;   // eta from wo aspect.
-    vec3 VN = outN * sign(dot(outN, wo));
-
-    float _pdf;
-    vec3 h = GTR2_sample_h(m, uv, VN, _pdf);
-    if(dot(wo, h) < 0) {
-        pdf = -1;
-        return vec3(0);
-    }
-    vec3 wi = refract(-wo, h, eta);
-    if(length(wi) < EPS) {
-        pdf = -1;
-        return vec3(0);
-    }
-    pdf = _pdf * eta * eta * abs(dot(wi, h)) / len2(wo + eta * wi);
-    return wi;
-}
-float refract_sample_pdf(in Material m, vec2 uv, vec3 wo, vec3 outN, vec3 wi) {
-    float eta = m.index_of_refraction;
-    if(dot(outN, wo) < 0) eta = 1. / eta;  // eta from wo aspect.
-    vec3 VN = outN * sign(dot(outN, wo));
-
-    float NdotL = dot(VN, wi);
-    float NdotV = dot(VN, wo);
-    if(NdotV <= 0 || NdotL >= 0) return 0;
-    vec3 h = normalize(wo + eta * wi);
-    h *= sign(dot(wo, h));
-    if(dot(h, VN) <= 0) return 0;
-    if(1 - pow2(dot(wo, h)) >= eta * eta) return 0; // 全反射
-
-    float _pdf = GTR2_sample_pdf(m, uv, VN, h);
-    return _pdf * eta * eta * abs(dot(wi, h)) / len2(wo + eta * wi);
-}
+// assert L.z > 0
+//vec3 reflect_sample(in Material m, vec2 uv, vec3 L, out float pdf) {
+//    vec3 N = outN * sign(dot(outN, wo));
+//    float _pdf;
+//    vec3 h = GTR2_sample_h(get_roughness(m, uv), _pdf);
+//    if(dot(h, wo) < 0) {
+//        pdf = -1;
+//        return vec3(0);
+//    }
+//    vec3 wi = reflect(-wo, h);
+//    pdf = _pdf / (4 * dot(h, wi));
+//    return wi;
+//}
+//float reflect_sample_pdf(in Material m, vec2 uv, vec3 wo, vec3 outN, vec3 wi) {
+//    vec3 N = outN * sign(dot(outN, wo));
+//    vec3 h = normalize(wi + wo);
+//    float _pdf = GTR2_sample_pdf(m, uv, N, h);
+//    return _pdf / (4 * dot(h, wi));
+//}
+//
+//// 折射光重要性采样
+//vec3 refract_sample(in Material m, vec2 uv, vec3 wo, vec3 outN, out float pdf) {
+//    float eta = m.index_of_refraction;
+//    if(dot(outN, wo) < 0) eta = 1. / eta;   // eta from wo aspect.
+//    vec3 VN = outN * sign(dot(outN, wo));
+//
+//    float _pdf;
+//    vec3 h = GTR2_sample_h(m, uv, VN, _pdf);
+//    if(dot(wo, h) < 0) {
+//        pdf = -1;
+//        return vec3(0);
+//    }
+//    vec3 wi = refract(-wo, h, eta);
+//    if(length(wi) < EPS) {
+//        pdf = -1;
+//        return vec3(0);
+//    }
+//    pdf = _pdf * eta * eta * abs(dot(wi, h)) / len2(wo + eta * wi);
+//    return wi;
+//}
+//float refract_sample_pdf(in Material m, vec2 uv, vec3 wo, vec3 outN, vec3 wi) {
+//    float eta = m.index_of_refraction;
+//    if(dot(outN, wo) < 0) eta = 1. / eta;  // eta from wo aspect.
+//    vec3 VN = outN * sign(dot(outN, wo));
+//
+//    float NdotL = dot(VN, wi);
+//    float NdotV = dot(VN, wo);
+//    if(NdotV <= 0 || NdotL >= 0) return 0;
+//    vec3 h = normalize(wo + eta * wi);
+//    h *= sign(dot(wo, h));
+//    if(dot(h, VN) <= 0) return 0;
+//    if(1 - pow2(dot(wo, h)) >= eta * eta) return 0; // 全反射
+//
+//    float _pdf = GTR2_sample_pdf(m, uv, VN, h);
+//    return _pdf * eta * eta * abs(dot(wi, h)) / len2(wo + eta * wi);
+//}
 
 // bxdf
 // ---------------------------------------------- //
 
-float SchlickGGX(float NdotV, float roughness) {
-    float k = pow2(roughness + 1) / 8;
-    return NdotV / (NdotV * (1 - k) + k);
-}
-float GTR2(float NdotH, float a) {
-    float a2 = a * a;
-    float t = 1 + (a2-1)*NdotH*NdotH;
-    return a2 / (PI * t*t);
-}
-vec3 SchlickFresnel(vec3 f0, float c) {
-    return f0 + (vec3(1) - f0) * pow5(1 - c);
-}
-float fresnel(float cosI, float etaI, float etaT) {
-    float sinI = sqrt(1.0 - cosI * cosI);
-    float sinT = etaI / etaT * sinI;
-    float cosT = sqrt(1.0 - sinT * sinT);
-    float Rl = pow2((etaI * cosI - etaT * cosT) / (etaI * cosI + etaT * cosT));
-    float Rp = pow2((etaI * cosT - etaT * cosI) / (etaI * cosT + etaT * cosI));
-    return (Rl + Rp) / 2;
-}
 
-// L(in), N(same direction with L), V(out)
-vec3 btdf(in Material m, vec2 uv, vec3 L, vec3 V, vec3 N, float ior1, float ior2) {
+// L(in), V(out)
+vec3 btdf(in Material m, vec2 uv, vec3 L, vec3 V, float ior1, float ior2) {
     if(m.spec_trans < EPS) return vec3(0);
-    float NdotL = dot(N, L);
-    float NdotV = dot(N, V);
+    float NdotL = L.z;
+    float NdotV = V.z;
     if(NdotL <= 0 || NdotV >= 0) return vec3(0);
     float eta = ior2 / ior1;
     vec3 H = -normalize(L + eta * V);
-    float NdotH = dot(N, H);
+    float NdotH = H.z;
     if(NdotH <= 0) H = -H;
     float LdotH = dot(L, H);
     float VdotH = dot(V, H);
@@ -518,11 +517,11 @@ vec3 btdf(in Material m, vec2 uv, vec3 L, vec3 V, vec3 N, float ior1, float ior2
     return refraction;
 }
 
-vec3 brdf(in Material m, vec2 uv, vec3 L, vec3 V, vec3 N) {
+vec3 brdf(in Material m, vec2 uv, vec3 L, vec3 V) {
     vec3 H = normalize(L + V);
-    float NdotL = dot(N, L);
-    float NdotV = dot(N, V);
-    float NdotH = dot(N, H);
+    float NdotL = L.z;
+    float NdotV = V.z;
+    float NdotH = H.z;
     float LdotH = dot(L, H);
     if(NdotL <= 0 || NdotV <= 0) return vec3(0); // assert!
 
@@ -558,19 +557,73 @@ vec3 brdf(in Material m, vec2 uv, vec3 L, vec3 V, vec3 N) {
     return diffuse * (1 - m_metallic) + specular;
 }
 
-// 在m上，L方向入射，V方向出射，面法向为N（指向外），纹理坐标uv
-vec3 bxdf(in Material m, vec2 uv, vec3 L, vec3 V, vec3 outN) {
-    vec3 LN = dot(L, outN) > 0 ? outN : -outN;
-    if(dot(V, LN) >= 0) {
-        return brdf(m, uv, L, V, LN);
+// 在m上，纹理坐标uv
+vec3 bxdf_eval(in Material m, vec2 uv, vec3 L, vec3 V) {
+    if(L.z * V.z >= 0) {
+        V.z *= sign(L.z);
+        L.z *= sign(L.z);
+        return brdf(m, uv, L, V);
     } else {
-        float ior1 = 1, ior2 = m.index_of_refraction;
-        if(LN != outN) { // swap
-            ior1 += ior2;
-            ior2 = ior1 - ior2;
-            ior1 -= ior2;
+        float ior1 = 1.0, ior2 = m.index_of_refraction;
+        if(L.z < 0) { // swap
+            ior1 = m.index_of_refraction;
+            ior2 = 1.0;
+            V.z *= -1;
+            L.z *= -1;
         }
-        return btdf(m, uv, L, V, LN, ior1, ior2);
+        return btdf(m, uv, L, V, ior1, ior2);
+    }
+}
+
+vec3 bxdf_sample(in Material m, vec2 uv, vec3 L, out float pdf) {
+    vec3 h = GTR2_sample_h(get_roughness(m, uv), pdf);
+    if(rand() < m.spec_trans) {
+        vec3 V = reflect(-L, h);
+        if(V.z * L.z <= 0) {
+            pdf = -1;
+            return vec3(0);
+        }
+        pdf *= m.spec_trans / abs(4 * dot(h, L));
+        return V;
+    } else {
+        float eta = m.index_of_refraction;
+        if (L.z < 0) {
+            eta = 1.0 / eta;
+            h *= -1;
+        }
+        vec3 V = refract(-L, h, eta);
+        if (V.x < 0) { // refract 计算失败（全反射或不合法）
+            pdf = -1;
+            return vec3(0);
+        }
+        pdf *= (1 - m.spec_trans) * eta * eta * abs(dot(L, h)) / len2(L + eta * V);
+        return V;
+    }
+}
+
+float bxdf_pdf(in Material m, vec2 uv, vec3 L, vec3 V) {
+    if(L.z * V.z >= 0) {
+        vec3 h = normalize(L + V);
+        h *= sign(h.z);
+        float _pdf = GTR2_sample_pdf(get_roughness(m, uv), h);
+        return _pdf / abs(4 * dot(h, L)) * m.spec_trans;
+    } else {
+        float eta = m.index_of_refraction;
+        if(L.z < 0) {
+            L.z *= -1;
+            V.z *= -1;
+            eta = 1.0 / eta;
+        }
+
+        float NdotL = L.z;
+        float NdotV = V.z;
+        vec3 h = normalize(L + eta * V);
+        h *= sign(h.z);
+        if(dot(h, L) <= 0 || dot(h, V) >= 0) return 0;  // 不合法
+        if(1 - pow2(dot(L, h)) >= eta * eta) return 0;  // 全反射
+
+        float _pdf = GTR2_sample_pdf(get_roughness(m, uv), h);
+        return _pdf * eta * eta * abs(dot(L, h)) / len2(h);
     }
 }
 
@@ -595,11 +648,13 @@ vec3 shade(Ray ray, in Intersect first_isect) {
             break;
         }
 
+        Coord coord = create_coord(isect.normal);
+        vec3 wo = to_local(coord, -ray.dir);
+
         float pdf, MIP_w;
         vec3 wi;
         vec3 pos = isect.pos;
-        vec3 wo = -ray.dir;
-        vec3 nor = isect.normal;                      // 指向物体外的法线
+//        vec3 nor = isect.normal;                      // 指向物体外的法线
         vec2 uv = interpolate_uv(tr1, isect.u, isect.v);
         Intersect tsect;
 
@@ -608,60 +663,55 @@ vec3 shade(Ray ray, in Intersect first_isect) {
         // light from skybox(IBL)
         if(rand() < 0.5) {
             wi = skybox_sample(pdf);
+            wi = to_local(coord, wi); // 统一采样到local下
             MIP_w = 1.0 / 0.5;
         } else {
-            if(rand() < m1.spec_trans) {
-                wi = refract_sample(m1, uv, wo, nor, pdf);
-                MIP_w = 2.0 / m1.spec_trans;
-            } else {
-                wi = reflect_sample(m1, uv, wo, nor, pdf);
-                MIP_w = 2.0 / (1.0 - m1.spec_trans);
-            }
+            wi = bxdf_sample(m1, uv, wo, pdf);
+            MIP_w = 1.0 / 0.5;
         }
         if(pdf > 0) {
             float Spdf = skybox_sample_pdf(wi) +
-            refract_sample_pdf(m1, uv, wo, nor, wi) +
-            reflect_sample_pdf(m1, uv, wo, nor, wi);
+                    bxdf_pdf(m1, uv, wo, wi);
 
             MIP_w *= pdf / Spdf;
-            if(isnan(MIP_w)) return vec3(1000, 0, 0);
 
-            tsect = get_intersect(Ray(pos, wi));
+            tsect = get_intersect(Ray(pos, to_world(coord, wi)));
             if(!tsect.exist) {
-                vec3 f_r = bxdf(m1, uv, wi, wo, nor) * MIP_w;
-                vec3 recv_col = get_background_color(wi) * f_r * abs(dot(nor, wi)) / pdf;
+                vec3 f_r = bxdf_eval(m1, uv, wi, wo) * MIP_w;
+                vec3 recv_col = get_background_color(wi) * f_r * abs(wi.z) / pdf;
                 result += history * recv_col;
             }
         }
+        break;
 
 
-        // indirect light
-        if(rand() < RussianRoulette) {
-
-            // Multiple Sampling
-            if(rand() < m1.spec_trans) {
-                wi = refract_sample(m1, uv, wo, nor, pdf);
-                MIP_w = 1.0 / m1.spec_trans;
-            } else {
-                wi = reflect_sample(m1, uv, wo, nor, pdf);
-                MIP_w = 1.0 / (1 - m1.spec_trans);
-            }
-            if(pdf <= 0) break;
-
-            float Spdf = refract_sample_pdf(m1, uv, wo, nor, wi) +
-                        reflect_sample_pdf(m1, uv, wo, nor, wi);
-            MIP_w *= pdf / Spdf;
-
-            vec3 f_r = bxdf(m1, uv, wi, wo, nor) * MIP_w;
-
-            tsect = get_intersect(Ray(pos, wi));
-            if(!tsect.exist) break;
-
-            history *= f_r * abs(dot(nor, wi)) / pdf / RussianRoulette;
-            tr1 = get_triangle(tsect.t_index);
-            m1 = get_material(tr1.m_index);
-            isect = tsect;
-        } else break;
+//        // indirect light
+//        if(rand() < RussianRoulette) {
+//
+//            // Multiple Sampling
+//            if(rand() < m1.spec_trans) {
+//                wi = refract_sample(m1, uv, wo, nor, pdf);
+//                MIP_w = 1.0 / m1.spec_trans;
+//            } else {
+//                wi = reflect_sample(m1, uv, wo, nor, pdf);
+//                MIP_w = 1.0 / (1 - m1.spec_trans);
+//            }
+//            if(pdf <= 0) break;
+//
+//            float Spdf = refract_sample_pdf(m1, uv, wo, nor, wi) +
+//            reflect_sample_pdf(m1, uv, wo, nor, wi);
+//            MIP_w *= pdf / Spdf;
+//
+//            vec3 f_r = bxdf(m1, uv, wi, wo, nor) * MIP_w;
+//
+//            tsect = get_intersect(Ray(pos, wi));
+//            if(!tsect.exist) break;
+//
+//            history *= f_r * abs(dot(nor, wi)) / pdf / RussianRoulette;
+//            tr1 = get_triangle(tsect.t_index);
+//            m1 = get_material(tr1.m_index);
+//            isect = tsect;
+//        } else break;
     }
     return result;
 }
@@ -702,7 +752,7 @@ void main() {
     vec3 wpos = isect.pos;
     worldpos_out = wpos;
 
-//    static mix frame.
+    //    static mix frame.
     vec3 last_col = texture(last_frame, screen_uv).xyz;
     result = mix(last_col, result, 1.0 / frameCounter);
     color_out = result;
