@@ -27,17 +27,23 @@ vec3 refract(vec3 I, vec3 N, float eta) {
     float c1 = dot(N, -I);
     float s1 = sqrt(1 - c1 * c1);
     float s2 = s1 / eta;
-    if(s2 >= 1) return vec3(-1); // full reflect
+    if(s2 >= 1) return vec3(0); // full reflect
     float c2 = sqrt(1 - s2 * s2);
     return -N * c2 + (I + N * c1) / eta;
 }
-
 
 float SchlickGGX(float NdotV, float roughness) {
 	float k = pow2(roughness + 1) / 8;
 	return NdotV / (NdotV * (1 - k) + k);
 }
-float GTR2(float NdotH, float a) {
+
+// G / (2 * NdotV)
+float SchlickGGXi2(float NdotV, float roughness) {
+	float k = pow2(roughness + 1) / 8;
+	return 0.5 / (NdotV * (1 - k) + k);
+}
+
+float DGGX(float NdotH, float a) {
 	float a2 = a * a;
 	float t = 1 + (a2-1)*NdotH*NdotH;
 	return a2 / (PI * t*t);
@@ -48,6 +54,7 @@ vec3 SchlickFresnel(vec3 f0, float c) {
 float fresnel(float cosI, float etaI, float etaT) {
 	float sinI = sqrt(1.0 - cosI * cosI);
 	float sinT = etaI / etaT * sinI;
+	if(sinT > 1) return 1; // Full reflect
 	float cosT = sqrt(1.0 - sinT * sinT);
 	float Rl = pow2((etaI * cosI - etaT * cosT) / (etaI * cosI + etaT * cosT));
 	float Rp = pow2((etaI * cosT - etaT * cosI) / (etaI * cosT + etaT * cosI));

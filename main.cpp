@@ -24,6 +24,7 @@ Camera *camera;
 HDRTexture* skybox;
 NerfCreator nerfCreator;
 bool show_imgui = true;
+uint frameCounter = 0;
 
 // ----
 
@@ -42,16 +43,17 @@ void mouse_callback(GLFWwindow* window, double xpos, double ypos) {
         camera->transform.rotation += vec3(-dy * 0.01, 0, 0);
         mouse_lastX = xpos;
         mouse_lastY = ypos;
+		frameCounter = 0;
     }
 }
 
 void update(float dt) {
 
-    static uint frame = 0, last_frame = 0, last_worldpos = 0;
+    static uint last_frame = 0, last_worldpos = 0;
 	static bool fast_shade = false;
 	static glm::mat4 back_projection(1);
 
-	frame++;
+	frameCounter++;
 
     // 渲染管线
 	// ---------------------------------------
@@ -67,8 +69,9 @@ void update(float dt) {
         glUniform1i(glGetUniformLocation(pass1->shaderProgram, "SCREEN_W"), SCREEN_W);
         glUniform1i(glGetUniformLocation(pass1->shaderProgram, "SCREEN_H"), SCREEN_H);
 		glUniform1i(glGetUniformLocation(pass1->shaderProgram, "SPP"), Config::SPP);
-		glUniform1ui(glGetUniformLocation(pass1->shaderProgram, "frameCounter"), frame);
+		glUniform1ui(glGetUniformLocation(pass1->shaderProgram, "frameCounter"), frameCounter);
         glUniform1f(glGetUniformLocation(pass1->shaderProgram, "skybox_Light_SUM"), skybox->Light_SUM);
+		glUniform1i(glGetUniformLocation(pass1->shaderProgram, "is_motionvector_enabled"), Config::is_motionvector_enabled);
 		glUniform1f(glGetUniformLocation(pass1->shaderProgram, "fov"), SCREEN_FOV);
 		glUniform1i(glGetUniformLocation(pass1->shaderProgram, "SKY_W"), skybox->width);
         glUniform1i(glGetUniformLocation(pass1->shaderProgram, "SKY_H"), skybox->height);
@@ -116,8 +119,9 @@ void update(float dt) {
 
     //--------------------------------------
 
-	if(glfwGetKeyDown(window, GLFW_KEY_R)) fast_shade = !fast_shade, frame = 0;
+	if(glfwGetKeyDown(window, GLFW_KEY_R)) fast_shade = !fast_shade, frameCounter = 0;
 
+	// Menu
 	if(glfwGetKeyDown(window, GLFW_KEY_E)) {
 		show_imgui = show_imgui ^ 1;
 		pass1->reload_meshes(scene);
@@ -129,6 +133,8 @@ void update(float dt) {
 		cout << "Position: " << t.position;
 		cout << "Rotation: " << t.rotation;
 	}
+
+	Transform before = camera->transform;
 
 	// screen shot for nerf.
 	if(glfwGetKeyDown(window, GLFW_KEY_T)) nerfCreator.screenshot(camera);
@@ -145,10 +151,11 @@ void update(float dt) {
 	if(glfwGetKey(window, GLFW_KEY_UP)) camera->transform.rotation += vec3(1, 0, 0) * dt;
 	if(glfwGetKey(window, GLFW_KEY_DOWN)) camera->transform.rotation += vec3(-1, 0, 0) * dt;
 
-
     if(glfwGetKey(window, GLFW_KEY_SPACE)) camera->transform.position += vec3(0, speed * dt, 0);
     if(glfwGetKey(window, GLFW_KEY_LEFT_SHIFT))  camera->transform.position += vec3(0, -speed * dt, 0);
 	if(glfwGetKey(window, GLFW_KEY_Q)) glfwSetWindowShouldClose(window, GL_TRUE);
+
+	if(!(camera->transform == before)) frameCounter = 0;
 }
 
 void init() {
@@ -164,7 +171,7 @@ void init() {
 
     {
         Instance *o1 = AssimpLoader::load_model("model/casa_obj.glb");
-        o1->transform.rotation = vec3(-M_PI / 2, 0, 0);
+        o1->transform.rotation = vec3(-M_PI / 2, M_PI_2, 0);
 		// pre setting
 		Material *m1 = o1->get_child(0)->get_child(1)->meshes[0]->material;
 		m1->roughness = 0.001;
@@ -178,12 +185,12 @@ void init() {
 		m2->spec_trans = 0.5;
 		scene->add_child(o1);
 
-//        Instance *light= Loader::load_model("model/light.obj");
-//        light->transform.scale = vec3(30, 30, 30);
-//        light->transform.position = vec3(0, 100, 0);
-//        light->get_child(0)->meshes[0]->material->emission = vec3(5);
-//        light->get_child(0)->meshes[0]->material->is_emit = true;
-//        scene->add_child(light);
+        Instance *light= AssimpLoader::load_model("model/light.obj");
+        light->transform.scale = vec3(30, 30, 30);
+        light->transform.position = vec3(0, 100, 0);
+        light->get_child(0)->meshes[0]->material->emission = vec3(5);
+        light->get_child(0)->meshes[0]->material->is_emit = true;
+        scene->add_child(light);
     }
 
 	skybox = new HDRTexture("hdrs/kloofendal_48d_partly_cloudy_puresky_2k.hdr");

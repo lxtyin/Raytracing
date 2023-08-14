@@ -75,3 +75,7 @@ vec3 Transform::direction_y() {
 vec3 Transform::direction_z() {
 	return matrix()[2];
 }
+
+bool Transform::operator ==(const Transform& t) const {
+	return position == t.position && scale == t.scale && rotation == t.rotation && order == t.order;
+}
