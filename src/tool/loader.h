@@ -8,7 +8,7 @@
 #include "../instance/Instance.h"
 #include "../instance/Material.h"
 
-namespace Loader{
+namespace AssimpLoader{
 
 	SimpleTexture*  processImage(const string &name, const aiScene *scene);
 	Material* processMaterial(aiMaterial *mat, const aiScene *scene);

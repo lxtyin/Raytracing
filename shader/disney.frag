@@ -4,11 +4,8 @@
 #define M_SIZ 8    // 一个material占的vec3数量
 #define T_SIZ 9    // 一个triangle占的vec3数量
 #define B_SIZ 3    // 一个bvhnode占的vec3数量
-#define INF 1E18
-#define PI 3.1415926
-#define IVPI 0.3183098
-#define EPS 0.0001
-#define RAY_EPS 0.01
+
+#include shader/basic/math
 
 in float pixel_x;
 in float pixel_y;
@@ -19,6 +16,7 @@ layout(location = 1) out vec3 albedo_out;
 layout(location = 2) out vec3 normal_out;
 layout(location = 3) out vec3 worldpos_out;
 
+
 // memory
 // ---------------------------------------------- //
 
@@ -28,15 +26,20 @@ uniform samplerBuffer lightidxs;
 uniform samplerBuffer bvhnodes;
 uniform int light_t_num;
 uniform int triangle_num;
+
 uniform mat4 v2w_mat;
 
 uniform float RussianRoulette = 0.9;
 uniform int SPP = 1;
 uniform float fov = PI / 3;
 uniform bool fast_shade = true; // 仅渲染diffuse_color
+uniform bool is_motionvector_enabled = true;
 
 uniform int SCREEN_W;
 uniform int SCREEN_H;
+uniform sampler2D last_frame;
+uniform sampler2D last_worldpos;
+uniform mat4 back_proj;
 uniform sampler2D texture_list[25];
 uniform sampler2D skybox;
 uniform sampler2D skybox_samplecache;
@@ -45,10 +48,6 @@ uniform int SKY_W;
 uniform int SKY_H;
 uniform uint frameCounter;
 
-// math
-// ---------------------------------------------- //
-int stack[256];
-int stack_h = 0;
 
 uint seed = uint(
 uint(pixel_x + SCREEN_W / 2) * uint(1973) +
@@ -68,53 +67,11 @@ float rand() {
     return float(wang_hash(seed)) / 4294967296.0;
 }
 
-//uint sobel_V[3][32] = {
-//2147483648, 1073741824, 536870912, 268435456, 134217728, 67108864, 33554432, 16777216, 8388608, 4194304, 2097152, 1048576, 524288, 262144, 131072, 65536, 32768, 16384, 8192, 4096, 2048, 1024, 512, 256, 128, 64, 32, 16, 8, 4, 2, 1,
-//2147483648, 3221225472, 2684354560, 4026531840, 2281701376, 3422552064, 2852126720, 4278190080, 2155872256, 3233808384, 2694840320, 4042260480, 2290614272, 3435921408, 2863267840, 4294901760, 2147516416, 3221274624, 2684395520, 4026593280, 2281736192, 3422604288, 2852170240, 4278255360, 2155905152, 3233857728, 2694881440, 4042322160, 2290649224, 3435973836, 2863311530, 4294967295,
-//2147483648, 3221225472, 1610612736, 2415919104, 3892314112, 1543503872, 2382364672, 3305111552, 1753219072, 2629828608, 3999268864, 1435500544, 2154299392, 3231449088, 1626210304, 2421489664, 3900735488, 1556135936, 2388680704, 3314585600, 1751705600, 2627492864, 4008611328, 1431684352, 2147543168, 3221249216, 1610649184, 2415969680, 3892340840, 1543543964, 2382425838, 3305133397
-//};
-//uint sobel(uint i, uint d) {
-//    uint r = 0;
-//    for(int j = 0;i > 0;j++) {
-//        if((i & 1u) == 1) r ^= sobel_V[d][j];
-//        i >>= 1;
-//    }
-//    return r;
-//}
-//
-//// [0, 1)
-//uint seed =
-//float rand() {
-//
-//}
 
-int roundint(float x) {
-    float b = step(x, 0);
-    return int(x - b + 0.5);
-}
-float len2(vec3 x) {
-    return x.x * x.x + x.y * x.y + x.z * x.z;
-}
-float pow2(float x) {
-    return x * x;
-}
-float pow5(float x) {
-    float x2 = x * x;
-    return x2 * x2 * x;
-}
-vec3 powv(vec3 v, float n) {
-    return vec3(pow(v.x, n), pow(v.y, n), pow(v.z, n));
-}
-
-// N(same direction with I)
-vec3 refract(vec3 I, vec3 N, float eta) {
-    float c1 = dot(N, -I);
-    float s1 = sqrt(1 - c1 * c1);
-    float s2 = s1 / eta;
-    if(s2 >= 1) return vec3(0); // full reflect
-    float c2 = sqrt(1 - s2 * s2);
-    return -N * c2 + (I + N * c1) / eta;
-}
+// math
+// ---------------------------------------------- //
+int stack[256];
+int stack_h = 0;
 
 // v原先在n = +z下表示
 vec3 to_world(vec3 v, vec3 n) {
@@ -434,6 +391,7 @@ vec3 skybox_sample(out float pdf) {
     float r = cos(phi);
     vec3 wi = vec3(r * cos(theta), sin(phi), r * sin(theta));
     float w2a = (2 * PI * PI * sqrt(1.0 - wi.y * wi.y)) / (SKY_H * SKY_W); // 积分域转换项
+    if(w2a == 0) w2a = SKY_W * PI / SKY_H; // 极点情况
     pdf = samp.z / w2a;
     return wi;
 }
@@ -441,8 +399,8 @@ float skybox_sample_pdf(vec3 v) {
     vec3 l = get_background_color(v);
     float lw = (l.x * 0.2 + l.y * 0.7 + l.z * 0.1) / skybox_Light_SUM;
     float w2a = (2 * PI * PI * sqrt(1.0 - v.y * v.y)) / (SKY_H * SKY_W); // 积分域转换项
-    float pdf = lw / w2a;
-    return pdf;
+    if(w2a == 0) w2a = SKY_W * PI / SKY_H; // 极点情况
+    return lw / w2a;
 }
 
 // 对于反射和折射采样来说，由于是先对h采样再求反射/折射方向，会采样到一些不合法方向（全反射等）。
@@ -458,14 +416,15 @@ vec3 reflect_sample(in Material m, vec2 uv, vec3 wo, vec3 outN, out float pdf) {
         return vec3(0);
     }
     vec3 wi = reflect(-wo, h);
-    pdf = _pdf / 4 * abs(dot(h, wi));
+    pdf = _pdf / (4 * dot(h, wi));
     return wi;
 }
 float reflect_sample_pdf(in Material m, vec2 uv, vec3 wo, vec3 outN, vec3 wi) {
     vec3 N = outN * sign(dot(outN, wo));
+//    if(dot(N, wo) < 0 || dot(N, wi) < 0) return 0;
     vec3 h = normalize(wi + wo);
     float _pdf = GTR2_sample_pdf(m, uv, N, h);
-    return _pdf / 4 * abs(dot(h, wi));
+    return _pdf / (4 * dot(h, wi));
 }
 
 // 折射光重要性采样
@@ -508,28 +467,6 @@ float refract_sample_pdf(in Material m, vec2 uv, vec3 wo, vec3 outN, vec3 wi) {
 // bxdf
 // ---------------------------------------------- //
 
-float smithG_GGX(float NdotV, float roughness) {
-    float a2 = pow2(pow2(0.5 + roughness / 2));
-    float b = NdotV*NdotV;
-    return 2.0f * b / (NdotV + sqrt(a2 + b - a2*b));
-}
-float GTR2(float NdotH, float a) {
-    float a2 = a * a;
-    float t = 1 + (a2-1)*NdotH*NdotH;
-    return a2 / (PI * t*t);
-}
-vec3 SchlickFresnel(vec3 f0, float c) {
-    return f0 + (vec3(1) - f0) * pow5(1 - c);
-}
-float fresnel(float cosI, float etaI, float etaT) {
-    float sinI = sqrt(1.0 - cosI * cosI);
-    float sinT = etaI / etaT * sinI;
-    float cosT = sqrt(1.0 - sinT * sinT);
-    float Rl = pow2((etaI * cosI - etaT * cosT) / (etaI * cosI + etaT * cosT));
-    float Rp = pow2((etaI * cosT - etaT * cosI) / (etaI * cosT + etaT * cosI));
-    return (Rl + Rp) / 2;
-}
-
 // L(in), N(same direction with L), V(out)
 vec3 btdf(in Material m, vec2 uv, vec3 L, vec3 V, vec3 N, float ior1, float ior2) {
     if(m.spec_trans < EPS) return vec3(0);
@@ -550,14 +487,13 @@ vec3 btdf(in Material m, vec2 uv, vec3 L, vec3 V, vec3 N, float ior1, float ior2
     vec3 m_transmission = sqrt(get_diffuse_color(m, uv)) * m.spec_trans;
 
     float sqrtDenom = LdotH + eta * VdotH;
-    float Ds = GTR2(NdotH, m_roughness);
-    float iFs = 1 - fresnel(LdotH, ior1, ior2);
-    if(iFs <= 0) return vec3(0); // 全反射
-    float Gs = smithG_GGX(abs(NdotL), m_roughness);
-    Gs *= smithG_GGX(abs(NdotV), m_roughness);
+    float Ds = DGGX(NdotH, m_roughness);
+    float Fs = fresnel(LdotH, ior1, ior2);
+    float Gs = SchlickGGX(abs(NdotL), m_roughness);
+    Gs *= SchlickGGX(abs(NdotV), m_roughness);
 
-    vec3 refraction = abs((LdotH * VdotH * pow2(eta) * Ds * m_transmission) // ignore F and G tmporary
-    / (NdotV * NdotL * pow2(sqrtDenom)));
+    vec3 refraction = (LdotH * VdotH * pow2(eta) * Ds * (1 - Fs) * Gs * m_transmission) // ignore F and G tmporary
+    / (NdotV * NdotL * pow2(sqrtDenom));
 
     return refraction;
 }
@@ -592,14 +528,13 @@ vec3 brdf(in Material m, vec2 uv, vec3 L, vec3 V, vec3 N) {
     //    vec3 diffuse = IVPI * mix(Fd, ss, m.subsurface) * Cdlin;
 
     // specular
-    float Ds = GTR2(NdotH, m_roughness);
+    float Ds = DGGX(NdotH, m_roughness);
     vec3 Fs = SchlickFresnel(Cspec0, LdotH);
-    float Gs = smithG_GGX(NdotL, m_roughness);
-    Gs *= smithG_GGX(NdotV, m_roughness);
+    float Gs = SchlickGGX(NdotL, m_roughness);
+    Gs *= SchlickGGX(NdotV, m_roughness);
 
     vec3 specular = Gs * Fs * Ds / (4 * NdotV * NdotL);
 
-    // 菲涅尔项已经蕴含了金属度
     return diffuse * (1 - m_metallic) + specular;
 }
 
@@ -622,7 +557,7 @@ vec3 bxdf(in Material m, vec2 uv, vec3 L, vec3 V, vec3 outN) {
 // path tracing
 // ---------------------------------------------- //
 
-vec3 shade(Ray ray, Intersect first_isect) {
+vec3 shade(Ray ray, in Intersect first_isect) {
 
     vec3 result = vec3(0);
     vec3 history = vec3(1); // 栈上乘积
@@ -646,6 +581,7 @@ vec3 shade(Ray ray, Intersect first_isect) {
         vec3 wo = -ray.dir;
         vec3 nor = isect.normal;                      // 指向物体外的法线
         vec2 uv = interpolate_uv(tr1, isect.u, isect.v);
+        Intersect tsect;
 
         // 积分策略：球面拆分为天空和其他部分，分别进行多重重要性采样
 
@@ -662,17 +598,26 @@ vec3 shade(Ray ray, Intersect first_isect) {
                 MIP_w = 2.0 / (1.0 - m1.spec_trans);
             }
         }
-        float Spdf = skybox_sample_pdf(wi) +
-                refract_sample_pdf(m1, uv, wo, nor, wi) +
-                reflect_sample_pdf(m1, uv, wo, nor, wi);
-        MIP_w *= pdf / Spdf;
+        if(pdf > 0) {
 
-        Intersect tsect = get_intersect(Ray(pos, wi));
-        if(pdf > 0 && !tsect.exist) {
-            vec3 f_r = bxdf(m1, uv, wi, wo, nor) * MIP_w;
-            vec3 recv_col = get_background_color(wi) * f_r * abs(dot(nor, wi)) / pdf;
-            result += history * recv_col;
+            float refract_pdf = refract_sample_pdf(m1, uv, wo, nor, wi);
+            float reflect_pdf = reflect_sample_pdf(m1, uv, wo, nor, wi);
+
+//            if(reflect_pdf > 0 && refract_pdf > 0) return vec3(1000, 0, 0);
+
+            float Spdf = skybox_sample_pdf(wi) + refract_pdf + reflect_pdf;
+
+            MIP_w *= pdf / Spdf;
+            if(isnan(MIP_w) || isinf(MIP_w)) return vec3(1000, 0, 0);
+
+            tsect = get_intersect(Ray(pos, wi));
+            if(!tsect.exist) {
+                vec3 f_r = bxdf(m1, uv, wi, wo, nor) * MIP_w;
+                vec3 recv_col = get_background_color(wi) * f_r * abs(dot(nor, wi)) / pdf;
+                result += history * recv_col;
+            }
         }
+
 
         // indirect light
         if(rand() < RussianRoulette) {
@@ -693,7 +638,8 @@ vec3 shade(Ray ray, Intersect first_isect) {
 
             vec3 f_r = bxdf(m1, uv, wi, wo, nor) * MIP_w;
 
-            tsect = get_intersect(Ray(pos, wi));
+            ray = Ray(pos, wi);
+            tsect = get_intersect(ray);
             if(!tsect.exist) break;
 
             history *= f_r * abs(dot(nor, wi)) / pdf / RussianRoulette;
@@ -718,7 +664,8 @@ void main() {
     normal_out = vec3(1, 1, 1);
     Intersect isect = get_intersect(ray);
     if(!isect.exist) {
-        worldpos_out = ray.dir * 10000;
+        worldpos_out = vec3(10000);
+
         color_out = get_background_color(ray.dir);
         return;
     }
@@ -726,7 +673,6 @@ void main() {
     Triangle tr1 = get_triangle(isect.t_index);
     Material m1 = get_material(tr1.m_index);
     vec2 uv = interpolate_uv(tr1, isect.u, isect.v);
-    worldpos_out = isect.pos;
     albedo_out = get_diffuse_color(m1, uv);
     normal_out = isect.normal;
 
@@ -735,15 +681,35 @@ void main() {
         return;
     }
 
-    vec3 result = vec3(0);
-    float cnt = 0;
-    for(int i = 0;i < SPP;i++) {
-        if(length(result) < 0.1) {
-            result += shade(ray, isect);
-            cnt++;
+    vec3 result = shade(ray, isect);
+    if(any(isnan(result))) result = vec3(0, 0, 0); // Minimal probability
+
+    vec3 wpos = isect.pos;
+    worldpos_out = wpos;
+
+//    static mix frame.
+    if(!is_motionvector_enabled) {
+        vec3 last_col = texture(last_frame, screen_uv).xyz;
+        result = mix(last_col, result, 1.0 / frameCounter);
+        color_out = result;
+        return;
+    }
+
+    // motion vector
+    vec4 Hcoord = back_proj * vec4(wpos, 1); // homogeneous coordinates
+    vec2 last_xy = Hcoord.xy / Hcoord.w;
+    if(0. < last_xy.x && last_xy.x < 1. && 0. < last_xy.y && last_xy.y < 1.) {
+        vec3 _wpos = texture(last_worldpos, last_xy).xyz;
+        if(length(wpos - _wpos) < 1) {
+            vec3 last_col = texture(last_frame, last_xy).xyz;
+            result = mix(last_col, result, 0.2);
+            color_out = result;
+            return;
         }
     }
-    result /= cnt;
+
+    for(int i = 1;i < SPP;i++) result += shade(ray, isect);
+    result /= SPP;
 
     color_out = result;
 }

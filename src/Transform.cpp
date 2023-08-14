@@ -23,18 +23,21 @@ mat4 Transform::matrix() {
 	float x = rotation.x;
 	float y = rotation.y;
 	float z = rotation.z;
-	mat4 rot_x{ 1,		0,		0,		0,
+	mat4 rot_x = glm::matbyrow({
+				1,		0,		0,		0,
 				0,		cos(x),	-sin(x),0,
 				0,		sin(x),	cos(x),	0,
-				0, 		0,	 	0,		1};
-	mat4 rot_y{ cos(y), 0,		sin(y), 0,
+				0, 		0,	 	0,		1});
+	mat4 rot_y = glm::matbyrow({
+				cos(y), 0,		sin(y), 0,
 				0, 		1,		0,		0,
 				-sin(y),0,		cos(y), 0,
-				0, 		0,		0, 		1 };
-	mat4 rot_z{ cos(z), -sin(z),0, 		0,
+				0, 		0,		0, 		1 });
+	mat4 rot_z = glm::matbyrow({
+				cos(z), -sin(z),0, 		0,
 				sin(z), cos(z), 0, 		0,
 				0, 	 	0,	   	1, 		0,
-				0,   	0,  	0, 		1 };
+				0,   	0,  	0, 		1 });
 	mat4 res(1);
 	for(char c: order){
 		if(c == 'X') res *= rot_x;
@@ -71,4 +74,8 @@ vec3 Transform::direction_y() {
 }
 vec3 Transform::direction_z() {
 	return matrix()[2];
+}
+
+bool Transform::operator ==(const Transform& t) const {
+	return position == t.position && scale == t.scale && rotation == t.rotation && order == t.order;
 }

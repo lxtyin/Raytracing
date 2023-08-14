@@ -41,4 +41,15 @@ namespace glm {
 		}
 		return f;
 	}
+
+	inline mat4 matbyrow(const std::initializer_list<float> &a) {
+		assert(a.size() == 16);
+		const float *d = data(a);
+		return {
+			d[0], d[4], d[8], d[12],
+			d[1], d[5], d[9], d[13],
+			d[2], d[6], d[10], d[14],
+			d[3], d[7], d[11], d[15]
+		};
+	}
 }

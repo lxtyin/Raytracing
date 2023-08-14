@@ -15,12 +15,12 @@ class Config {
  public:
 	static int SPP;
 	static bool is_filter_enabled;
-	static bool is_mix_frame;
+	static bool is_motionvector_enabled;
 
 	static void insert_gui() {
 		if(ImGui::TreeNode("Config")) {
 			ImGui::Checkbox("Use Filter", &is_filter_enabled);
-			ImGui::Checkbox("Mix Frame", &is_mix_frame);
+			ImGui::Checkbox("Use Motion Vector", &is_motionvector_enabled);
 			ImGui::SliderInt("Samples per pixel", &SPP, 1, 32);
 			ImGui::TreePop();
 		}
@@ -29,7 +29,7 @@ class Config {
 
 inline int Config::SPP = 1;
 inline bool Config::is_filter_enabled = false;
-inline bool Config::is_mix_frame = true;
+inline bool Config::is_motionvector_enabled = false;
 
 
 #endif //PATH_TRACING_CONFIG_H

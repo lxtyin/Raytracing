@@ -8,6 +8,7 @@
 #include "src/Config.h"
 #include "src/tool/loader.h"
 #include "src/texture/HDRTexture.h"
+#include "src/instance/Camera.h"
 #include "imgui/imgui.h"
 #include "imgui/backend/imgui_impl_glfw.h"
 #include "imgui/backend/imgui_impl_opengl3.h"
@@ -17,12 +18,13 @@ using namespace std;
 // 一些状态 ------
 GLFWwindow *window;
 Renderer *pass1;
-RenderPass *pass_mix, *pass_cp, *pass_fw, *pass_fh;
+RenderPass *pass_mix, *pass_fw, *pass_fh;
 Scene *scene;
-Instance *camera;
+Camera *camera;
 HDRTexture* skybox;
 NerfCreator nerfCreator;
 bool show_imgui = true;
+uint frameCounter = 0;
 
 // ----
 
@@ -37,52 +39,61 @@ void mouse_callback(GLFWwindow* window, double xpos, double ypos) {
     if(mouse_button == GLFW_PRESS) {
         double dx = xpos - mouse_lastX;
         double dy = ypos - mouse_lastY;
-        camera->transform.rotation += vec3(0, dx * 0.01, 0);
-        camera->transform.rotation += vec3(dy * 0.01, 0, 0);
+        camera->transform.rotation += vec3(0, -dx * 0.01, 0);
+        camera->transform.rotation += vec3(-dy * 0.01, 0, 0);
         mouse_lastX = xpos;
         mouse_lastY = ypos;
+		frameCounter = 0;
     }
 }
 
 void update(float dt) {
 
-    static uint frame = 0, last_frame_hdr = 0;
-	frame++;
+    static uint last_frame = 0, last_worldpos = 0;
+	static bool fast_shade = false;
+	static glm::mat4 back_projection(1);
+
+	frameCounter++;
 
     // 渲染管线
 	// ---------------------------------------
     pass1->use();
     {
-		if(glfwGetKey(window, GLFW_KEY_R)) {
-			glUniform1i(glGetUniformLocation(pass1->shaderProgram, "fast_shade"), false);
-		} else {
-			frame = 1;
-			glUniform1i(glGetUniformLocation(pass1->shaderProgram, "fast_shade"), true);
-		}
-
+		glUniform1i(glGetUniformLocation(pass1->shaderProgram, "fast_shade"), fast_shade);
 		pass1->bind_texture("skybox", skybox->TTO);
 		pass1->bind_texture("skybox_samplecache", skybox->sample_cache_tto);
-        glUniformMatrix4fv(glGetUniformLocation(pass1->shaderProgram, "v2w_mat"), 1, GL_FALSE, glm::value_ptr(camera->matrix_to_global()));
+		pass1->bind_texture("last_frame", last_frame);
+		pass1->bind_texture("last_worldpos", last_worldpos);
+        glUniformMatrix4fv(glGetUniformLocation(pass1->shaderProgram, "v2w_mat"), 1, GL_FALSE, glm::value_ptr(camera->v2w_matrix()));
+		glUniformMatrix4fv(glGetUniformLocation(pass1->shaderProgram, "back_proj"), 1, GL_FALSE, glm::value_ptr(back_projection));
         glUniform1i(glGetUniformLocation(pass1->shaderProgram, "SCREEN_W"), SCREEN_W);
         glUniform1i(glGetUniformLocation(pass1->shaderProgram, "SCREEN_H"), SCREEN_H);
 		glUniform1i(glGetUniformLocation(pass1->shaderProgram, "SPP"), Config::SPP);
-		glUniform1ui(glGetUniformLocation(pass1->shaderProgram, "frameCounter"), frame);
+		glUniform1ui(glGetUniformLocation(pass1->shaderProgram, "frameCounter"), frameCounter);
         glUniform1f(glGetUniformLocation(pass1->shaderProgram, "skybox_Light_SUM"), skybox->Light_SUM);
+		glUniform1i(glGetUniformLocation(pass1->shaderProgram, "is_motionvector_enabled"), Config::is_motionvector_enabled);
 		glUniform1f(glGetUniformLocation(pass1->shaderProgram, "fov"), SCREEN_FOV);
 		glUniform1i(glGetUniformLocation(pass1->shaderProgram, "SKY_W"), skybox->width);
         glUniform1i(glGetUniformLocation(pass1->shaderProgram, "SKY_H"), skybox->height);
     }
     pass1->draw();
 
+	last_frame = pass1->attach_textures[0];
+
+	last_worldpos = pass1->attach_textures[3];
+	glm::mat4 viewPort = glm::matbyrow({
+		1./SCREEN_W, 0, 			0,	 0.5,
+		0, 			 1./SCREEN_H, 	0,	 0.5,
+		0, 			 0, 			0,	 0,
+		0, 			 0, 			0,	 1
+	});
+	back_projection = viewPort * camera->projection() * camera->w2v_matrix();
+
 	pass_mix->use();
     {
-		glUniform1ui(glGetUniformLocation(pass_mix->shaderProgram, "frameCounter"), frame);
-		glUniform1i(glGetUniformLocation(pass_mix->shaderProgram, "is_mix_frame"), Config::is_mix_frame);
-		pass_mix->bind_texture("last_mixed_frame", last_frame_hdr);
         pass_mix->bind_texture("prevpass_color", pass1->attach_textures[0]);
     }
     pass_mix->draw();
-	last_frame_hdr = pass_mix->attach_textures[1];
 
 	pass_fw->use();
     {
@@ -108,6 +119,9 @@ void update(float dt) {
 
     //--------------------------------------
 
+	if(glfwGetKeyDown(window, GLFW_KEY_R)) fast_shade = !fast_shade, frameCounter = 0;
+
+	// Menu
 	if(glfwGetKeyDown(window, GLFW_KEY_E)) {
 		show_imgui = show_imgui ^ 1;
 		pass1->reload_meshes(scene);
@@ -120,6 +134,8 @@ void update(float dt) {
 		cout << "Rotation: " << t.rotation;
 	}
 
+	Transform before = camera->transform;
+
 	// screen shot for nerf.
 	if(glfwGetKeyDown(window, GLFW_KEY_T)) nerfCreator.screenshot(camera);
 	if(glfwGetKeyDown(window, GLFW_KEY_Y) || glfwGetKeyDown(window, GLFW_KEY_Q)) nerfCreator.writejson();
@@ -130,31 +146,32 @@ void update(float dt) {
     if(glfwGetKey(window, GLFW_KEY_D)) camera->transform.position += camera->transform.direction_x() * speed * dt;
     if(glfwGetKey(window, GLFW_KEY_A)) camera->transform.position += camera->transform.direction_x() * -speed * dt;
 
-	if(glfwGetKey(window, GLFW_KEY_LEFT)) camera->transform.rotation += vec3(0, -1, 0) * dt;
-	if(glfwGetKey(window, GLFW_KEY_RIGHT)) camera->transform.rotation += vec3(0, 1, 0) * dt;
-	if(glfwGetKey(window, GLFW_KEY_UP)) camera->transform.rotation += vec3(-1, 0, 0) * dt;
-	if(glfwGetKey(window, GLFW_KEY_DOWN)) camera->transform.rotation += vec3(1, 0, 0) * dt;
-
+	if(glfwGetKey(window, GLFW_KEY_LEFT)) camera->transform.rotation += vec3(0, 1, 0) * dt;
+	if(glfwGetKey(window, GLFW_KEY_RIGHT)) camera->transform.rotation += vec3(0, -1, 0) * dt;
+	if(glfwGetKey(window, GLFW_KEY_UP)) camera->transform.rotation += vec3(1, 0, 0) * dt;
+	if(glfwGetKey(window, GLFW_KEY_DOWN)) camera->transform.rotation += vec3(-1, 0, 0) * dt;
 
     if(glfwGetKey(window, GLFW_KEY_SPACE)) camera->transform.position += vec3(0, speed * dt, 0);
     if(glfwGetKey(window, GLFW_KEY_LEFT_SHIFT))  camera->transform.position += vec3(0, -speed * dt, 0);
 	if(glfwGetKey(window, GLFW_KEY_Q)) glfwSetWindowShouldClose(window, GL_TRUE);
+
+	if(!(camera->transform == before)) frameCounter = 0;
 }
 
 void init() {
 
     // passes
-    pass1 = new Renderer("shader/disney.frag", 4);
-    pass_mix = new RenderPass("shader/mixAndMap.frag", 2);
-	pass_cp = new RenderPass("shader/fireflyClamp.frag", 1);
-    pass_fw = new RenderPass("shader/filter_w.frag", 1);
-	pass_fh = new RenderPass("shader/filter_h.frag", 0, true);
+    pass1    = new Renderer("shader/pathtracing.frag", 4);
+    pass_mix = new RenderPass("shader/postprocessing/mixAndMap.frag", 1);
+    pass_fw  = new RenderPass("shader/postprocessing/filter_w.frag", 1);
+	pass_fh  = new RenderPass("shader/postprocessing/filter_h.frag", 0, true);
 
     scene = new Scene("Scene");
-    camera = new Instance;
+    camera = new Camera(M_PI / 3);
+
     {
-        Instance *o1 = Loader::load_model("model/casa_obj.glb");
-        o1->transform.rotation = vec3(M_PI / 2, 0, 0);
+        Instance *o1 = AssimpLoader::load_model("model/casa_obj.glb");
+        o1->transform.rotation = vec3(-M_PI / 2, M_PI_2, 0);
 		// pre setting
 		Material *m1 = o1->get_child(0)->get_child(1)->meshes[0]->material;
 		m1->roughness = 0.001;
@@ -168,19 +185,19 @@ void init() {
 		m2->spec_trans = 0.5;
 		scene->add_child(o1);
 
-//        Instance *light= Loader::load_model("model/light.obj");
-//        light->transform.scale = vec3(30, 30, 30);
-//        light->transform.position = vec3(0, 100, 0);
-//        light->get_child(0)->meshes[0]->material->emission = vec3(5);
-//        light->get_child(0)->meshes[0]->material->is_emit = true;
-//        scene->add_child(light);
+        Instance *light= AssimpLoader::load_model("model/light.obj");
+        light->transform.scale = vec3(30, 30, 30);
+        light->transform.position = vec3(0, 100, 0);
+        light->get_child(0)->meshes[0]->material->emission = vec3(5);
+        light->get_child(0)->meshes[0]->material->is_emit = true;
+        scene->add_child(light);
     }
 
 	skybox = new HDRTexture("hdrs/kloofendal_48d_partly_cloudy_puresky_2k.hdr");
 
     camera->transform.rotation.y = M_PI;
 	camera->transform.position = vec3(-10.1444, 3.76839, 18.4049);
-	camera->transform.rotation = vec3(0.26, 6.92161, 0);
+	camera->transform.rotation = vec3(-0.26, 5.92161, 0);
     scene->reload();
     pass1->reload_scene(scene);
 }

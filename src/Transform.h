@@ -23,6 +23,8 @@ public:
     Transform();
     Transform(vec3 position, vec3 rotation, vec3 scale);
 
+	bool operator ==(const Transform &t) const;
+
 	vec3 direction_x();
 	vec3 direction_y();
 	vec3 direction_z();
