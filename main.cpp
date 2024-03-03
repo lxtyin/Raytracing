@@ -49,7 +49,9 @@ void mouse_callback(GLFWwindow* window, double xpos, double ypos) {
 
 void update(float dt) {
 
-    static uint last_frame = 0, last_worldpos = 0;
+//    scene->reload();
+    pass1->reload_scene(scene);
+    static uint last_colorT = 0, last_wposT = 0;
 	static bool fast_shade = false;
 	static glm::mat4 back_projection(1);
 
@@ -57,66 +59,69 @@ void update(float dt) {
 
     // 渲染管线
 	// ---------------------------------------
-    pass1->use();
     {
-		glUniform1i(glGetUniformLocation(pass1->shaderProgram, "fast_shade"), fast_shade);
-		pass1->bind_texture("skybox", skybox->TTO);
-		pass1->bind_texture("skybox_samplecache", skybox->sample_cache_tto);
-		pass1->bind_texture("last_frame", last_frame);
-		pass1->bind_texture("last_worldpos", last_worldpos);
-        glUniformMatrix4fv(glGetUniformLocation(pass1->shaderProgram, "v2w_mat"), 1, GL_FALSE, glm::value_ptr(camera->v2w_matrix()));
-		glUniformMatrix4fv(glGetUniformLocation(pass1->shaderProgram, "back_proj"), 1, GL_FALSE, glm::value_ptr(back_projection));
-        glUniform1i(glGetUniformLocation(pass1->shaderProgram, "SCREEN_W"), SCREEN_W);
-        glUniform1i(glGetUniformLocation(pass1->shaderProgram, "SCREEN_H"), SCREEN_H);
-		glUniform1i(glGetUniformLocation(pass1->shaderProgram, "SPP"), Config::SPP);
-		glUniform1ui(glGetUniformLocation(pass1->shaderProgram, "frameCounter"), frameCounter);
-        glUniform1f(glGetUniformLocation(pass1->shaderProgram, "skybox_Light_SUM"), skybox->Light_SUM);
-		glUniform1i(glGetUniformLocation(pass1->shaderProgram, "is_motionvector_enabled"), Config::is_motionvector_enabled);
-		glUniform1f(glGetUniformLocation(pass1->shaderProgram, "fov"), SCREEN_FOV);
-		glUniform1i(glGetUniformLocation(pass1->shaderProgram, "SKY_W"), skybox->width);
-        glUniform1i(glGetUniformLocation(pass1->shaderProgram, "SKY_H"), skybox->height);
+        pass1->use();
+        {
+            glUniform1i(glGetUniformLocation(pass1->shaderProgram, "fast_shade"), fast_shade);
+            pass1->bind_texture("skybox", skybox->TTO);
+            pass1->bind_texture("skybox_samplecache", skybox->sample_cache_tto);
+            glUniformMatrix4fv(glGetUniformLocation(pass1->shaderProgram, "v2w_mat"), 1, GL_FALSE, glm::value_ptr(camera->v2w_matrix()));
+            glUniform1i(glGetUniformLocation(pass1->shaderProgram, "SCREEN_W"), SCREEN_W);
+            glUniform1i(glGetUniformLocation(pass1->shaderProgram, "SCREEN_H"), SCREEN_H);
+            glUniform1i(glGetUniformLocation(pass1->shaderProgram, "SPP"), Config::SPP);
+            glUniform1ui(glGetUniformLocation(pass1->shaderProgram, "frameCounter"), frameCounter);
+            glUniform1f(glGetUniformLocation(pass1->shaderProgram, "skybox_Light_SUM"), skybox->Light_SUM);
+            glUniform1f(glGetUniformLocation(pass1->shaderProgram, "fov"), SCREEN_FOV);
+            glUniform1i(glGetUniformLocation(pass1->shaderProgram, "SKY_W"), skybox->width);
+            glUniform1i(glGetUniformLocation(pass1->shaderProgram, "SKY_H"), skybox->height);
+        }
+        pass1->draw();
+
+        glm::mat4 viewPort = glm::matbyrow({
+                                                   1./SCREEN_W, 0, 			0,	 0.5,
+                                                   0, 			 1./SCREEN_H, 	0,	 0.5,
+                                                   0, 			 0, 			0,	 0,
+                                                   0, 			 0, 			0,	 1
+                                           });
+        back_projection = viewPort * camera->projection() * camera->w2v_matrix();
+
+        pass_mix->use();
+        {
+            pass_mix->bind_texture("cur_colorT", pass1->attach_textures[0]);
+            pass_mix->bind_texture("cur_wposT", pass1->attach_textures[3]);
+            pass_mix->bind_texture("last_colorT", last_colorT);
+            pass_mix->bind_texture("last_wposT", last_wposT);
+            glUniform1ui(glGetUniformLocation(pass_mix->shaderProgram, "frameCounter"), frameCounter);
+            glUniformMatrix4fv(glGetUniformLocation(pass_mix->shaderProgram, "back_proj"), 1, GL_FALSE, glm::value_ptr(back_projection));
+            glUniform1i(glGetUniformLocation(pass_mix->shaderProgram, "is_motionvector_enabled"), Config::is_motionvector_enabled);
+        }
+        pass_mix->draw();
+
+        last_colorT = pass_mix->attach_textures[1];
+        last_wposT = pass1->attach_textures[3];
+
+        pass_fw->use();
+        {
+            glUniform1i(glGetUniformLocation(pass_fw->shaderProgram, "SCREEN_W"), SCREEN_W);
+            glUniform1i(glGetUniformLocation(pass_fw->shaderProgram, "SCREEN_H"), SCREEN_H);
+            glUniform1i(glGetUniformLocation(pass_fw->shaderProgram, "is_filter_enabled"), Config::is_filter_enabled);
+            pass_fw->bind_texture("prevpass_color", pass_mix->attach_textures[0]);
+            pass_fw->bind_texture("prevpass_albedo", pass1->attach_textures[1]);
+            pass_fw->bind_texture("prevpass_normal", pass1->attach_textures[2]);
+        }
+        pass_fw->draw();
+
+        pass_fh->use();
+        {
+            glUniform1i(glGetUniformLocation(pass_fh->shaderProgram, "SCREEN_W"), SCREEN_W);
+            glUniform1i(glGetUniformLocation(pass_fh->shaderProgram, "SCREEN_H"), SCREEN_H);
+            glUniform1i(glGetUniformLocation(pass_fh->shaderProgram, "is_filter_enabled"), Config::is_filter_enabled);
+            pass_fh->bind_texture("prevpass_color", pass_fw->attach_textures[0]);
+            pass_fh->bind_texture("prevpass_albedo", pass1->attach_textures[1]);
+            pass_fh->bind_texture("prevpass_normal", pass1->attach_textures[2]);
+        }
+        pass_fh->draw();
     }
-    pass1->draw();
-
-	last_frame = pass1->attach_textures[0];
-
-	last_worldpos = pass1->attach_textures[3];
-	glm::mat4 viewPort = glm::matbyrow({
-		1./SCREEN_W, 0, 			0,	 0.5,
-		0, 			 1./SCREEN_H, 	0,	 0.5,
-		0, 			 0, 			0,	 0,
-		0, 			 0, 			0,	 1
-	});
-	back_projection = viewPort * camera->projection() * camera->w2v_matrix();
-
-	pass_mix->use();
-    {
-        pass_mix->bind_texture("prevpass_color", pass1->attach_textures[0]);
-    }
-    pass_mix->draw();
-
-	pass_fw->use();
-    {
-		glUniform1i(glGetUniformLocation(pass_fw->shaderProgram, "SCREEN_W"), SCREEN_W);
-		glUniform1i(glGetUniformLocation(pass_fw->shaderProgram, "SCREEN_H"), SCREEN_H);
-		glUniform1i(glGetUniformLocation(pass_fw->shaderProgram, "is_filter_enabled"), Config::is_filter_enabled);
-		pass_fw->bind_texture("prevpass_color", pass_mix->attach_textures[0]);
-		pass_fw->bind_texture("prevpass_albedo", pass1->attach_textures[1]);
-		pass_fw->bind_texture("prevpass_normal", pass1->attach_textures[2]);
-    }
-    pass_fw->draw();
-
-	pass_fh->use();
-	{
-		glUniform1i(glGetUniformLocation(pass_fh->shaderProgram, "SCREEN_W"), SCREEN_W);
-		glUniform1i(glGetUniformLocation(pass_fh->shaderProgram, "SCREEN_H"), SCREEN_H);
-		glUniform1i(glGetUniformLocation(pass_fh->shaderProgram, "is_filter_enabled"), Config::is_filter_enabled);
-		pass_fh->bind_texture("prevpass_color", pass_fw->attach_textures[0]);
-		pass_fh->bind_texture("prevpass_albedo", pass1->attach_textures[1]);
-		pass_fh->bind_texture("prevpass_normal", pass1->attach_textures[2]);
-	}
-	pass_fh->draw();
-
     //--------------------------------------
 
 	if(glfwGetKeyDown(window, GLFW_KEY_R)) fast_shade = !fast_shade, frameCounter = 0;
@@ -162,7 +167,7 @@ void init() {
 
     // passes
     pass1    = new Renderer("shader/pathtracing.frag", 4);
-    pass_mix = new RenderPass("shader/postprocessing/mixAndMap.frag", 1);
+    pass_mix = new RenderPass("shader/postprocessing/mixAndMap.frag", 2);
     pass_fw  = new RenderPass("shader/postprocessing/filter_w.frag", 1);
 	pass_fh  = new RenderPass("shader/postprocessing/filter_h.frag", 0, true);
 
@@ -171,18 +176,18 @@ void init() {
 
     {
         Instance *o1 = AssimpLoader::load_model("model/casa_obj.glb");
-        o1->transform.rotation = vec3(-M_PI / 2, M_PI_2, 0);
+        o1->transform.rotation = vec3(-M_PI / 2, M_PI / 4, 0);
 		// pre setting
 		Material *m1 = o1->get_child(0)->get_child(1)->meshes[0]->material;
-		m1->roughness = 0.001;
-		m1->metallic = 1;
+		m1->roughness = 0.01;
+		m1->metallic = 0;
 		m1->index_of_refraction = 1.25;
 		m1->spec_trans = 1;
 		Material *m2 = o1->get_child(0)->get_child(3)->meshes[0]->material;
-		m2->roughness = 0.001;
-		m2->metallic = 0.6;
+		m2->roughness = 0.04;
+		m2->metallic = 0;
 		m2->index_of_refraction = 1.01;
-		m2->spec_trans = 0.5;
+		m2->spec_trans = 0.8;
 		scene->add_child(o1);
 
         Instance *light= AssimpLoader::load_model("model/light.obj");
@@ -196,14 +201,13 @@ void init() {
 	skybox = new HDRTexture("hdrs/kloofendal_48d_partly_cloudy_puresky_2k.hdr");
 
     camera->transform.rotation.y = M_PI;
-	camera->transform.position = vec3(-10.1444, 3.76839, 18.4049);
-	camera->transform.rotation = vec3(-0.26, 5.92161, 0);
+	camera->transform.position = vec3(-13.7884, 11.7131, 4.57255);
+	camera->transform.rotation = vec3(-0.58, 11.3216, 0);
     scene->reload();
     pass1->reload_scene(scene);
 }
 
 int main(int argc, const char* argv[]) {
-
     glfwInit();
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);//主版本号
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);//次版本号

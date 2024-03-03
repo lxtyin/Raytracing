@@ -33,14 +33,10 @@ uniform float RussianRoulette = 0.9;
 uniform int SPP = 1;
 uniform float fov = PI / 3;
 uniform bool fast_shade = true; // 仅渲染diffuse_color
-uniform bool is_motionvector_enabled = true;
 
 uniform int SCREEN_W;
 uniform int SCREEN_H;
-uniform sampler2D last_frame;
-uniform sampler2D last_worldpos;
-uniform mat4 back_proj;
-uniform sampler2D texture_list[25];
+uniform sampler2D texture_list[26];
 uniform sampler2D skybox;
 uniform sampler2D skybox_samplecache;
 uniform float skybox_Light_SUM;
@@ -431,12 +427,12 @@ vec3 btdf(in Material m, vec2 uv, vec3 L, vec3 V, float ior1, float ior2) {
     float NdotV = V.z;
     if(NdotL <= 0 || NdotV >= 0) return vec3(0);
     float eta = ior2 / ior1;
-    vec3 H = -normalize(L + eta * V);
+    vec3 H = normalize(L + eta * V);
+    H *= sign(H.z);
     float NdotH = H.z;
-    if(NdotH <= 0) H = -H;
     float LdotH = dot(L, H);
     float VdotH = dot(V, H);
-    if(LdotH * VdotH >= 0) return vec3(0);
+    if(LdotH <= 0 || VdotH >= 0) return vec3(0);
 
     float m_roughness = get_roughness(m, uv);
     float m_metallic = get_metallic(m, uv);
@@ -465,6 +461,30 @@ vec3 brdf(in Material m, vec2 uv, vec3 L, vec3 V) {
     float m_metallic = get_metallic(m, uv);
     vec3 m_albedo = get_diffuse_color(m, uv);
 
+    // specular
+    float Ds = DGGX(NdotH, m_roughness);
+    vec3 F0 = mix(vec3(0.04), m_albedo, m_metallic);
+    vec3 Fs = SchlickFresnel(F0, LdotH);
+    float Gs = SchlickGGXi2(NdotL, m_roughness);
+    Gs *= SchlickGGXi2(NdotV, m_roughness);
+
+    vec3 specular = Gs * Fs * Ds;
+
+    return specular;
+}
+
+vec3 bssdf(in Material m, vec2 uv, vec3 L, vec3 V) {
+    vec3 H = normalize(L + V);
+    float NdotL = L.z;
+    float NdotV = V.z;
+    float NdotH = H.z;
+    float LdotH = dot(L, H);
+    if(NdotL <= 0 || NdotV <= 0) return vec3(0); // assert!
+
+    float m_roughness = get_roughness(m, uv);
+    float m_metallic = get_metallic(m, uv);
+    vec3 m_albedo = get_diffuse_color(m, uv);
+
     // diffuse
     float FL = pow5(1 - NdotL), FV = pow5(1 - NdotV);
     float Fd90 = 0.5 + 2 * LdotH*LdotH * m_roughness;
@@ -477,16 +497,7 @@ vec3 brdf(in Material m, vec2 uv, vec3 L, vec3 V) {
     //    float ss = 1.25 * (Fss * (1 / (NdotL + NdotV) - .5) + .5);
     //    vec3 diffuse = IVPI * mix(Fd, ss, m.subsurface) * Cdlin;
 
-    // specular
-    float Ds = DGGX(NdotH, m_roughness);
-    vec3 F0 = mix(vec3(0.04), m_albedo, m_metallic);
-    vec3 Fs = SchlickFresnel(F0, LdotH);
-    float Gs = SchlickGGXi2(NdotL, m_roughness);
-    Gs *= SchlickGGXi2(NdotV, m_roughness);
-
-    vec3 specular = Gs * Fs * Ds;
-
-    return diffuse * (1 - m_metallic) + specular;
+    return diffuse * (1 - m_metallic);
 }
 
 // N = (0, 0, 1)
@@ -494,7 +505,7 @@ vec3 bxdf_eval(in Material m, vec2 uv, vec3 L, vec3 V) {
     if(L.z * V.z >= 0) {
         V.z *= sign(L.z);
         L.z *= sign(L.z);
-        return brdf(m, uv, L, V);
+        return brdf(m, uv, L, V) + bssdf(m, uv, L, V);
     } else {
         float ior1 = 1.0, ior2 = m.index_of_refraction;
         if(L.z < 0) { // swap
@@ -507,7 +518,7 @@ vec3 bxdf_eval(in Material m, vec2 uv, vec3 L, vec3 V) {
     }
 }
 
-// 由V采样到L。
+// 由V采样到L，采样失败返回pdf = -1
 vec3 bxdf_sample(in Material m, vec2 uv, vec3 V, out float pdf) {
     vec3 h = GGX_sample(get_roughness(m, uv), pdf);
     h *= sign(V.z);
@@ -522,16 +533,15 @@ vec3 bxdf_sample(in Material m, vec2 uv, vec3 V, out float pdf) {
         ior1 = m.index_of_refraction;
         ior2 = 1.0;
     }
-    float Fs = fresnel(VdotH, ior1, ior2);
 
-    if(rand() > Fs) {
+    if(rand() > 0.5) {
         float eta = ior2 / ior1;
         vec3 L = refract(-V, h, eta);
         if (length(L) < EPS) { // refract 计算失败（全反射或不合法）
             pdf = -1;
             return vec3(0);
         }
-        pdf *= (1 - Fs) * eta * eta * abs(dot(L, h)) / len2(V + eta * L);
+        pdf *= 0.5 * eta * eta * abs(dot(L, h)) / len2(V + eta * L);
         return L;
     } else {
         vec3 L = reflect(-V, h);
@@ -539,7 +549,7 @@ vec3 bxdf_sample(in Material m, vec2 uv, vec3 V, out float pdf) {
             pdf = -1;
             return vec3(0);
         }
-        pdf *= Fs / (4 * VdotH);
+        pdf *= 0.5 / (4 * VdotH);
         return L;
     }
 }
@@ -552,26 +562,27 @@ float bxdf_pdf(in Material m, vec2 uv, vec3 L, vec3 V) {
         ior1 = m.index_of_refraction;
         ior2 = 1.0;
     }
+    float m_metallic = get_metallic(m, uv);
 
-    if(L.z * V.z >= 0) {
+    if(L.z * V.z > 0) {
         vec3 h = normalize(L + V);
-        float Fs = fresnel(dot(h, V), ior1, ior2);
+        float VdotH = abs(dot(h, V)); // ?
+
         float _pdf = GGX_sample_pdf(get_roughness(m, uv), h * sign(h.z));
-        return _pdf / (4 * dot(h, V)) * Fs;
+        return _pdf / (4 * VdotH) * 0.5;
     } else {
         float eta = ior2 / ior1;
 
         vec3 h = normalize(V + eta * L);
+        if(V == -eta * L) h = vec3(0, 0, 1);
         h *= sign(h.z) * sign(V.z);
         float VdotH = dot(h, V);
         float LdotH = dot(h, L);
         if(VdotH <= 0 || LdotH >= 0) return 0;  // 不合法
         if(1 - pow2(VdotH) >= eta * eta) return 0;  // 全反射
 
-        float Fs = fresnel(VdotH, ior1, ior2);
-
         float _pdf = GGX_sample_pdf(get_roughness(m, uv), h * sign(h.z));
-        return _pdf * eta * eta * abs(LdotH) / len2(V + eta * L) * (1 - Fs);
+        return _pdf * eta * eta * abs(LdotH) / len2(V + eta * L) * 0.5;
     }
 }
 
@@ -610,7 +621,6 @@ vec3 shade(Ray ray, in Intersect first_isect) {
 
         if(pdf > 0) {
             float MIP_w = pdf / (pdf + bxdf_pdf(m1, uv, wi, wo));
-            if(MIP_w > 1000) return vec3(100, 0, 0);
 
             tsect = get_intersect(Ray(pos, gwi));
             if(!tsect.exist) {
@@ -647,6 +657,7 @@ vec3 shade(Ray ray, in Intersect first_isect) {
             isect = tsect;
         } else break;
     }
+    if(result.x < 0 || result.y < 0 || result.z < 0) result = vec3(100000, 0, 0);
     return result;
 }
 
@@ -686,32 +697,7 @@ void main() {
 
     if(any(isnan(result))) result = vec3(0, 0, 0); // Minimal probability
 
-    vec3 wpos = isect.pos;
-    worldpos_out = wpos;
-
-    //    static mix frame.
-    if(!is_motionvector_enabled) {
-        vec3 last_col = texture(last_frame, screen_uv).xyz;
-        result = mix(last_col, result, 1.0 / frameCounter);
-        color_out = result;
-        return;
-    }
-
-    // motion vector
-    vec4 Hcoord = back_proj * vec4(wpos, 1); // homogeneous coordinates
-    vec2 last_xy = Hcoord.xy / Hcoord.w;
-    if(0. < last_xy.x && last_xy.x < 1. && 0. < last_xy.y && last_xy.y < 1.) {
-        vec3 _wpos = texture(last_worldpos, last_xy).xyz;
-        if(length(wpos - _wpos) < 1) {
-            vec3 last_col = texture(last_frame, last_xy).xyz;
-            result = mix(last_col, result, 0.2);
-            color_out = result;
-            return;
-        }
-    }
-
-    for(int i = 1;i < SPP;i++) result += shade(ray, isect);
-    result /= SPP;
-
+    worldpos_out = isect.pos;
     color_out = result;
+
 }

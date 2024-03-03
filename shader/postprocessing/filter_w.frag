@@ -32,7 +32,7 @@ void main() {
     float sum_weight = 0;
     vec3 sum_color = vec3(0);
 
-    int r = 16;
+    int r = 8;
     // copy parameter from games202.
     float m_sigmaCoord = 4.0f;
     float m_sigmaColor = 0.6;

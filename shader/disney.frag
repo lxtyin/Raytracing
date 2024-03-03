@@ -212,7 +212,7 @@ float get_metallic(in Material m, vec2 uv) {
     return texture(texture_list[m.metalness_map_idx], uv).x;
 }
 float get_roughness(in Material m, vec2 uv) {
-    if(m.roughness_map_idx == -1) return max(0.01f, m.roughness);
+    if(m.roughness_map_idx == -1) return max(0.001f, m.roughness);
     return max(0.001f, texture(texture_list[m.roughness_map_idx], uv).x);
 }
 
