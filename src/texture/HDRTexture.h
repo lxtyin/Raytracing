@@ -8,16 +8,15 @@
 #include "Texture.h"
 
 
-class HDRTexture: public Texture {
+class HDRTexture: public GPUResource {
 public:
     int width;
     int height;
     int channel;
-    double Light_SUM; // 亮度总和
-
-    uint sample_cache_tto; /** < 对HDR贴图重要性采样的cache tto > **/
+    float *data;
 
     HDRTexture(const string &imagePath);
+    ~HDRTexture();
 };
 
 

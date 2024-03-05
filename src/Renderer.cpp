@@ -10,7 +10,7 @@
 #include <iostream>
 #include <queue>
 
-uint Renderer::gen_buffer_texture(vector<vec3> &buff) {
+uint Renderer::gen_buffer_texture(std::vector<vec3> &buff) {
     uint tbo;
     glGenBuffers(1, &tbo);
     glBindBuffer(GL_TEXTURE_BUFFER, tbo);
@@ -24,61 +24,69 @@ uint Renderer::gen_buffer_texture(vector<vec3> &buff) {
 }
 
 void Renderer::reload_meshes(Scene *scene) {
+    // TODO: 拆分为两个update level
+    textureHandlesBuffer.clear();
+    materialBuffer.clear();
+//    meshInfoBuffer.clear();
+//    meshIndexMap.clear();
+
+    std::vector<std::pair<Mesh*, mat4>> allMeshes;
+    scene->fetch_meshes(scene, mat4(1), allMeshes);
+
+    std::map<Texture*, uint> textureIndexMap;
+
     triangle_buff.clear();
     lightidx_buff.clear();
-    material_buff.clear();
-    texture_list.clear();
-    material_num = 0;
     triangle_num = 0;
     light_num = 0;
-    for(auto &mesh: scene->world_meshes) {
-        auto *m = mesh.material;
+    for(auto &[u, mat]: allMeshes) {
+        assert(u->material);
+        auto umtexs = u->material->textures();
+        for(Texture *t: umtexs) {
+            if(!textureIndexMap.count(t)) {
+                textureIndexMap[t] = textureHandlesBuffer.size();
+                textureHandlesBuffer.push_back(t->textureHandle);
+            }
+        }
+        uint materialPtr = u->material->insert_buffer(materialBuffer, textureIndexMap);
 
-        int diffuse_map_idx = -1, metalness_map_idx = -1, normal_map_idx = -1, roughness_map_idx = -1;
-        if(m->diffuse_map) {
-            diffuse_map_idx = (int)texture_list.size();
-            texture_list.push_back(m->diffuse_map);
-        }
-        if(m->metalness_map) {
-            metalness_map_idx = (int)texture_list.size();
-            texture_list.push_back(m->metalness_map);
-        }
-        if(m->normal_map) {
-            normal_map_idx = (int)texture_list.size();
-            texture_list.push_back(m->normal_map);
-        }
-        if(m->roughness_map) {
-            roughness_map_idx = (int)texture_list.size();
-            texture_list.push_back(m->roughness_map);
-        }
-
-        material_buff.emplace_back(m->base_color);
-        material_buff.emplace_back(m->emission);
-        material_buff.emplace_back(m->is_emit, m->metallic, m->roughness);
-        material_buff.emplace_back(m->specular, m->specular_tint, m->sheen);
-        material_buff.emplace_back(m->sheen_tint, m->subsurface, m->clearcoat);
-        material_buff.emplace_back(m->clearcoat_gloss, m->anisotropic, m->index_of_refraction);
-        material_buff.emplace_back(m->spec_trans, 0, diffuse_map_idx);
-        material_buff.emplace_back(metalness_map_idx, roughness_map_idx, normal_map_idx);
-        for(auto &t: mesh.triangles) {
+        for(auto &t: u->triangles) {
             for(auto & v : t.vertex) triangle_buff.emplace_back(v);
             for(auto & n : t.normal) triangle_buff.emplace_back(n);
             triangle_buff.emplace_back(t.uv[0][0], t.uv[1][0], t.uv[2][0]);
             triangle_buff.emplace_back(t.uv[0][1], t.uv[1][1], t.uv[2][1]);
-            triangle_buff.emplace_back(material_num, 0, 0);
-            triangle_index[&t] = triangle_num;
-            if(m->is_emit) {
-                lightidx_buff.emplace_back(triangle_num, 0, 0);
-                light_num++;
-            }
+            triangle_buff.emplace_back(materialPtr, 0, 0);
+            triangle_index[&t] = triangle_num; // TODO TMP
+//            if(u->material->is_emit) {
+//                lightidx_buff.emplace_back(triangle_num, 0, 0);
+//                light_num++;
+//            }
             triangle_num++;
         }
-        material_num++;
+
+//        meshInfoBuffer.emplace_back(mat, false, vec3(0.0), materialPtr);
     }
-    if(material_texbuff) glDeleteTextures(1, &material_texbuff);
+
+    if(textureHandleSSBO) glDeleteBuffers(1, &textureHandleSSBO);
+    glCreateBuffers(1, &textureHandleSSBO);
+    glNamedBufferStorage(
+            textureHandleSSBO,
+            sizeof(GLuint64) * textureHandlesBuffer.size(),
+            (const void *)textureHandlesBuffer.data(),
+            GL_DYNAMIC_STORAGE_BIT
+    );
+
+    if(materialSSBO) glDeleteBuffers(1, &materialSSBO);
+    glCreateBuffers(1, &materialSSBO);
+    glNamedBufferStorage(
+            materialSSBO,
+            sizeof(float) * materialBuffer.size(),
+            (const void *)materialBuffer.data(),
+            GL_DYNAMIC_STORAGE_BIT
+    );
+
     if(triangle_texbuff) glDeleteTextures(1, &triangle_texbuff);
     if(lightidx_texbuff) glDeleteTextures(1, &lightidx_texbuff);
-    material_texbuff = gen_buffer_texture(material_buff);
     triangle_texbuff = gen_buffer_texture(triangle_buff);
     lightidx_texbuff = gen_buffer_texture(lightidx_buff);
 }
@@ -111,13 +119,12 @@ void Renderer::reload_scene(Scene *scene) {
 void Renderer::draw() {
     glUniform1i(glGetUniformLocation(shaderProgram, "light_t_num"), light_num);
     glUniform1i(glGetUniformLocation(shaderProgram, "triangle_num"), triangle_num);
-    bind_texture("materials", material_texbuff, GL_TEXTURE_BUFFER);
     bind_texture("triangles", triangle_texbuff, GL_TEXTURE_BUFFER);
     bind_texture("bvhnodes",  bvhnodes_texbuff, GL_TEXTURE_BUFFER);
     bind_texture("lightidxs", lightidx_texbuff, GL_TEXTURE_BUFFER);
-    for(int i = 0;i < texture_list.size();i++) {
-        bind_texture(str_format("texture_list[%d]", i).c_str(), texture_list[i]->TTO);
-    }
+
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, textureHandleSSBO);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, materialSSBO);
     RenderPass::draw();
 }
 

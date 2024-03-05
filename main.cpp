@@ -7,12 +7,12 @@
 #include "src/tool/tool.h"
 #include "src/Config.h"
 #include "src/tool/loader.h"
-#include "src/texture/HDRTexture.h"
+#include "src/texture/Skybox.h"
 #include "src/instance/Camera.h"
 #include "imgui/imgui.h"
 #include "imgui/backend/imgui_impl_glfw.h"
 #include "imgui/backend/imgui_impl_opengl3.h"
-#include "NerfCreator.h"
+#include <opencv2/opencv.hpp>
 using namespace std;
 
 // 一些状态 ------
@@ -21,8 +21,7 @@ Renderer *pass1;
 RenderPass *pass_mix, *pass_fw, *pass_fh;
 Scene *scene;
 Camera *camera;
-HDRTexture* skybox;
-NerfCreator nerfCreator;
+Skybox* skybox;
 bool show_imgui = true;
 uint frameCounter = 0;
 
@@ -50,7 +49,8 @@ void mouse_callback(GLFWwindow* window, double xpos, double ypos) {
 void update(float dt) {
 
 //    scene->reload();
-    pass1->reload_scene(scene);
+//    pass1->reload_meshes(scene);
+
     static uint last_colorT = 0, last_wposT = 0;
 	static bool fast_shade = false;
 	static glm::mat4 back_projection(1);
@@ -63,14 +63,14 @@ void update(float dt) {
         pass1->use();
         {
             glUniform1i(glGetUniformLocation(pass1->shaderProgram, "fast_shade"), fast_shade);
-            pass1->bind_texture("skybox", skybox->TTO);
-            pass1->bind_texture("skybox_samplecache", skybox->sample_cache_tto);
+            pass1->bind_texture("skybox", skybox->textureObject);
+            pass1->bind_texture("skybox_samplecache", skybox->skyboxsamplerObject);
             glUniformMatrix4fv(glGetUniformLocation(pass1->shaderProgram, "v2w_mat"), 1, GL_FALSE, glm::value_ptr(camera->v2w_matrix()));
             glUniform1i(glGetUniformLocation(pass1->shaderProgram, "SCREEN_W"), SCREEN_W);
             glUniform1i(glGetUniformLocation(pass1->shaderProgram, "SCREEN_H"), SCREEN_H);
             glUniform1i(glGetUniformLocation(pass1->shaderProgram, "SPP"), Config::SPP);
             glUniform1ui(glGetUniformLocation(pass1->shaderProgram, "frameCounter"), frameCounter);
-            glUniform1f(glGetUniformLocation(pass1->shaderProgram, "skybox_Light_SUM"), skybox->Light_SUM);
+            glUniform1f(glGetUniformLocation(pass1->shaderProgram, "skybox_Light_SUM"), skybox->lightSum);
             glUniform1f(glGetUniformLocation(pass1->shaderProgram, "fov"), SCREEN_FOV);
             glUniform1i(glGetUniformLocation(pass1->shaderProgram, "SKY_W"), skybox->width);
             glUniform1i(glGetUniformLocation(pass1->shaderProgram, "SKY_H"), skybox->height);
@@ -141,9 +141,17 @@ void update(float dt) {
 
 	Transform before = camera->transform;
 
-	// screen shot for nerf.
-	if(glfwGetKeyDown(window, GLFW_KEY_T)) nerfCreator.screenshot(camera);
-	if(glfwGetKeyDown(window, GLFW_KEY_Y) || glfwGetKeyDown(window, GLFW_KEY_Q)) nerfCreator.writejson();
+	// screen shot.
+	if(glfwGetKeyDown(window, GLFW_KEY_T)) {
+        string file_path = str_format("screenshots/%s.png", localtimestring().c_str());
+        cv::Mat screenshot(SCREEN_W, SCREEN_H, CV_8UC3);
+        glReadPixels(0, 0, SCREEN_W, SCREEN_H, GL_BGR, GL_UNSIGNED_BYTE, screenshot.data);
+        cv::Mat fliped;
+        cv::flip(screenshot, fliped, 0);
+        cv::imwrite(file_path, fliped);
+
+        cout << "ScreenShot " << file_path << '\n';
+    }
 
     float speed = 10;
     if(glfwGetKey(window, GLFW_KEY_W)) camera->transform.position += camera->transform.direction_z() * -speed * dt;
@@ -166,7 +174,7 @@ void update(float dt) {
 void init() {
 
     // passes
-    pass1    = new Renderer("shader/pathtracing.frag", 4);
+    pass1    = new Renderer("shader/pathtracing2024.frag", 4);
     pass_mix = new RenderPass("shader/postprocessing/mixAndMap.frag", 2);
     pass_fw  = new RenderPass("shader/postprocessing/filter_w.frag", 1);
 	pass_fh  = new RenderPass("shader/postprocessing/filter_h.frag", 0, true);
@@ -178,27 +186,27 @@ void init() {
         Instance *o1 = AssimpLoader::load_model("model/casa_obj.glb");
         o1->transform.rotation = vec3(-M_PI / 2, M_PI / 4, 0);
 		// pre setting
-		Material *m1 = o1->get_child(0)->get_child(1)->meshes[0]->material;
-		m1->roughness = 0.01;
-		m1->metallic = 0;
-		m1->index_of_refraction = 1.25;
-		m1->spec_trans = 1;
-		Material *m2 = o1->get_child(0)->get_child(3)->meshes[0]->material;
-		m2->roughness = 0.04;
-		m2->metallic = 0;
-		m2->index_of_refraction = 1.01;
-		m2->spec_trans = 0.8;
+//		Material *m1 = o1->get_child(0)->get_child(1)->meshes[0]->material;
+//		m1->roughness = 0.01;
+//		m1->metallic = 0;
+//		m1->index_of_refraction = 1.25;
+//		m1->spec_trans = 1;
+//		Material *m2 = o1->get_child(0)->get_child(3)->meshes[0]->material;
+//		m2->roughness = 0.04;
+//		m2->metallic = 0;
+//		m2->index_of_refraction = 1.01;
+//		m2->spec_trans = 0.8;
 		scene->add_child(o1);
 
-        Instance *light= AssimpLoader::load_model("model/light.obj");
-        light->transform.scale = vec3(30, 30, 30);
-        light->transform.position = vec3(0, 100, 0);
-        light->get_child(0)->meshes[0]->material->emission = vec3(5);
-        light->get_child(0)->meshes[0]->material->is_emit = true;
-        scene->add_child(light);
+//        Instance *light= AssimpLoader::load_model("model/light.obj");
+//        light->transform.scale = vec3(30, 30, 30);
+//        light->transform.position = vec3(0, 100, 0);
+//        light->get_child(0)->meshes[0]->material->emission = vec3(5);
+//        light->get_child(0)->meshes[0]->material->is_emit = true;
+//        scene->add_child(light);
     }
 
-	skybox = new HDRTexture("hdrs/kloofendal_48d_partly_cloudy_puresky_2k.hdr");
+	skybox = new Skybox("hdrs/kloofendal_48d_partly_cloudy_puresky_2k.hdr");
 
     camera->transform.rotation.y = M_PI;
 	camera->transform.position = vec3(-13.7884, 11.7131, 4.57255);
@@ -208,9 +216,10 @@ void init() {
 }
 
 int main(int argc, const char* argv[]) {
+
     glfwInit();
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);//主版本号
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);//次版本号
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);//次版本号
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);//使用核心渲染模式
 
     //创建窗口，放入上下文中
@@ -223,6 +232,7 @@ int main(int argc, const char* argv[]) {
 
     //初始化glad
     gladLoadGLLoader((GLADloadproc)glfwGetProcAddress);
+
     glDisable(GL_DEPTH_TEST);
 
     IMGUI_CHECKVERSION();
@@ -236,7 +246,7 @@ int main(int argc, const char* argv[]) {
     init();
 
     float last_time = glfwGetTime(), detaTime;
-	float fps = 60, counter_time = 0;
+	float fps = 60, counter_time = 0, counter_frame = 0;
     while(!glfwWindowShouldClose(window)) {
         detaTime = glfwGetTime() - last_time;
         last_time += detaTime;
@@ -248,10 +258,11 @@ int main(int argc, const char* argv[]) {
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
 
-		counter_time += detaTime;
+        counter_frame ++;
+        counter_time += detaTime;
 		if(counter_time > 1) {
-			counter_time = 0;
-			fps = 1.0 / detaTime;
+            fps = counter_frame / counter_time;
+            counter_frame = counter_time = 0;
 		}
 
 //        ImGui::ShowDemoWindow(&show_imgui);

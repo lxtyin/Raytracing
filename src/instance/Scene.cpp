@@ -5,29 +5,30 @@
 #include "Scene.h"
 #include <iostream>
 
-void Scene::fetch_tree(Instance *cur, mat4 transform) {
-    for(auto *mesh: cur->meshes){
-        Mesh nwm(*mesh);
-        for(auto &t: nwm.triangles) {
-            for(auto &v: t.vertex) v = transform * vec4(v, 1);
-            for(auto &n: t.normal) n = glm::transpose(glm::inverse(transform)) * vec4(n, 0);
-            t.center = (t.vertex[0] + t.vertex[1] + t.vertex[2]) / 3.0f;
-        }
-        world_meshes.push_back(nwm);
+
+void Scene::fetch_meshes(Instance* cur, mat4 transform2world, std::vector<std::pair<Mesh*, mat4>> &allMeshes) {
+    for(auto *m: cur->meshes) {
+        allMeshes.emplace_back(std::make_pair(m, transform2world));
     }
     Instance *child;
     for(int i = 0; (child = cur->get_child(i)) != nullptr; i++){
-        fetch_tree(child, transform * child->transform.matrix());
+        fetch_meshes(child, transform2world * child->transform.matrix(), allMeshes);
     }
 }
 
 void Scene::reload() {
-    world_meshes.clear();
-    fetch_tree(this, mat4(1));
-    vector<Triangle*> tmp;
-    for(auto &m: world_meshes)
-        for(auto &t: m.triangles)
+
+    std::vector<std::pair<Mesh*, mat4>> allMeshes;
+    fetch_meshes(this, mat4(1), allMeshes);
+
+    std::vector<Triangle*> tmp;
+    for(auto &[u, mat]: allMeshes){
+        for(auto &t: u->triangles) {
             tmp.push_back(&t);
+            // TODO transform
+        }
+    }
+
     bvh_root = BVHNode::build(tmp);
     std::cout << "BVH size:" << bvh_root->siz << std::endl;
     std::cout << "BVH depth:" << bvh_root->depth << std::endl;

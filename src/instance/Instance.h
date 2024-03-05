@@ -8,15 +8,14 @@
 #include "Mesh.h"
 #include "../Transform.h"
 #include <vector>
-using std::vector;
 
 class Instance {
 
     Instance *parent = nullptr;
-    vector<Instance*> children;
+    std::vector<Instance*> children;
 
 public:
-    vector<Mesh*> meshes;
+    std::vector<Mesh*> meshes;
     string name = "A Instance";
     Transform transform;                 /**< transform to parent. */
 

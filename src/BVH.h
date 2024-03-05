@@ -7,7 +7,6 @@
 
 #include "instance/Triangle.h"
 #include <vector>
-using std::vector;
 
 #define MAX_TRIANGLES 1000002
 
@@ -21,7 +20,7 @@ public:
     int siz = 1; // 子树节点数
     int depth = 0; // 树最大深度
 
-    static BVHNode* build(vector<Triangle*> &triangles);
+    static BVHNode* build(std::vector<Triangle*> &triangles);
 };
 
 

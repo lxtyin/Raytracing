@@ -11,8 +11,8 @@ layout(location = 0) out vec3 MapedColor;
 layout(location = 1) out vec3 MixedHdrColor;
 
 vec3 tonemapping(vec3 x) {
-    return min(x, vec3(1.0));
-//    return x / (x + 1);
+//    return min(x, vec3(1.0));
+    return x / (x + 1);
 }
 
 void main() {

@@ -16,16 +16,35 @@
 
 class Renderer: public RenderPass {
 
-    vector<vec3> material_buff;
-    vector<vec3> triangle_buff;
-    vector<vec3> bvhnodes_buff;
-    vector<vec3> lightidx_buff;
+//    struct MeshInfo {
+//        mat4 world2local;
+//        bool isEmitter;
+//        vec3 emission;
+//        int mptr;
+//        MeshInfo(const mat4 &m, bool ise, vec3 e, int mp): world2local(m), isEmitter(ise), emission(e), mptr(mp) {}
+//    };
+
+    std::vector<GLuint64> textureHandlesBuffer;
+    std::vector<float> materialBuffer;
+//    std::vector<MeshInfo> meshInfoBuffer;
+    GLuint textureHandleSSBO;
+//    GLuint meshInfoSSBO;
+    GLuint materialSSBO;
+
+//    std::map<Mesh*, uint> meshIndexMap;
+
+
+    // old
+    std::vector<vec3> material_buff;
+    std::vector<vec3> triangle_buff;
+    std::vector<vec3> bvhnodes_buff;
+    std::vector<vec3> lightidx_buff;
     uint material_texbuff = 0;
     uint triangle_texbuff = 0;
     uint bvhnodes_texbuff = 0;
     uint lightidx_texbuff = 0;
-    int light_num, triangle_num, material_num;
-    vector<Texture*> texture_list;
+    int light_num, triangle_num;
+    std::vector<Texture*> texture_list;
 
     std::map<Triangle*, int> triangle_index;
 public:
@@ -38,7 +57,7 @@ public:
      * @param buff 要加载的buff
      * @return
      */
-    uint gen_buffer_texture(vector<vec3> &buff);
+    uint gen_buffer_texture(std::vector<vec3> &buff);
 
     void reload_meshes(Scene *scene);
 

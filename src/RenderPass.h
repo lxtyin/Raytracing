@@ -22,8 +22,8 @@ protected:
 
 public:
 
-    vector<uint> attachments;
-    vector<uint> attach_textures;
+    std::vector<uint> attachments;
+    std::vector<uint> attach_textures;
     uint shaderProgram = 0;
 
 	// set attach_num = 0 when to_screen is true, or there's inexplicable bug.

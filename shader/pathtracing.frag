@@ -283,14 +283,21 @@ Intersect intersect_triangle(Ray ray, int i) {
     float t = dot(S2, E2) * k;
     float u = dot(S1, S) * k;
     float v = dot(S2, ray.dir) * k;
-    if(RAY_EPS < t && 0 < u && 0 < v && u + v < 1) {
-        vec3 pos = ray.ori + t * ray.dir;
-        vec3 nor = normalize(tri.normal[0] * (1 - u - v) + tri.normal[1] * u + tri.normal[2] * v);
-        return Intersect(true, pos, nor, i, u, v, t);
-    } else {
-        return nointersect;
-    }
+
+    bool exist = (RAY_EPS < t && 0 < u && 0 < v && u + v < 1);
+
+    vec3 pos = ray.ori + t * ray.dir;
+    vec3 nor = normalize(tri.normal[0] * (1 - u - v) + tri.normal[1] * u + tri.normal[2] * v);
+    return Intersect(exist, pos, nor, i, u, v, t);
+//    if(RAY_EPS < t && 0 < u && 0 < v && u + v < 1) {
+//        vec3 pos = ray.ori + t * ray.dir;
+//        vec3 nor = normalize(tri.normal[0] * (1 - u - v) + tri.normal[1] * u + tri.normal[2] * v);
+//        return Intersect(true, pos, nor, i, u, v, t);
+//    } else {
+//        return nointersect;
+//    }
 }
+
 
 /// 在场景中的第一个交点
 Intersect get_intersect(Ray ray) {

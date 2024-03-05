@@ -1,4 +1,4 @@
-//
+﻿//
 // Created by lx_tyin on 2023/2/23.
 //
 
@@ -6,7 +6,9 @@
 #define PATH_TRACING_CONFIG_H
 
 #include "imgui/imgui.h"
+#include <cmath>
 
+const double M_PI = acos(-1);
 #define SCREEN_W 512
 #define SCREEN_H 512
 #define SCREEN_FOV (M_PI / 3)

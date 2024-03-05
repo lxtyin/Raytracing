@@ -8,16 +8,14 @@
 #include "Instance.h"
 #include "../BVH.h"
 
-class Scene: public Instance{
 
-    /**
-     * recursive load meshes to world mesh
-     * @param cur current instance
-     * @param transform accumulated transform
-     */
-    void fetch_tree(Instance* cur, mat4 transform);
+class Scene: public Instance{
 public:
-    vector<Mesh> world_meshes;    /**< meshes in world space >**/
+    /**
+     * recursive load all meshes and get their transform2world.
+     */
+    void fetch_meshes(Instance* cur, mat4 transform2world, std::vector<std::pair<Mesh*, mat4>> &allMeshes);
+
     BVHNode* bvh_root = nullptr;
 
     explicit Scene(const string &nm);
@@ -27,6 +25,5 @@ public:
      */
     void reload();
 };
-
 
 #endif //PATH_TRACING_SCENE_H

@@ -8,6 +8,7 @@
 #include "glad/glad.h"
 #include <fstream>
 #include <iostream>
+#include <ctime>
 #include <sstream>
 using namespace std;
 
@@ -46,3 +47,15 @@ string read_shader(const string& path) {
 	return result;
 }
 
+string localtimestring() {
+    // 获取当前时间点
+    std::time_t currentTime = std::time(nullptr);
+
+    // 转换为本地时间
+    std::tm* localTime = std::localtime(&currentTime);
+
+    // 格式化时间字符串
+    char timeString[100];
+    std::strftime(timeString, sizeof(timeString), "%Y-%m-%d-%H-%M-%S", localTime);
+    return string(timeString);
+}

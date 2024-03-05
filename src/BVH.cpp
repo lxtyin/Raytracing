@@ -22,7 +22,7 @@ float cost(const vec3 &aa, const vec3 &bb) {
 }
 vec3 pre_aa[MAX_TRIANGLES], pre_bb[MAX_TRIANGLES], suf_aa[MAX_TRIANGLES], suf_bb[MAX_TRIANGLES];
 
-BVHNode* BVHNode::build(vector<Triangle*> &triangles) {
+BVHNode* BVHNode::build(std::vector<Triangle*> &triangles) {
 
     int n = triangles.size();
     BVHNode* cur = new BVHNode;
@@ -44,7 +44,7 @@ BVHNode* BVHNode::build(vector<Triangle*> &triangles) {
         return cur;
     }
 
-    vector<Triangle*> t[3] = {triangles, triangles, triangles};
+    std::vector<Triangle*> t[3] = {triangles, triangles, triangles};
 
     int bs_d = 0, bs_i = 0;
     float bs_cost = n * cost(cur->aa, cur->bb); // max possible cost
@@ -89,7 +89,7 @@ BVHNode* BVHNode::build(vector<Triangle*> &triangles) {
     }
     assert(bs_i < n);
 
-    vector<Triangle*> rt;
+    std::vector<Triangle*> rt;
     while(t[bs_d].size() > bs_i + 1){
         rt.push_back(t[bs_d].back());
         t[bs_d].pop_back();

@@ -8,3 +8,4 @@ out vec4 FragColor;
 void main() {
     FragColor = texture(prevpass_color, screen_uv);
 }
+
