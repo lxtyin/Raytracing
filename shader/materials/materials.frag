@@ -40,10 +40,6 @@ float fresnel(float cosI, float etaI, float etaT) {
 }
 
 
-layout(binding = 2, std430) readonly buffer ssbo2 {
-    float materialBuffer[];
-};
-
 struct BSDFQueryRecord {
     // 同mitsuba：wo 光源方向 (L), wi 观察方向 (V)
     vec3 wi, wo;

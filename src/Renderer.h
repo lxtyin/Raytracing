@@ -33,11 +33,13 @@ class Renderer: public RenderPass {
 
     std::vector<GLuint64> textureHandlesBuffer;
     std::vector<float> materialBuffer;
-    std::vector<MeshInfo> meshInfoBuffer; // TODO 传进去错位了？？？
+    std::vector<Triangle> triangleBuffer;
+    std::vector<MeshInfo> meshInfoBuffer;
     std::vector<BVHNodeInfo> bvhNodeBuffer;
     GLuint textureHandleSSBO;
-    GLuint meshInfoSSBO;
     GLuint materialSSBO;
+    GLuint triangleSSBO;
+    GLuint meshInfoSSBO;
     GLuint bvhNodeSSBO;
 
     std::map<Mesh*, uint> meshIndexMap;
