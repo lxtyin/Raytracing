@@ -15,8 +15,8 @@ using glm::mat4;
 class Triangle {
 public:
     vec3 vertex[3];
-    vec2 uv[3];
     vec3 normal[3];     /**< normal for each vertex >**/
+    vec2 uv[3];
 
     Triangle() = default;
     Triangle(vec3 v0, vec3 v1, vec3 v2,

@@ -36,9 +36,7 @@ void Renderer::reload_meshes(Scene *scene) {
     scene->fetch_meshes(scene, mat4(1), allMeshes);
     std::map<Texture*, uint> textureIndexMap;
 
-//    triangle_buff.clear();
     lightidx_buff.clear();
-//    triangle_num = 0;
     light_num = 0;
     for(auto &[u, mat]: allMeshes) {
         assert(u->material);
@@ -53,13 +51,7 @@ void Renderer::reload_meshes(Scene *scene) {
 
         for(auto &t: u->triangles) {
             triangleIndexMap[&t] = triangleBuffer.size();
-            TriangleInfo y;
-            for(int i = 0;i < 3;i++) {
-                y.vertex[i] = vec4(t.vertex[i], 0);
-                y.normal[i] = vec4(t.normal[i], 0);
-                y.uv[i] = t.uv[i];
-            }
-            triangleBuffer.push_back(y);
+            triangleBuffer.push_back(t);
         }
 
         assert(!meshIndexMap.count(u));
@@ -154,8 +146,6 @@ void Renderer::reload_scene(Scene *scene) {
 
 void Renderer::draw() {
     glUniform1i(glGetUniformLocation(shaderProgram, "light_t_num"), light_num);
-    glUniform1i(glGetUniformLocation(shaderProgram, "triangle_num"), triangle_num);
-    bind_texture("triangles", triangle_texbuff, GL_TEXTURE_BUFFER);
     bind_texture("lightidxs", lightidx_texbuff, GL_TEXTURE_BUFFER);
 
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, textureHandleSSBO);

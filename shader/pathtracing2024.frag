@@ -1,23 +1,12 @@
 
 #version 460 core
-
 #extension GL_ARB_bindless_texture : require
-
-//#define matrix44_ptr uint
-//#define triangle_ptr uint
-//
-//uniform samplerBuffer uniformbuffer;
-
-#define M_SIZ 8    // 一个material占的vec3数量
-#define T_SIZ 9    // 一个triangle占的vec3数量
-#define B_SIZ 3    // 一个bvhnode占的vec3数量
 
 #include shader/basic/math.frag
 
 in float pixel_x;
 in float pixel_y;
 in vec2 screen_uv;
-
 
 layout(location = 0) out vec3 color_out;
 layout(location = 1) out vec3 albedo_out;
@@ -32,7 +21,6 @@ uniform samplerBuffer triangles;
 uniform samplerBuffer lightidxs;
 uniform samplerBuffer bvhnodes;
 uniform int light_t_num;
-uniform int triangle_num;
 
 uniform mat4 v2w_mat;
 
@@ -60,13 +48,28 @@ layout(binding = 1, std430) readonly buffer ssbo1 {
 };
 
 struct Triangle {
-    vec4 ver[3];
-    vec4 normal[3];
+    vec3 ver[3];
+    vec3 normal[3];
     vec2 uv[3];
 };
-layout(binding = 2, std430) readonly buffer ssbo2 {
-    Triangle triangleBuffer[];
+struct TriangleX {
+    float ver[9];
+    float normal[9];
+    float uv[6];
 };
+layout(binding = 2, std430) readonly buffer ssbo2 {
+    TriangleX triangleBuffer[];
+};
+Triangle get_triangle(int idx) {
+    TriangleX x = triangleBuffer[idx];
+    Triangle y;
+    for(int i = 0;i < 3;i++) {
+        y.ver[i] = vec3(x.ver[i * 3 + 0], x.ver[i * 3 + 1], x.ver[i * 3 + 2]);
+        y.normal[i] = vec3(x.normal[i * 3 + 0], x.normal[i * 3 + 1], x.normal[i * 3 + 2]);
+        y.uv[i] = vec2(x.uv[i * 2 + 0], x.uv[i * 2 + 1]);
+    }
+    return y;
+}
 
 struct MeshInfo {
     mat4 world2local;
@@ -88,7 +91,6 @@ struct BVHNode {
 layout(binding = 4, std430) readonly buffer ssbo4 {
     BVHNode bvhNodeBuffer[];
 };
-
 
 uint seed = uint(
 uint(pixel_x + SCREEN_W / 2) * uint(1973) +
@@ -193,7 +195,7 @@ bool intersect_aabb(Ray ray, vec3 aa, vec3 bb, out float nearT) {
 
 /// 返回与triangle的具体碰撞信息
 Intersect intersect_triangle(Ray ray, int triangleIndex) {
-    Triangle tri = triangleBuffer[triangleIndex];
+    Triangle tri = get_triangle(triangleIndex);
 
     vec3 E1 = tri.ver[1].xyz - tri.ver[0].xyz;
     vec3 E2 = tri.ver[2].xyz - tri.ver[0].xyz;

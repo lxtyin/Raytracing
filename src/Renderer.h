@@ -16,12 +16,6 @@
 
 class Renderer: public RenderPass {
 
-    struct TriangleInfo {
-        vec4 vertex[3];
-        vec4 normal[3];
-        vec2 uv[3];
-        int emptyblock[2];
-    };
     struct MeshInfo {
         mat4 world2local;
         vec4 emission;
@@ -38,7 +32,7 @@ class Renderer: public RenderPass {
 
     std::vector<GLuint64> textureHandlesBuffer;
     std::vector<float> materialBuffer;
-    std::vector<TriangleInfo> triangleBuffer;
+    std::vector<Triangle> triangleBuffer;
     std::vector<MeshInfo> meshInfoBuffer;
     std::vector<BVHNodeInfo> bvhNodeBuffer;
     GLuint textureHandleSSBO;
@@ -50,14 +44,10 @@ class Renderer: public RenderPass {
     std::map<Mesh*, uint> meshIndexMap;
     std::map<Triangle*, uint> triangleIndexMap;
 
-
     // old
-    std::vector<vec3> material_buff;
-    std::vector<vec3> triangle_buff;
     std::vector<vec3> lightidx_buff;
-    uint triangle_texbuff = 0;
     uint lightidx_texbuff = 0;
-    int light_num, triangle_num;
+    int light_num;
 
 public:
 
