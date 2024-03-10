@@ -135,8 +135,8 @@ void update(float dt) {
 	if(glfwGetKeyDown(window, GLFW_KEY_P)) {
 		Transform t = camera->transform;
 		cout << "Camera pose:\n";
-		cout << "Position: " << t.position;
-		cout << "Rotation: " << t.rotation;
+		cout << "Position: " << t.position[0] << ", " << t.position[1] << ", " << t.position[2] << '\n';
+		cout << "Rotation: " << t.rotation[0] << ", " << t.rotation[1] << ", " << t.rotation[2] << '\n';
 	}
 
 	Transform before = camera->transform;
@@ -181,7 +181,6 @@ void init() {
 
     scene = new Scene("Scene");
     camera = new Camera(M_PI / 3);
-
     {
         Instance *o1 = AssimpLoader::load_model("model/casa_obj.glb");
         o1->transform.rotation = vec3(-M_PI / 2, M_PI / 4, 0);
@@ -209,9 +208,9 @@ void init() {
 	skybox = new Skybox("hdrs/kloofendal_48d_partly_cloudy_puresky_2k.hdr");
 
     camera->transform.rotation.y = M_PI;
-	camera->transform.position = vec3(-13.7884, 11.7131, 4.57255);
-	camera->transform.rotation = vec3(-0.58, 11.3216, 0);
-    scene->reload();
+	camera->transform.position = vec3(-6.39289, 2.33742, 2.80014);
+	camera->transform.rotation = vec3(-0.85, 11.4216, 0);
+    scene->build_sceneBVH();
     pass1->reload_scene(scene);
 }
 

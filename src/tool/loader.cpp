@@ -25,7 +25,7 @@ namespace AssimpLoader{
                                                         &height,
                                                         &channel, 0);
 
-            vector<uchar> data(width * height * channel);
+            std::vector<uchar> data(width * height * channel);
             memcpy(data.data(), buff, data.size());
             stbi_image_free(buff);
             return new Texture(width, height, channel, move(data));
@@ -80,12 +80,12 @@ namespace AssimpLoader{
     }
 
     Mesh* processMesh(aiMesh *mesh, const aiScene *scene) {
-        Mesh *result = new Mesh;
-        result->name = mesh->mName.C_Str();
 
-        vector<vec3> vertexs;
-        vector<vec2> uvs;
-        vector<vec3> normals;
+        std::vector<vec3> vertexs;
+        std::vector<vec2> uvs;
+        std::vector<vec3> normals;
+        std::vector<Triangle> triangles;
+
 
         for(int i = 0; i < mesh->mNumVertices; i++){
             float tex[2] = {0, 0};
@@ -101,11 +101,12 @@ namespace AssimpLoader{
             aiFace &face = mesh->mFaces[i];
             assert(face.mNumIndices == 3);
             auto *id = face.mIndices;
-            result->triangles.emplace_back(vertexs[id[0]], vertexs[id[1]], vertexs[id[2]],
+            triangles.emplace_back(vertexs[id[0]], vertexs[id[1]], vertexs[id[2]],
                                            normals[id[0]], normals[id[1]], normals[id[2]],
                                            uvs[id[0]], uvs[id[1]], uvs[id[2]]);
         }
 
+        Mesh *result = new Mesh(mesh->mName.C_Str(), std::move(triangles));
         if(mesh->mMaterialIndex >= 0){
             aiMaterial *mat = scene->mMaterials[mesh->mMaterialIndex];
             result->material = processMaterial(mat, scene);

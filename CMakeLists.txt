@@ -27,7 +27,8 @@ add_executable(path_tracing ${SRC_FILES} src/tool/exglfw.h src/tool/json.hpp src
         src/GPUResource.cpp
         src/texture/Skybox.cpp
         src/material/RoughConductor.h
-        src/material/RoughConductor.cpp)
+        src/material/RoughConductor.cpp
+        src/AABB.cpp)
 
 #target_link_libraries(path_tracing opengl32 glu32 libglfw3.a libzlibstatic.a libassimp.dll.a ${OpenCV_LIBS})
 target_link_libraries(path_tracing opengl32 glu32 assimp-vc143-mt.lib ${OpenCV_LIBS} glfw3.dll)

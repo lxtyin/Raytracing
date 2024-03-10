@@ -16,14 +16,11 @@ public:
      */
     void fetch_meshes(Instance* cur, mat4 transform2world, std::vector<std::pair<Mesh*, mat4>> &allMeshes);
 
-    BVHNode* bvh_root = nullptr;
+    BVHNode* sceneBVHRoot = nullptr;
 
     explicit Scene(const string &nm);
 
-    /**
-     * refatch all meshes an reload bvh
-     */
-    void reload();
+    void build_sceneBVH();
 };
 
 #endif //PATH_TRACING_SCENE_H

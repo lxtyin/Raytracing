@@ -6,21 +6,28 @@
 #define PATH_TRACING_BVH_H
 
 #include "instance/Triangle.h"
+#include "AABB.h"
 #include <vector>
 
-#define MAX_TRIANGLES 1000002
+class Mesh;
+
+struct BVHPrimitive {
+    AABB aabb;
+    Mesh *meshPtr = nullptr;
+    Triangle *trianglePtr = nullptr;
+};
 
 class BVHNode {
 public:
-    vec3 aa, bb;            // x(a[0], b[0]), y(a[1], b[1]), z(a[2], b[2])
-    bool isleaf = false;
+    AABB aabb;
     BVHNode *ls = nullptr;
     BVHNode *rs = nullptr;
-    Triangle *triangle = nullptr;
+    Mesh* meshPtr = nullptr;
+    Triangle* trianglePtr = nullptr;
     int siz = 1; // 子树节点数
     int depth = 0; // 树最大深度
 
-    static BVHNode* build(std::vector<Triangle*> &triangles);
+    static BVHNode* build(std::vector<BVHPrimitive> &primitives);
 };
 
 

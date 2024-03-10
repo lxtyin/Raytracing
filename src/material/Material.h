@@ -21,7 +21,7 @@ public:
      * @param textureIndexMap
      * @return ptr in the materialBuffer.
      */
-    virtual uint insert_buffer(std::vector<float> &materialBuffer, const std::map<Texture*, uint> &textureIndexMap) = 0;
+    virtual int insert_buffer(std::vector<float> &materialBuffer, const std::map<Texture*, uint> &textureIndexMap) = 0;
 
     /**
      * returns all texture included in this material

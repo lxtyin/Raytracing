@@ -19,7 +19,7 @@ public:
 
     void insert_gui() override;
     std::vector<Texture*> textures() override;
-    uint insert_buffer(std::vector<float> &materialBuffer, const std::map<Texture*, uint> &textureIndexMap) override;
+    int insert_buffer(std::vector<float> &materialBuffer, const std::map<Texture*, uint> &textureIndexMap) override;
 };
 
 

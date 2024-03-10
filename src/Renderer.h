@@ -16,37 +16,42 @@
 
 class Renderer: public RenderPass {
 
-//    struct MeshInfo {
-//        mat4 world2local;
-//        bool isEmitter;
-//        vec3 emission;
-//        int mptr;
-//        MeshInfo(const mat4 &m, bool ise, vec3 e, int mp): world2local(m), isEmitter(ise), emission(e), mptr(mp) {}
-//    };
+    struct MeshInfo {
+        mat4 world2local;
+        vec4 emission;
+        int materialPtr;
+        int emptyblock[11];
+    };
+
+    struct BVHNodeInfo {
+        vec4 aa, bb;
+        int lsIndex = -1;
+        int rsIndex = -1;
+        int meshIndex = -1;
+        int triangleIndex = -1;
+    };
 
     std::vector<GLuint64> textureHandlesBuffer;
     std::vector<float> materialBuffer;
-//    std::vector<MeshInfo> meshInfoBuffer;
+    std::vector<MeshInfo> meshInfoBuffer; // TODO 传进去错位了？？？
+    std::vector<BVHNodeInfo> bvhNodeBuffer;
     GLuint textureHandleSSBO;
-//    GLuint meshInfoSSBO;
+    GLuint meshInfoSSBO;
     GLuint materialSSBO;
+    GLuint bvhNodeSSBO;
 
-//    std::map<Mesh*, uint> meshIndexMap;
+    std::map<Mesh*, uint> meshIndexMap;
+    std::map<Triangle*, uint> triangleIndexMap;
 
 
     // old
     std::vector<vec3> material_buff;
     std::vector<vec3> triangle_buff;
-    std::vector<vec3> bvhnodes_buff;
     std::vector<vec3> lightidx_buff;
-    uint material_texbuff = 0;
     uint triangle_texbuff = 0;
-    uint bvhnodes_texbuff = 0;
     uint lightidx_texbuff = 0;
     int light_num, triangle_num;
-    std::vector<Texture*> texture_list;
 
-    std::map<Triangle*, int> triangle_index;
 public:
 
     Renderer(const string &frag_shader_path, int attach_num = 0, bool to_screen = false):

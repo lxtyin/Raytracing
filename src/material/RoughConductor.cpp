@@ -25,8 +25,8 @@ void RoughConductor::insert_gui() {
     }
 }
 
-uint RoughConductor::insert_buffer(std::vector<float> &materialBuffer, const std::map<Texture*, uint> &textureIndexMap) {
-    uint ptr = materialBuffer.size();
+int RoughConductor::insert_buffer(std::vector<float> &materialBuffer, const std::map<Texture*, uint> &textureIndexMap) {
+    int ptr = materialBuffer.size();
     materialBuffer.emplace_back((float)materialType);
     materialBuffer.emplace_back(albedo.x);
     materialBuffer.emplace_back(albedo.y);

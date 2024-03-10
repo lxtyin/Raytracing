@@ -16,22 +16,30 @@ void Scene::fetch_meshes(Instance* cur, mat4 transform2world, std::vector<std::p
     }
 }
 
-void Scene::reload() {
-
+void Scene::build_sceneBVH() {
     std::vector<std::pair<Mesh*, mat4>> allMeshes;
     fetch_meshes(this, mat4(1), allMeshes);
 
-    std::vector<Triangle*> tmp;
+    std::vector<BVHPrimitive> primitives;
     for(auto &[u, mat]: allMeshes){
-        for(auto &t: u->triangles) {
-            tmp.push_back(&t);
-            // TODO transform
+        BVHPrimitive p;
+        p.meshPtr = u;
+        AABB cube = u->meshBVHRoot->aabb;
+        for(int i = 0;i < 8;i++) {
+            vec3 point = {
+                (i & 1) ? cube.mi[0] : cube.mx[0],
+                (i & 2) ? cube.mi[1] : cube.mx[1],
+                (i & 4) ? cube.mi[2] : cube.mx[2]
+            };
+//            point = mat * vec4(point, 1); // TODO
+            p.aabb.addPoint(point);
         }
+        primitives.push_back(p);
     }
 
-    bvh_root = BVHNode::build(tmp);
-    std::cout << "BVH size:" << bvh_root->siz << std::endl;
-    std::cout << "BVH depth:" << bvh_root->depth << std::endl;
+    sceneBVHRoot = BVHNode::build(primitives);
+    std::cout << "BVH size:" << sceneBVHRoot->siz << std::endl;
+    std::cout << "BVH depth:" << sceneBVHRoot->depth << std::endl;
 }
 
 Scene::Scene(const string &nm): Instance(nm, nullptr) {}
