@@ -25,7 +25,7 @@ uniform int light_t_num;
 uniform mat4 v2w_mat;
 
 uniform int SPP = 1;
-uniform int MAX_DEPTH = 3;
+uniform int MAX_DEPTH = 2;
 uniform float fov = PI / 3;
 uniform bool fast_shade = true; // 仅渲染diffuse_color
 
@@ -115,12 +115,12 @@ float rand() {
 // math
 // ---------------------------------------------- //
 
-struct Coord {
+struct Frame {
     vec3 s, t, n;
 };
 
-Coord create_coord(vec3 n) {
-    Coord f;
+Frame create_coord(vec3 n) {
+    Frame f;
     if(abs(n.z) > 1 - EPS) f.s = cross(n, vec3(1, 0, 0));
     else f.s = cross(n, vec3(0, 0, 1));
     f.t = cross(n, f.s);
@@ -128,10 +128,10 @@ Coord create_coord(vec3 n) {
     return f;
 }
 
-vec3 to_world(in Coord f, vec3 v) {
+vec3 to_world(in Frame f, vec3 v) {
     return v.x * f.s + v.y * f.t + v.z * f.n;
 }
-vec3 to_local(in Coord f, vec3 v) {
+vec3 to_local(in Frame f, vec3 v) {
     return vec3(dot(v, f.s), dot(v, f.t), dot(v, f.n));
 }
 
@@ -166,17 +166,17 @@ struct Ray {
     vec3 dir;
 };
 
-struct Intersect {
+struct Intersection {
     bool exist;
-    vec3 pos;
-    vec3 normal;   // 击中平面的法线（向物体外）
+    vec3 position; // in world space.
+    vec3 normal; // in world space.
     float t;
     vec2 uv;
     int materialPtr;
     int meshIndex;
     int triangleIndex;
 };
-const Intersect nointersect = Intersect(false, vec3(0), vec3(0), INF, vec2(0), -1, -1, -1);
+const Intersection nointersect = Intersection(false, vec3(0), vec3(0, 0, 1), INF, vec2(0), -1, -1, -1);
 
 /// 检测是否与AABB碰撞，返回最早碰撞时间
 bool intersect_aabb(Ray ray, vec3 aa, vec3 bb, out float nearT) {
@@ -194,7 +194,7 @@ bool intersect_aabb(Ray ray, vec3 aa, vec3 bb, out float nearT) {
 }
 
 /// 返回与triangle的具体碰撞信息
-Intersect intersect_triangle(Ray ray, int triangleIndex) {
+Intersection intersect_triangle(Ray ray, int triangleIndex) {
     Triangle tri = get_triangle(triangleIndex);
 
     vec3 E1 = tri.ver[1].xyz - tri.ver[0].xyz;
@@ -212,14 +212,30 @@ Intersect intersect_triangle(Ray ray, int triangleIndex) {
     vec3 pos = ray.ori + t * ray.dir;
     vec3 nor = normalize(tri.normal[0].xyz * (1 - u - v) + tri.normal[1].xyz * u + tri.normal[2].xyz * v);
 
-    return Intersect(exist, pos, nor, t, interpolate_uv(tri, u, v), -1, -1, triangleIndex);
+    // TODO: geo/shading frame
+//    vec2 D1 = tri.uv[1] - tri.uv[0];
+//    vec2 D2 = tri.uv[2] - tri.uv[0];
+//    frame.t = 1.0 / (D1.x * D2.y - D2.x * D1.y) * (E1 * D1.x - E2 * D2.x);
+
+    return Intersection(exist, pos, nor, t, interpolate_uv(tri, u, v), -1, -1, triangleIndex);
 }
 
 int stack_h = 0;
 int stack[256];
-void intersect_meshBVH(int rootIndex, Ray ray, int meshIndex, inout Intersect result) {
+void intersect_meshBVH(int bvhRootIndex, int meshIndex, Ray _ray, inout Intersection result) {
     int starth = stack_h;
-    stack[++stack_h] = rootIndex;
+    stack[++stack_h] = bvhRootIndex;
+
+    mat4 w2l = meshInfoBuffer[meshIndex].world2local;
+    mat3 rot = mat3(normalize(w2l[0].xyz),
+                    normalize(w2l[1].xyz),
+                    normalize(w2l[2].xyz));
+
+    Ray ray;
+    ray.ori = (w2l * vec4(_ray.ori, 1)).xyz;
+    ray.dir = w2l[0].xyz * _ray.dir[0] + w2l[1].xyz * _ray.dir[1] + w2l[2].xyz * _ray.dir[2]; // keep scale.
+//    ray.dir = (w2l * vec4(_ray.dir, 0)).xyz;
+//    Ray ray = _ray;
 
     while(stack_h > starth) {
         int id = stack[stack_h--];
@@ -227,8 +243,11 @@ void intersect_meshBVH(int rootIndex, Ray ray, int meshIndex, inout Intersect re
 
         if(cur.triangleIndex >= 0) {
             // leaf
-            Intersect isect = intersect_triangle(ray, cur.triangleIndex);
+            Intersection isect = intersect_triangle(ray, cur.triangleIndex);
             if(isect.exist && isect.t < result.t){
+//                // M^-1 * v = M^T * v -> v * M
+                isect.normal = isect.normal * rot;
+                isect.position = _ray.ori + isect.t * _ray.dir;
                 result = isect;
                 result.meshIndex = meshIndex;
             }
@@ -244,9 +263,8 @@ void intersect_meshBVH(int rootIndex, Ray ray, int meshIndex, inout Intersect re
 }
 
 /// 在场景中的第一个交点
-Intersect intersect_sceneBVH(Ray ray) {
-
-    Intersect result = nointersect;
+Intersection intersect_sceneBVH(Ray ray) {
+    Intersection result = nointersect;
 
     stack_h = 0;
     stack[++stack_h] = 0;
@@ -256,13 +274,7 @@ Intersect intersect_sceneBVH(Ray ray) {
         BVHNode cur = bvhNodeBuffer[id];
 
         if(cur.meshIndex >= 0) {
-//            mat4 w2l = meshInfoBuffer[cur.meshIndex].world2local; // todo
-//
-//            vec3 o = (w2l * vec4(ray.ori, 1)).xyz;
-//            vec3 t = normalize((w2l * vec4(ray.dir, 0)).xyz);
-//            intersect_meshBVH(id, Ray(o, t), cur.meshIndex, result);
-            intersect_meshBVH(id, ray, cur.meshIndex, result);
-
+            intersect_meshBVH(id, cur.meshIndex, ray, result);
         } else {
             float tnear;
             if(!intersect_aabb(ray, vec3(cur.aa), vec3(cur.bb), tnear)) continue;
@@ -288,9 +300,9 @@ Intersect intersect_sceneBVH(Ray ray) {
 //    Ray ray;
 //} stack[256];
 //
-//Intersect intersect_sceneBVH(Ray ray) {
+//Intersection intersect_sceneBVH(Ray ray) {
 //
-//    Intersect result = nointersect;
+//    Intersection result = nointersect;
 //
 //    stack_h = 0;
 //    stack[++stack_h] = RayQuery(0, -1, INF, ray);
@@ -309,7 +321,7 @@ Intersect intersect_sceneBVH(Ray ray) {
 //
 //        if(cur.triangleIndex >= 0) {
 //            // leaf
-//            Intersect isect = intersect_triangle(rq.ray, cur.triangleIndex);
+//            Intersection isect = intersect_triangle(rq.ray, cur.triangleIndex);
 //            if(isect.exist && isect.t < result.t){
 //                result = isect;
 //                result.meshIndex = rq.meshIndex;
@@ -448,12 +460,12 @@ float skybox_sample_pdf(vec3 v) {
 // path tracing
 // ---------------------------------------------- //
 
-vec3 shade(Ray ray, in Intersect first_isect) {
+vec3 shade(Ray ray, in Intersection first_isect) {
 
     vec3 result = vec3(0);
     vec3 history = vec3(1); // 栈上乘积
 
-    Intersect isect = first_isect;
+    Intersection isect = first_isect;
     if(!isect.exist) return get_background_color(ray.dir);
 
     for(int dep = 0; dep < MAX_DEPTH; dep++) {
@@ -462,7 +474,7 @@ vec3 shade(Ray ray, in Intersect first_isect) {
 //            result += history * m1.emission;
 //            break;
 //        }
-        Coord coord = create_coord(isect.normal);
+        Frame coord = create_coord(isect.normal);
         vec3 wi = to_local(coord, -ray.dir);
         vec3 wo, global_wo;
         float pdf;
@@ -472,7 +484,7 @@ vec3 shade(Ray ray, in Intersect first_isect) {
 
         // direct light
         if(pdf > 0) {
-            Intersect tsect = intersect_sceneBVH(Ray(isect.pos, global_wo));
+            Intersection tsect = intersect_sceneBVH(Ray(isect.position, global_wo));
             if(!tsect.exist) {
                 vec3 fr = eval_material(bRec);
                 vec3 recv_col = get_background_color(global_wo) * fr * abs(bRec.wo.z) / (pdf + pdf_material(bRec));
@@ -485,7 +497,7 @@ vec3 shade(Ray ray, in Intersect first_isect) {
         global_wo = to_world(coord, bRec.wo);
         if(pdf <= 0) break;
 
-        ray = Ray(isect.pos, global_wo);
+        ray = Ray(isect.position, global_wo);
         isect = intersect_sceneBVH(ray);
         if(!isect.exist) {  // hit sky
             vec3 recv_col = get_background_color(global_wo) * fr * abs(bRec.wo.z) / (pdf + skybox_sample_pdf(global_wo));
@@ -513,7 +525,7 @@ void main() {
     normal_out = vec3(1, 1, 1);
     worldpos_out = vec3(1, 1, 1);
 
-//    Intersect ttt = intersect_sceneBVH(ray);
+//    Intersection ttt = intersect_sceneBVH(ray);
 //    if(!ttt.exist) {
 //        color_out = get_background_color(ray.dir);
 //    } else {
@@ -524,7 +536,7 @@ void main() {
 //    }
 //    return;
 
-    Intersect isect = intersect_sceneBVH(ray);
+    Intersection isect = intersect_sceneBVH(ray);
     if(!isect.exist) {
         worldpos_out = vec3(10000);
         color_out = get_background_color(ray.dir);
@@ -548,7 +560,7 @@ void main() {
 
     if(any(isnan(result))) result = vec3(0, 0, 0); // Minimal probability
 
-    worldpos_out = isect.pos;
+    worldpos_out = isect.position;
     color_out = result;
 
 }

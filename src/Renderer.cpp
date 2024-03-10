@@ -99,9 +99,7 @@ void Renderer::reload_meshes(Scene *scene) {
             GL_DYNAMIC_STORAGE_BIT
     );
 
-    if(triangle_texbuff) glDeleteTextures(1, &triangle_texbuff);
     if(lightidx_texbuff) glDeleteTextures(1, &lightidx_texbuff);
-    triangle_texbuff = gen_buffer_texture(triangle_buff);
     lightidx_texbuff = gen_buffer_texture(lightidx_buff);
 }
 

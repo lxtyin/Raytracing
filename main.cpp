@@ -197,6 +197,10 @@ void init() {
 //		m2->spec_trans = 0.8;
 		scene->add_child(o1);
 
+//        Instance *o2 = AssimpLoader::load_model("model/casa_obj.glb");
+//        o2->transform.rotation = vec3(-M_PI / 2, -M_PI / 2, 0);
+//        scene->add_child(o2);
+
 //        Instance *light= AssimpLoader::load_model("model/light.obj");
 //        light->transform.scale = vec3(30, 30, 30);
 //        light->transform.position = vec3(0, 100, 0);

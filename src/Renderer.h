@@ -10,10 +10,6 @@
 #include "texture/Texture.h"
 #include <map>
 
-#define M_SIZ 7
-#define T_SIZ 9
-#define B_SIZ 3
-
 class Renderer: public RenderPass {
 
     struct MeshInfo {

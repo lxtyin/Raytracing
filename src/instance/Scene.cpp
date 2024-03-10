@@ -31,7 +31,7 @@ void Scene::build_sceneBVH() {
                 (i & 2) ? cube.mi[1] : cube.mx[1],
                 (i & 4) ? cube.mi[2] : cube.mx[2]
             };
-//            point = mat * vec4(point, 1); // TODO
+            point = mat * vec4(point, 1);
             p.aabb.addPoint(point);
         }
         primitives.push_back(p);
