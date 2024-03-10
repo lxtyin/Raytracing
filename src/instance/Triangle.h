@@ -16,7 +16,6 @@ class Triangle {
 public:
     vec3 vertex[3];
     vec2 uv[3];
-    vec3 center;
     vec3 normal[3];     /**< normal for each vertex >**/
 
     Triangle() = default;
@@ -24,7 +23,6 @@ public:
              vec3 n0, vec3 n1, vec3 n2,
              vec2 u0 = vec2(0), vec2 u1 = vec2(0), vec2 u2 = vec2(0)):
             vertex{v0, v1, v2}, normal{n0, n1, n2}, uv{u0, u1, u2} {
-        center = (v0 + v1 + v2) / 3.0f;
     }
 };
 

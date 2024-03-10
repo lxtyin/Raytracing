@@ -27,6 +27,7 @@ void Renderer::reload_meshes(Scene *scene) {
     // TODO: 拆分为两个update level
     textureHandlesBuffer.clear();
     materialBuffer.clear();
+    triangleBuffer.clear();
     meshInfoBuffer.clear();
     meshIndexMap.clear();
     triangleIndexMap.clear();
@@ -35,9 +36,9 @@ void Renderer::reload_meshes(Scene *scene) {
     scene->fetch_meshes(scene, mat4(1), allMeshes);
     std::map<Texture*, uint> textureIndexMap;
 
-    triangle_buff.clear();
+//    triangle_buff.clear();
     lightidx_buff.clear();
-    triangle_num = 0;
+//    triangle_num = 0;
     light_num = 0;
     for(auto &[u, mat]: allMeshes) {
         assert(u->material);
@@ -51,17 +52,8 @@ void Renderer::reload_meshes(Scene *scene) {
         int materialPtr = u->material->insert_buffer(materialBuffer, textureIndexMap);
 
         for(auto &t: u->triangles) {
-            for(auto & v : t.vertex) triangle_buff.emplace_back(v);
-            for(auto & n : t.normal) triangle_buff.emplace_back(n);
-            triangle_buff.emplace_back(t.uv[0][0], t.uv[1][0], t.uv[2][0]);
-            triangle_buff.emplace_back(t.uv[0][1], t.uv[1][1], t.uv[2][1]);
-            triangle_buff.emplace_back(0, 0, 0); // placeholder
-//            if(u->material->is_emit) {
-//                lightidx_buff.emplace_back(triangle_num, 0, 0);
-//                light_num++;
-//            }
-            triangleIndexMap[&t] = triangle_num; // TODO
-            triangle_num++;
+            triangleIndexMap[&t] = triangleBuffer.size();
+            triangleBuffer.push_back(t);
         }
 
         assert(!meshIndexMap.count(u));
@@ -88,6 +80,15 @@ void Renderer::reload_meshes(Scene *scene) {
             materialSSBO,
             sizeof(float) * materialBuffer.size(),
             (const void *)materialBuffer.data(),
+            GL_DYNAMIC_STORAGE_BIT
+    );
+
+    if(triangleSSBO) glDeleteBuffers(1, &triangleSSBO);
+    glCreateBuffers(1, &triangleSSBO);
+    glNamedBufferStorage(
+            triangleSSBO,
+            sizeof(Triangle) * triangleBuffer.size(),
+            (const void *)triangleBuffer.data(),
             GL_DYNAMIC_STORAGE_BIT
     );
 
@@ -152,9 +153,10 @@ void Renderer::draw() {
     bind_texture("lightidxs", lightidx_texbuff, GL_TEXTURE_BUFFER);
 
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, textureHandleSSBO);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, meshInfoSSBO);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, materialSSBO);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, bvhNodeSSBO);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, materialSSBO);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, triangleSSBO);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, meshInfoSSBO);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 4, bvhNodeSSBO);
     RenderPass::draw();
 }
 
