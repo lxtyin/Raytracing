@@ -1,4 +1,9 @@
-/cmake-build-debug
-/cmake-build-release
+/cmake-build-debug*
+/cmake-build-release*
 /.idea
 .vscode/
+/notes
+/screenshots
+/lib
+/model
+/hdrs
