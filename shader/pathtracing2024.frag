@@ -60,9 +60,9 @@ layout(binding = 1, std430) readonly buffer ssbo1 {
 };
 
 struct Triangle {
-    vec3 ver[3];
+    vec4 ver[3];
+    vec4 normal[3];
     vec2 uv[3];
-    vec3 normal[3];
 };
 layout(binding = 2, std430) readonly buffer ssbo2 {
     Triangle triangleBuffer[];
@@ -195,9 +195,9 @@ bool intersect_aabb(Ray ray, vec3 aa, vec3 bb, out float nearT) {
 Intersect intersect_triangle(Ray ray, int triangleIndex) {
     Triangle tri = triangleBuffer[triangleIndex];
 
-    vec3 E1 = tri.ver[1] - tri.ver[0];
-    vec3 E2 = tri.ver[2] - tri.ver[0];
-    vec3 S = ray.ori - tri.ver[0];
+    vec3 E1 = tri.ver[1].xyz - tri.ver[0].xyz;
+    vec3 E2 = tri.ver[2].xyz - tri.ver[0].xyz;
+    vec3 S = ray.ori - tri.ver[0].xyz;
     vec3 S1 = cross(ray.dir, E2);
     vec3 S2 = cross(S, E1);
     float k = 1.0 / dot(S1, E1);
@@ -208,7 +208,7 @@ Intersect intersect_triangle(Ray ray, int triangleIndex) {
     bool exist = (RAY_EPS < t && 0 < u && 0 < v && u + v < 1);
 
     vec3 pos = ray.ori + t * ray.dir;
-    vec3 nor = normalize(tri.normal[0] * (1 - u - v) + tri.normal[1] * u + tri.normal[2] * v);
+    vec3 nor = normalize(tri.normal[0].xyz * (1 - u - v) + tri.normal[1].xyz * u + tri.normal[2].xyz * v);
 
     return Intersect(exist, pos, nor, t, interpolate_uv(tri, u, v), -1, -1, triangleIndex);
 }
@@ -365,8 +365,8 @@ Intersect intersect_sceneBVH(Ray ray) {
 void sample_triangle(in Triangle t, out vec3 position, out vec3 normal) {
     float r1 = sqrt(rand());
     float r2 = rand();
-    normal = t.normal[0] * (1 - r1) + t.normal[1] * r1 * (1 - r2) + t.normal[2] * r1 * r2;
-    position = t.ver[0] * (1 - r1) + t.ver[1] * r1 * (1 - r2) + t.ver[2] * r1 * r2;
+    normal = (t.normal[0] * (1 - r1) + t.normal[1] * r1 * (1 - r2) + t.normal[2] * r1 * r2).xyz;
+    position = (t.ver[0] * (1 - r1) + t.ver[1] * r1 * (1 - r2) + t.ver[2] * r1 * r2).xyz;
 }
 
 /// 在所有光面上采样 [unused]

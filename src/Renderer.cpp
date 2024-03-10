@@ -53,7 +53,13 @@ void Renderer::reload_meshes(Scene *scene) {
 
         for(auto &t: u->triangles) {
             triangleIndexMap[&t] = triangleBuffer.size();
-            triangleBuffer.push_back(t);
+            TriangleInfo y;
+            for(int i = 0;i < 3;i++) {
+                y.vertex[i] = vec4(t.vertex[i], 0);
+                y.normal[i] = vec4(t.normal[i], 0);
+                y.uv[i] = t.uv[i];
+            }
+            triangleBuffer.push_back(y);
         }
 
         assert(!meshIndexMap.count(u));

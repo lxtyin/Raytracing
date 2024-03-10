@@ -16,13 +16,18 @@
 
 class Renderer: public RenderPass {
 
+    struct TriangleInfo {
+        vec4 vertex[3];
+        vec4 normal[3];
+        vec2 uv[3];
+        int emptyblock[2];
+    };
     struct MeshInfo {
         mat4 world2local;
         vec4 emission;
         int materialPtr;
         int emptyblock[11];
     };
-
     struct BVHNodeInfo {
         vec4 aa, bb;
         int lsIndex = -1;
@@ -33,7 +38,7 @@ class Renderer: public RenderPass {
 
     std::vector<GLuint64> textureHandlesBuffer;
     std::vector<float> materialBuffer;
-    std::vector<Triangle> triangleBuffer;
+    std::vector<TriangleInfo> triangleBuffer;
     std::vector<MeshInfo> meshInfoBuffer;
     std::vector<BVHNodeInfo> bvhNodeBuffer;
     GLuint textureHandleSSBO;
