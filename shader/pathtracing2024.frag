@@ -3,6 +3,7 @@
 #extension GL_ARB_bindless_texture : require
 
 #include shader/basic/math.frag
+#include shader/basic/sobol.frag
 
 in float pixel_x;
 in float pixel_y;
@@ -91,24 +92,6 @@ struct BVHNode {
 layout(binding = 4, std430) readonly buffer ssbo4 {
     BVHNode bvhNodeBuffer[];
 };
-
-uint seed = uint(
-uint(pixel_x + SCREEN_W / 2) * uint(1973) +
-uint(pixel_y + SCREEN_H / 2) * uint(9277) +
-uint(frameCounter) * uint(26699)) | uint(1);
-
-uint wang_hash(inout uint seed) {
-    seed = uint(seed ^ uint(61)) ^ uint(seed >> uint(16));
-    seed *= uint(9);
-    seed = seed ^ (seed >> 4);
-    seed *= uint(0x27d4eb2d);
-    seed = seed ^ (seed >> 15);
-    return seed;
-}
-
-float rand() {
-    return float(wang_hash(seed)) / 4294967296.0;
-}
 
 #include shader/materials/materials.frag
 
@@ -217,6 +200,7 @@ Intersection intersect_triangle(Ray ray, int triangleIndex) {
 //    vec2 D2 = tri.uv[2] - tri.uv[0];
 //    frame.t = 1.0 / (D1.x * D2.y - D2.x * D1.y) * (E1 * D1.x - E2 * D2.x);
 
+    // returns in local frame, then updated to world frame.
     return Intersection(exist, pos, nor, t, interpolate_uv(tri, u, v), -1, -1, triangleIndex);
 }
 
@@ -513,54 +497,57 @@ vec3 shade(Ray ray, in Intersection first_isect) {
 
 void main() {
 
-    float dis_z = SCREEN_W * 0.5 / tan(fov / 2);
-    vec3 w_ori = vec3(v2w_mat * vec4(0, 0, 0, 1));
-    vec3 w_tar = vec3(v2w_mat * vec4(pixel_x, pixel_y, -dis_z, 1));
-    vec3 dir = normalize(w_tar - w_ori);
-    Ray ray = Ray(w_ori, dir);
-
-
-    // 预设
+    // tmp
     albedo_out = vec3(1, 1, 1);
     normal_out = vec3(1, 1, 1);
     worldpos_out = vec3(1, 1, 1);
 
-//    Intersection ttt = intersect_sceneBVH(ray);
-//    if(!ttt.exist) {
-//        color_out = get_background_color(ray.dir);
-//    } else {
-//        vec3 albedo = vec3(materialBuffer[ttt.materialPtr + 1],
-//        materialBuffer[ttt.materialPtr + 2],
-//        materialBuffer[ttt.materialPtr + 3]);
-//        color_out = albedo;
-//    }
-//    return;
-
-    Intersection isect = intersect_sceneBVH(ray);
-    if(!isect.exist) {
-        worldpos_out = vec3(10000);
-        color_out = get_background_color(ray.dir);
-        return;
-    }
-
-//    Triangle tr1 = get_triangle(isect.t_index);
-//    Material m1 = get_material(tr1.m_index);
-//    vec2 uv = interpolate_uv(tr1, isect.u, isect.v);
-//    albedo_out = get_diffuse_color(m1, uv);
-//    normal_out = isect.normal;
-//
-//    if(fast_shade) {
-//        color_out = get_diffuse_color(m1, uv);
-//        return;
-//    }
-
     vec3 result = vec3(0);
-    for(int i = 1;i <= SPP;i++) result += shade(ray, isect);
-    result /= SPP;
 
-    if(any(isnan(result))) result = vec3(0, 0, 0); // Minimal probability
+    for(int spp = 0;spp < SPP;spp++) {
 
-    worldpos_out = isect.position;
-    color_out = result;
+        uint seed = uint(
+        uint(pixel_x + SCREEN_W / 2) * uint(1973) +
+        uint(pixel_y + SCREEN_H / 2) * uint(9277) +
+        uint(frameCounter * SPP + spp) * uint(26699)) | uint(1);
+
+        // 每次tracing为一个随机过程
+        sobolseed = seed;
+        sobolcurdim = 0u;
+
+        vec2 offset = rand2D();
+
+
+        float dis_z = SCREEN_W * 0.5 / tan(fov / 2);
+        vec3 w_ori = vec3(v2w_mat * vec4(0, 0, 0, 1));
+        vec3 w_tar = vec3(v2w_mat * vec4(pixel_x, pixel_y, -dis_z, 1));
+        vec3 dir = normalize(w_tar - w_ori);
+        Ray ray = Ray(w_ori, dir);
+
+        Intersection isect = intersect_sceneBVH(ray);
+        if(!isect.exist) {
+            worldpos_out = vec3(10000);
+            color_out = get_background_color(ray.dir);
+            return;
+        }
+
+        //    Triangle tr1 = get_triangle(isect.t_index);
+        //    Material m1 = get_material(tr1.m_index);
+        //    vec2 uv = interpolate_uv(tr1, isect.u, isect.v);
+        //    albedo_out = get_diffuse_color(m1, uv);
+        //    normal_out = isect.normal;
+        //
+        //    if(fast_shade) {
+        //        color_out = get_diffuse_color(m1, uv);
+        //        return;
+        //    }
+
+        result += shade(ray, isect);
+
+//        if(sobolcurdim > 10) result = vec3(1.0, 0, 0);
+//        else result = vec3(sobolcurdim * 1.0 / 10);
+    }
+    if(any(isnan(result))) result = vec3(0, 0, 0);
+    color_out = result / SPP;
 
 }

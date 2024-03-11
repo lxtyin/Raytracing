@@ -11,7 +11,6 @@
 #include <map>
 
 class Renderer: public RenderPass {
-
     struct MeshInfo {
         mat4 world2local;
         vec4 emission;
@@ -47,8 +46,8 @@ class Renderer: public RenderPass {
 
 public:
 
-    Renderer(const string &frag_shader_path, int attach_num = 0, bool to_screen = false):
-        RenderPass(frag_shader_path, attach_num, to_screen) {}
+    Renderer(const string &frag_shader_path, int attach_num = 0, bool to_screen = false);
+
 
     /**
      * 生成texture buffer object

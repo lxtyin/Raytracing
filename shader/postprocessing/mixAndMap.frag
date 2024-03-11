@@ -23,7 +23,8 @@ void main() {
     if(!is_motionvector_enabled) {
         // static mix frame.
         vec3 last_color = texture(last_colorT, screen_uv).xyz;
-        result = mix(last_color, cur_color, 1.0 / frameCounter);
+//        result = mix(last_color, cur_color, 1.0 / frameCounter);
+        result = mix(last_color, cur_color, 1.0);
     } else {
         // motion vector
         vec4 Hcoord = back_proj * vec4(cur_wpos, 1); // homogeneous coordinates

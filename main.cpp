@@ -183,7 +183,7 @@ void init() {
     camera = new Camera(M_PI / 3);
     {
         Instance *o1 = AssimpLoader::load_model("model/casa_obj.glb");
-        o1->transform.rotation = vec3(-M_PI / 2, M_PI / 4, 0);
+        o1->transform.rotation = vec3(-M_PI / 2, 0, 0);
 		// pre setting
 //		Material *m1 = o1->get_child(0)->get_child(1)->meshes[0]->material;
 //		m1->roughness = 0.01;

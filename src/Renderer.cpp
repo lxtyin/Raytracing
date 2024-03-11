@@ -7,7 +7,7 @@
 #include "glad/glad.h"
 #include "glfw/glfw3.h"
 #include "glm/gtc/type_ptr.hpp"
-#include <iostream>
+#include <fstream>
 #include <queue>
 
 uint Renderer::gen_buffer_texture(std::vector<vec3> &buff) {
@@ -153,4 +153,7 @@ void Renderer::draw() {
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 4, bvhNodeSSBO);
     RenderPass::draw();
 }
+
+Renderer::Renderer(const string &frag_shader_path, int attach_num, bool to_screen)
+: RenderPass(frag_shader_path, attach_num, to_screen) { }
 
