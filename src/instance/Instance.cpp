@@ -43,6 +43,7 @@ mat4 Instance::matrix_to_global() {
 
 void Instance::insert_gui() {
     if(ImGui::TreeNode(name.c_str())) {
+        transform.insert_gui();
         for(auto *m: meshes) {
             if(m->material) {
                 m->material->insert_gui();

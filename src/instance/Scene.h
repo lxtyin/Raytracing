@@ -33,6 +33,8 @@ public:
      * update allMeshes and BVH.
      */
     void update();
+
+    ~Scene();
 };
 
 #endif //PATH_TRACING_SCENE_H

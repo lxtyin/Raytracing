@@ -27,3 +27,7 @@ Mesh::Mesh(string _name, std::vector<Triangle> &&_triangles):
     assert(_triangles.size() > 0);
     build_meshBVH();
 }
+
+Mesh::~Mesh() {
+    delete meshBVHRoot;
+}

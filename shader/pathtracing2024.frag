@@ -450,22 +450,24 @@ void main() {
         Intersection isect = intersect_sceneBVH(ray);
         if(!isect.exist) {
             worldpos_out = vec3(10000);
-            color_out = get_background_color(ray.dir);
-            return;
+            result += get_background_color(ray.dir);
+            continue;
         }
 
+        if(fast_shade) {
+            vec3 albedo = vec3(materialBuffer[isect.materialPtr + 1],
+                            materialBuffer[isect.materialPtr + 2],
+                            materialBuffer[isect.materialPtr + 3]);
+            result += albedo;
+        } else {
+            result += shade(ray, isect);
+        }
         //    Triangle tr1 = get_triangle(isect.t_index);
         //    Material m1 = get_material(tr1.m_index);
         //    vec2 uv = interpolate_uv(tr1, isect.u, isect.v);
         //    albedo_out = get_diffuse_color(m1, uv);
         //    normal_out = isect.normal;
-        //
-        //    if(fast_shade) {
-        //        color_out = get_diffuse_color(m1, uv);
-        //        return;
-        //    }
 
-        result += shade(ray, isect);
     }
     if(any(isnan(result))) result = vec3(0, 0, 0);
     color_out = result / SPP;

@@ -75,3 +75,8 @@ BVHNode* BVHNode::build(std::vector<BVHPrimitive> &primitives) {
     cur->depth = max(cur->ls->depth, cur->rs->depth) + 1;
     return cur;
 }
+
+BVHNode::~BVHNode() {
+    if(ls && !ls->meshPtr) delete ls;
+    if(rs && !rs->meshPtr) delete rs;
+}

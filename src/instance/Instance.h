@@ -22,9 +22,6 @@ public:
     Instance() = default;
     explicit Instance(const string &nm, Instance *p = nullptr);
 
-    /**
-     * Insert this node and it's childs into current image gui.
-     */
     void insert_gui();
 
 	mat4 matrix_to_global();

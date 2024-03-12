@@ -38,8 +38,8 @@ void mouse_callback(GLFWwindow* window, double xpos, double ypos) {
     if(mouse_button == GLFW_PRESS) {
         double dx = xpos - mouse_lastX;
         double dy = ypos - mouse_lastY;
-        camera->transform.rotation += vec3(0, -dx * 0.01, 0);
-        camera->transform.rotation += vec3(-dy * 0.01, 0, 0);
+        camera->transform.rotation += vec3(0, -dx * 0.3, 0);
+        camera->transform.rotation += vec3(-dy * 0.3, 0, 0);
         mouse_lastX = xpos;
         mouse_lastY = ypos;
 		frameCounter = 0;
@@ -49,10 +49,10 @@ void mouse_callback(GLFWwindow* window, double xpos, double ypos) {
 void update(float dt) {
 
     scene->update();
-    pass1->reload_scene(scene);
+    pass1->reload_sceneinfos(scene);
 
     static uint last_colorT = 0, last_wposT = 0;
-	static bool fast_shade = false;
+	static bool fast_shade = true;
 	static glm::mat4 back_projection(1);
 
 	frameCounter++;
@@ -77,50 +77,50 @@ void update(float dt) {
         }
         pass1->draw();
 
-        glm::mat4 viewPort = glm::matbyrow({
-                                                   1./SCREEN_W, 0, 			0,	 0.5,
-                                                   0, 			 1./SCREEN_H, 	0,	 0.5,
-                                                   0, 			 0, 			0,	 0,
-                                                   0, 			 0, 			0,	 1
-                                           });
-        back_projection = viewPort * camera->projection() * camera->w2v_matrix();
-
-        pass_mix->use();
-        {
-            pass_mix->bind_texture("cur_colorT", pass1->attach_textures[0]);
-            pass_mix->bind_texture("cur_wposT", pass1->attach_textures[3]);
-            pass_mix->bind_texture("last_colorT", last_colorT);
-            pass_mix->bind_texture("last_wposT", last_wposT);
-            glUniform1ui(glGetUniformLocation(pass_mix->shaderProgram, "frameCounter"), frameCounter);
-            glUniformMatrix4fv(glGetUniformLocation(pass_mix->shaderProgram, "back_proj"), 1, GL_FALSE, glm::value_ptr(back_projection));
-            glUniform1i(glGetUniformLocation(pass_mix->shaderProgram, "is_motionvector_enabled"), Config::is_motionvector_enabled);
-        }
-        pass_mix->draw();
-
-        last_colorT = pass_mix->attach_textures[1];
-        last_wposT = pass1->attach_textures[3];
-
-        pass_fw->use();
-        {
-            glUniform1i(glGetUniformLocation(pass_fw->shaderProgram, "SCREEN_W"), SCREEN_W);
-            glUniform1i(glGetUniformLocation(pass_fw->shaderProgram, "SCREEN_H"), SCREEN_H);
-            glUniform1i(glGetUniformLocation(pass_fw->shaderProgram, "is_filter_enabled"), Config::is_filter_enabled);
-            pass_fw->bind_texture("prevpass_color", pass_mix->attach_textures[0]);
-            pass_fw->bind_texture("prevpass_albedo", pass1->attach_textures[1]);
-            pass_fw->bind_texture("prevpass_normal", pass1->attach_textures[2]);
-        }
-        pass_fw->draw();
-
-        pass_fh->use();
-        {
-            glUniform1i(glGetUniformLocation(pass_fh->shaderProgram, "SCREEN_W"), SCREEN_W);
-            glUniform1i(glGetUniformLocation(pass_fh->shaderProgram, "SCREEN_H"), SCREEN_H);
-            glUniform1i(glGetUniformLocation(pass_fh->shaderProgram, "is_filter_enabled"), Config::is_filter_enabled);
-            pass_fh->bind_texture("prevpass_color", pass_fw->attach_textures[0]);
-            pass_fh->bind_texture("prevpass_albedo", pass1->attach_textures[1]);
-            pass_fh->bind_texture("prevpass_normal", pass1->attach_textures[2]);
-        }
-        pass_fh->draw();
+//        glm::mat4 viewPort = glm::matbyrow({
+//                                                   1./SCREEN_W, 0, 			0,	 0.5,
+//                                                   0, 			 1./SCREEN_H, 	0,	 0.5,
+//                                                   0, 			 0, 			0,	 0,
+//                                                   0, 			 0, 			0,	 1
+//                                           });
+//        back_projection = viewPort * camera->projection() * camera->w2v_matrix();
+//
+//        pass_mix->use();
+//        {
+//            pass_mix->bind_texture("cur_colorT", pass1->attach_textures[0]);
+//            pass_mix->bind_texture("cur_wposT", pass1->attach_textures[3]);
+//            pass_mix->bind_texture("last_colorT", last_colorT);
+//            pass_mix->bind_texture("last_wposT", last_wposT);
+//            glUniform1ui(glGetUniformLocation(pass_mix->shaderProgram, "frameCounter"), frameCounter);
+//            glUniformMatrix4fv(glGetUniformLocation(pass_mix->shaderProgram, "back_proj"), 1, GL_FALSE, glm::value_ptr(back_projection));
+//            glUniform1i(glGetUniformLocation(pass_mix->shaderProgram, "is_motionvector_enabled"), Config::is_motionvector_enabled);
+//        }
+//        pass_mix->draw();
+//
+//        last_colorT = pass_mix->attach_textures[1];
+//        last_wposT = pass1->attach_textures[3];
+//
+//        pass_fw->use();
+//        {
+//            glUniform1i(glGetUniformLocation(pass_fw->shaderProgram, "SCREEN_W"), SCREEN_W);
+//            glUniform1i(glGetUniformLocation(pass_fw->shaderProgram, "SCREEN_H"), SCREEN_H);
+//            glUniform1i(glGetUniformLocation(pass_fw->shaderProgram, "is_filter_enabled"), Config::is_filter_enabled);
+//            pass_fw->bind_texture("prevpass_color", pass_mix->attach_textures[0]);
+//            pass_fw->bind_texture("prevpass_albedo", pass1->attach_textures[1]);
+//            pass_fw->bind_texture("prevpass_normal", pass1->attach_textures[2]);
+//        }
+//        pass_fw->draw();
+//
+//        pass_fh->use();
+//        {
+//            glUniform1i(glGetUniformLocation(pass_fh->shaderProgram, "SCREEN_W"), SCREEN_W);
+//            glUniform1i(glGetUniformLocation(pass_fh->shaderProgram, "SCREEN_H"), SCREEN_H);
+//            glUniform1i(glGetUniformLocation(pass_fh->shaderProgram, "is_filter_enabled"), Config::is_filter_enabled);
+//            pass_fh->bind_texture("prevpass_color", pass_fw->attach_textures[0]);
+//            pass_fh->bind_texture("prevpass_albedo", pass1->attach_textures[1]);
+//            pass_fh->bind_texture("prevpass_normal", pass1->attach_textures[2]);
+//        }
+//        pass_fh->draw();
     }
     //--------------------------------------
 
@@ -158,10 +158,10 @@ void update(float dt) {
     if(glfwGetKey(window, GLFW_KEY_D)) camera->transform.position += camera->transform.direction_x() * speed * dt;
     if(glfwGetKey(window, GLFW_KEY_A)) camera->transform.position += camera->transform.direction_x() * -speed * dt;
 
-	if(glfwGetKey(window, GLFW_KEY_LEFT)) camera->transform.rotation += vec3(0, 1, 0) * dt;
-	if(glfwGetKey(window, GLFW_KEY_RIGHT)) camera->transform.rotation += vec3(0, -1, 0) * dt;
-	if(glfwGetKey(window, GLFW_KEY_UP)) camera->transform.rotation += vec3(1, 0, 0) * dt;
-	if(glfwGetKey(window, GLFW_KEY_DOWN)) camera->transform.rotation += vec3(-1, 0, 0) * dt;
+	if(glfwGetKey(window, GLFW_KEY_LEFT)) camera->transform.rotation += vec3(0, 50, 0) * dt;
+	if(glfwGetKey(window, GLFW_KEY_RIGHT)) camera->transform.rotation += vec3(0, -50, 0) * dt;
+	if(glfwGetKey(window, GLFW_KEY_UP)) camera->transform.rotation += vec3(50, 0, 0) * dt;
+	if(glfwGetKey(window, GLFW_KEY_DOWN)) camera->transform.rotation += vec3(-50, 0, 0) * dt;
 
     if(glfwGetKey(window, GLFW_KEY_SPACE)) camera->transform.position += vec3(0, speed * dt, 0);
     if(glfwGetKey(window, GLFW_KEY_LEFT_SHIFT))  camera->transform.position += vec3(0, -speed * dt, 0);
@@ -173,16 +173,18 @@ void update(float dt) {
 void init() {
 
     // passes
-    pass1    = new Renderer("shader/pathtracing2024.frag", 4);
-    pass_mix = new RenderPass("shader/postprocessing/mixAndMap.frag", 2);
-    pass_fw  = new RenderPass("shader/postprocessing/filter_w.frag", 1);
-	pass_fh  = new RenderPass("shader/postprocessing/filter_h.frag", 0, true);
+    pass1    = new Renderer("shader/pathtracing2024.frag", 0, true);
+
+//    pass1    = new Renderer("shader/pathtracing2024.frag", 4);
+//    pass_mix = new RenderPass("shader/postprocessing/mixAndMap.frag", 2);
+//    pass_fw  = new RenderPass("shader/postprocessing/filter_w.frag", 1);
+//	pass_fh  = new RenderPass("shader/postprocessing/filter_h.frag", 0, true);
 
     scene = new Scene("Scene");
-    camera = new Camera(M_PI / 3);
+    camera = new Camera(SCREEN_FOV);
     {
         Instance *o1 = AssimpLoader::load_model("model/casa_obj.glb");
-        o1->transform.rotation = vec3(-M_PI / 2, 0, 0);
+        o1->transform.rotation = vec3(-90, 0, 0);
 		// pre setting
 //		Material *m1 = o1->get_child(0)->get_child(1)->meshes[0]->material;
 //		m1->roughness = 0.01;
@@ -210,9 +212,9 @@ void init() {
 
 	skybox = new Skybox("hdrs/kloofendal_48d_partly_cloudy_puresky_2k.hdr");
 
-    camera->transform.rotation.y = M_PI;
-	camera->transform.position = vec3(-8.7711, 6.33925, 10.3415);
-	camera->transform.rotation = vec3(-0.69, 11.7516, 0);
+    camera->transform.rotation.y = 180;
+	camera->transform.position = vec3(-12.1396, 9.27221, 13.2912);
+	camera->transform.rotation = vec3(-26.19, -45.8484, 0);
     scene->update();
     pass1->reload_scene(scene);
     std::cout << "BVH size:" << scene->sceneBVHRoot->siz << std::endl;

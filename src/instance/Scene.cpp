@@ -34,7 +34,7 @@ void Scene::build_sceneBVH() {
         }
         primitives.push_back(p);
     }
-
+    if(sceneBVHRoot) delete sceneBVHRoot;
     sceneBVHRoot = BVHNode::build(primitives);
 }
 
@@ -46,3 +46,7 @@ void Scene::update() {
 }
 
 Scene::Scene(const string &nm): Instance(nm, nullptr) {}
+
+Scene::~Scene() {
+    if(sceneBVHRoot) delete sceneBVHRoot;
+}

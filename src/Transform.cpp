@@ -2,6 +2,8 @@
 #include "instance/Instance.h"
 #include <algorithm>
 #include <iostream>
+#include "imgui/imgui.h"
+#include "Config.h"
 
 using namespace std;
 
@@ -20,9 +22,9 @@ mat4 Transform::matrix() {
 			0, scale.y, 0, 	0,
 			0, 0, scale.z, 	0,
 			0, 0, 0,		1 };
-	float x = rotation.x;
-	float y = rotation.y;
-	float z = rotation.z;
+	float x = rotation.x / 180 * M_PI;
+	float y = rotation.y / 180 * M_PI;
+	float z = rotation.z / 180 * M_PI;
 	mat4 rot_x = glm::matbyrow({
 				1,		0,		0,		0,
 				0,		cos(x),	-sin(x),0,
@@ -78,4 +80,18 @@ vec3 Transform::direction_z() {
 
 bool Transform::operator ==(const Transform& t) const {
 	return position == t.position && scale == t.scale && rotation == t.rotation && order == t.order;
+}
+
+void Transform::insert_gui() {
+    float p[3] = { position.x, position.y, position.z };
+    ImGui::SliderFloat3("position", p, -10, 10, "%.2f");
+    position = vec3(p[0], p[1], p[2]);
+
+    float r[3] = { rotation.x, rotation.y, rotation.z };
+    ImGui::SliderFloat3("rotation", r, -180, 180, "%.2f");
+    rotation = vec3(r[0], r[1], r[2]);
+
+    float s[3] = { scale.x, scale.y, scale.z };
+    ImGui::SliderFloat3("scale", s, -10, 10, "%.2f");
+    scale = vec3(s[0], s[1], s[2]);
 }

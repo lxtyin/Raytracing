@@ -28,6 +28,8 @@ public:
     int depth = 0; // 树最大深度
 
     static BVHNode* build(std::vector<BVHPrimitive> &primitives);
+
+    ~BVHNode();
 };
 
 

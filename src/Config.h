@@ -6,11 +6,10 @@
 #define PATH_TRACING_CONFIG_H
 
 #include "imgui/imgui.h"
-#include <cmath>
+#include "common.h"
 
-const double M_PI = acos(-1);
-#define SCREEN_W 512
-#define SCREEN_H 512
+const int SCREEN_W = 1080;
+const int SCREEN_H = 720;
 #define SCREEN_FOV (M_PI / 3)
 
 class Config {

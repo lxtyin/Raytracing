@@ -3,10 +3,9 @@
 #include "loader.h"
 #include "exglm.hpp"
 #include "../material/RoughConductor.h"
+#include "common.h"
 using namespace std;
 
-const float INTERVAL = 0.2; //水平间距
-const float HISCALE = 0.02; //高度比例
 
 namespace AssimpLoader{
 
@@ -127,7 +126,7 @@ namespace AssimpLoader{
         aiVector3D position, rotation, scale;
         node->mTransformation.Decompose(scale, rotation, position);
         cur->transform.position = vec3(position.x, position.y, position.z);
-        cur->transform.rotation = vec3(rotation.x, rotation.y, rotation.z);
+        cur->transform.rotation = 180.0f / M_PI * vec3(rotation.x, rotation.y, rotation.z);
         cur->transform.scale    = vec3(scale.x,    scale.y,    scale.z    );
 
         for(int i = 0; i < node->mNumMeshes; i++) {

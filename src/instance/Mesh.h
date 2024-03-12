@@ -26,6 +26,7 @@ public:
 
     Mesh(string _name, std::vector<Triangle> &&_triangles);
     Mesh() = delete;
+    ~Mesh();
 };
 
 
