@@ -173,18 +173,52 @@ void Renderer::reload_meshes(Scene *scene) {
 }
 
 void Renderer::reload_bvhnodes(Scene *scene) {
-    bvhNodeBuffer.resize(scene->sceneBVHRoot->siz);
 
+    int meshBVHsize = 0;
+    for(auto &[u, mat]: targetMeshes) meshBVHsize += u->meshBVHRoot->siz;
+    meshBVHBuffer.resize(meshBVHsize);
+
+    // 0-M个节点作为各个meshBVH的根节点，index同meshIndex
+
+    int N = (int)targetMeshes.size() - 1;
+    // load all bvh of meshes;
+    for(int i = 0;i < targetMeshes.size();i++) {
+        std::queue<std::pair<BVHNode*, int>> q; // <node, index>
+        q.emplace(targetMeshes[i].first->meshBVHRoot, i);
+        while(!q.empty()) {
+            auto [p, index] = q.front();
+            q.pop();
+            int il = -1, ir = -1;
+            if(p->ls) il = ++N, q.emplace(p->ls, il);
+            if(p->rs) ir = ++N, q.emplace(p->rs, ir);
+
+            BVHNodeInfo y;
+            y.aa = vec4(p->aabb.mi, 0);
+            y.bb = vec4(p->aabb.mx, 0);
+            y.lsIndex = il;
+            y.rsIndex = ir;
+            if(p->meshPtr) y.meshIndex = meshIndexMap[p->meshPtr];
+            if(p->trianglePtr) y.triangleIndex = triangleIndexMap[p->trianglePtr];
+            meshBVHBuffer[index] = y;
+        }
+    }
+
+    sceneBVHBuffer.resize(scene->sceneBVHRoot->siz - meshBVHsize);
     std::queue<std::pair<BVHNode*, int>> q; // <node, index>
     q.emplace(scene->sceneBVHRoot, 0);
-    int n = 0;
+    N = 0;
     while(!q.empty()) {
         auto [p, index] = q.front();
         q.pop();
         int il = -1, ir = -1;
-        if(p->ls) il = ++n, q.emplace(p->ls, il);
-        if(p->rs) ir = ++n, q.emplace(p->rs, ir);
-
+        if(p->ls) {
+            if(p->ls->meshPtr) il = -meshIndexMap[p->ls->meshPtr];
+            else il = ++N, q.emplace(p->ls, il);
+        }
+        if(p->rs) {
+            if(p->rs->meshPtr) ir = -meshIndexMap[p->rs->meshPtr];
+            else ir = ++N, q.emplace(p->rs, ir);
+        }
         BVHNodeInfo y;
         y.aa = vec4(p->aabb.mi, 0);
         y.bb = vec4(p->aabb.mx, 0);
@@ -192,16 +226,23 @@ void Renderer::reload_bvhnodes(Scene *scene) {
         y.rsIndex = ir;
         if(p->meshPtr) y.meshIndex = meshIndexMap[p->meshPtr];
         if(p->trianglePtr) y.triangleIndex = triangleIndexMap[p->trianglePtr];
-        bvhNodeBuffer[index] = y;
+        sceneBVHBuffer[index] = y;
     }
-    assert(n + 1 == bvhNodeBuffer.size());
 
-    if(bvhNodeSSBO) glDeleteBuffers(1, &bvhNodeSSBO);
-    glCreateBuffers(1, &bvhNodeSSBO);
+    if(meshBVHSSBO) glDeleteBuffers(1, &meshBVHSSBO);
+    glCreateBuffers(1, &meshBVHSSBO);
     glNamedBufferStorage(
-            bvhNodeSSBO,
-            sizeof(BVHNodeInfo) * bvhNodeBuffer.size(),
-            (const void *)bvhNodeBuffer.data(),
+            meshBVHSSBO,
+            sizeof(BVHNodeInfo) * meshBVHBuffer.size(),
+            (const void *)meshBVHBuffer.data(),
+            GL_DYNAMIC_STORAGE_BIT
+    );
+    if(sceneBVHSSBO) glDeleteBuffers(1, &sceneBVHSSBO);
+    glCreateBuffers(1, &sceneBVHSSBO);
+    glNamedBufferStorage(
+            sceneBVHSSBO,
+            sizeof(BVHNodeInfo) * sceneBVHBuffer.size(),
+            (const void *)sceneBVHBuffer.data(),
             GL_DYNAMIC_STORAGE_BIT
     );
 }
@@ -219,7 +260,8 @@ void Renderer::draw() {
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, materialSSBO);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, triangleSSBO);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, meshInfoSSBO);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 4, bvhNodeSSBO);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 4, meshBVHSSBO);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 5, sceneBVHSSBO);
     RenderPass::draw();
 }
 

@@ -84,11 +84,15 @@ struct BVHNode {
     vec4 aa, bb; // actually vec3
     int lsIndex;
     int rsIndex;
-    int meshIndex;
+    int meshIndex; // unused
     int triangleIndex;
 };
 layout(binding = 4, std430) readonly buffer ssbo4 {
-    BVHNode bvhNodeBuffer[];
+    BVHNode meshBVHBuffer[];
+};
+layout(binding = 5, std430) readonly buffer ssbo5 {
+    BVHNode sceneBVHBuffer[];
+    // 在scene BVH中，用 -meshIndex 表示叶子节点（0~M-1），应转移到 meshBVH 中求交
 };
 
 #include shader/materials/materials.frag
@@ -204,9 +208,9 @@ Intersection intersect_triangle(Ray ray, int triangleIndex) {
 
 int stack_h = 0;
 int stack[256];
-void intersect_meshBVH(int bvhRootIndex, int meshIndex, Ray _ray, inout Intersection result) {
+void intersect_meshBVH(int meshIndex, Ray _ray, inout Intersection result) {
     int starth = stack_h;
-    stack[++stack_h] = bvhRootIndex;
+    stack[++stack_h] = meshIndex;
 
     mat4 w2l = meshInfoBuffer[meshIndex].world2local;
     mat3 rot = mat3(normalize(w2l[0].xyz),
@@ -216,12 +220,10 @@ void intersect_meshBVH(int bvhRootIndex, int meshIndex, Ray _ray, inout Intersec
     Ray ray;
     ray.ori = (w2l * vec4(_ray.ori, 1)).xyz;
     ray.dir = w2l[0].xyz * _ray.dir[0] + w2l[1].xyz * _ray.dir[1] + w2l[2].xyz * _ray.dir[2]; // keep scale.
-//    ray.dir = (w2l * vec4(_ray.dir, 0)).xyz;
-//    Ray ray = _ray;
 
     while(stack_h > starth) {
         int id = stack[stack_h--];
-        BVHNode cur = bvhNodeBuffer[id];
+        BVHNode cur = meshBVHBuffer[id];
 
         if(cur.triangleIndex >= 0) {
             // leaf
@@ -253,105 +255,24 @@ Intersection intersect_sceneBVH(Ray ray) {
 
     while(stack_h > 0) {
         int id = stack[stack_h--];
-        BVHNode cur = bvhNodeBuffer[id];
+        BVHNode cur = sceneBVHBuffer[id];
 
-        if(cur.meshIndex >= 0) {
-            intersect_meshBVH(id, cur.meshIndex, ray, result);
-        } else {
-            float tnear;
-            if(!intersect_aabb(ray, vec3(cur.aa), vec3(cur.bb), tnear)) continue;
-            if(tnear > result.t) continue;
+        float tnear;
+        if(!intersect_aabb(ray, vec3(cur.aa), vec3(cur.bb), tnear)) continue;
+        if(tnear > result.t) continue;
 
-            stack[++stack_h] = cur.lsIndex;
-            stack[++stack_h] = cur.rsIndex;
-        }
+        if(cur.lsIndex <= 0) intersect_meshBVH(-cur.lsIndex, ray, result);
+        else stack[++stack_h] = cur.lsIndex;
+
+        if(cur.rsIndex <= 0) intersect_meshBVH(-cur.rsIndex, ray, result);
+        else stack[++stack_h] = cur.rsIndex;
     }
 
     MeshInfo meshInfo = meshInfoBuffer[result.meshIndex];
     result.materialPtr = meshInfo.materialPtr;
-    // TODO: emission and others
 
     return result;
 }
-
-//int stack_h = 0;
-//struct RayQuery {
-//    int bvhNodeIndex;
-//    int meshIndex;
-//    float nearT; // intersect t of ray and boundingbox.
-//    Ray ray;
-//} stack[256];
-//
-//Intersection intersect_sceneBVH(Ray ray) {
-//
-//    Intersection result = nointersect;
-//
-//    stack_h = 0;
-//    stack[++stack_h] = RayQuery(0, -1, INF, ray);
-//
-//    if(stack[1].meshIndex >= 0) {
-////        mat4 w2l = meshInfoBuffer[stack[1].meshIndex].world2local;
-////        vec3 o = (w2l * vec4(rq.ray.ori, 1)).xyz;
-////        vec3 t = (w2l * vec4(rq.ray.dir, 0)).xyz;
-////        stack[1].ray = Ray(o, t);
-//    }
-//
-//    while(stack_h > 0) {
-//        RayQuery rq = stack[stack_h--];
-//        BVHNode cur = bvhNodeBuffer[rq.bvhNodeIndex];
-//        if(rq.nearT > result.t) continue;
-//
-//        if(cur.triangleIndex >= 0) {
-//            // leaf
-//            Intersection isect = intersect_triangle(rq.ray, cur.triangleIndex);
-//            if(isect.exist && isect.t < result.t){
-//                result = isect;
-//                result.meshIndex = rq.meshIndex;
-//            }
-//        }  else {
-//            BVHNode ls = bvhNodeBuffer[cur.lsIndex];
-//            BVHNode rs = bvhNodeBuffer[cur.rsIndex];
-//            RayQuery rql = RayQuery(cur.lsIndex, rq.meshIndex, INF, rq.ray);
-//            if(ls.meshIndex >= 0) {
-////                mat4 w2l = meshInfoBuffer[ls.meshIndex].world2local;
-////                vec3 o = (w2l * vec4(rq.ray.ori, 1)).xyz;
-////                vec3 t = (w2l * vec4(rq.ray.dir, 0)).xyz;
-////                rql.ray = Ray(o, t);
-//                rql.meshIndex = ls.meshIndex;
-//            }
-//
-//            RayQuery rqr = RayQuery(cur.rsIndex, rq.meshIndex, INF, rq.ray);
-//            if(rs.meshIndex >= 0) {
-////                mat4 w2l = meshInfoBuffer[rs.meshIndex].world2local;
-////                vec3 o = (w2l * vec4(rq.ray.ori, 1)).xyz;
-////                vec3 t = (w2l * vec4(rq.ray.dir, 0)).xyz;
-////                rqr.ray = Ray(o, t);
-//                rqr.meshIndex = rs.meshIndex;
-//            }
-//
-//            float lt = -1, rt = -1;
-//            if(intersect_aabb(rql.ray, vec3(ls.aa), vec3(ls.bb), lt) && lt < result.t) {
-//                rql.nearT = lt;
-//                stack[++stack_h] = rql;
-//            } else lt = -1;
-//            if(intersect_aabb(rqr.ray, vec3(rs.aa), vec3(rs.bb), rt) && rt < result.t) {
-//                rqr.nearT = rt;
-//                stack[++stack_h] = rqr;
-//            } else rt = -1;
-//            if(lt >= 0 && rt >= 0 && rt > lt) {
-//                RayQuery tmp = stack[stack_h];
-//                stack[stack_h] = stack[stack_h - 1];
-//                stack[stack_h - 1] = tmp;
-//            }
-//        }
-//    }
-//
-//    MeshInfo meshInfo = meshInfoBuffer[result.meshIndex];
-//    result.materialPtr = meshInfo.materialPtr;
-//    // TODO: emission and others
-//
-//    return result;
-//}
 
 
 // sample

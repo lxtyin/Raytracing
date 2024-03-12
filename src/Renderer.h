@@ -37,12 +37,14 @@ class Renderer: public RenderPass {
     std::vector<float> materialBuffer;
     std::vector<Triangle> triangleBuffer;
     std::vector<MeshInfo> meshInfoBuffer;
-    std::vector<BVHNodeInfo> bvhNodeBuffer;
+    std::vector<BVHNodeInfo> meshBVHBuffer;
+    std::vector<BVHNodeInfo> sceneBVHBuffer;
     GLuint textureHandleSSBO;
     GLuint materialSSBO;
     GLuint triangleSSBO;
     GLuint meshInfoSSBO;
-    GLuint bvhNodeSSBO;
+    GLuint meshBVHSSBO;
+    GLuint sceneBVHSSBO;
     std::map<Mesh*, uint> meshIndexMap;
     std::map<Triangle*, uint> triangleIndexMap;
 
