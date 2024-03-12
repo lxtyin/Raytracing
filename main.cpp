@@ -48,11 +48,8 @@ void mouse_callback(GLFWwindow* window, double xpos, double ypos) {
 
 void update(float dt) {
 
-//    scene->build_sceneBVH();
-    pass1->reload_meshes(scene);
-
-//    pass1->reload_transforms(scene);
-//    pass1->reload_bvhnodes(scene);
+    scene->update();
+    pass1->reload_scene(scene);
 
     static uint last_colorT = 0, last_wposT = 0;
 	static bool fast_shade = false;
@@ -132,7 +129,6 @@ void update(float dt) {
 	// Menu
 	if(glfwGetKeyDown(window, GLFW_KEY_E)) {
 		show_imgui = show_imgui ^ 1;
-		pass1->reload_meshes(scene);
 	}
 	// Output camera pose
 	if(glfwGetKeyDown(window, GLFW_KEY_P)) {
@@ -217,8 +213,10 @@ void init() {
     camera->transform.rotation.y = M_PI;
 	camera->transform.position = vec3(-8.7711, 6.33925, 10.3415);
 	camera->transform.rotation = vec3(-0.69, 11.7516, 0);
-    scene->build_sceneBVH();
+    scene->update();
     pass1->reload_scene(scene);
+    std::cout << "BVH size:" << scene->sceneBVHRoot->siz << std::endl;
+    std::cout << "BVH depth:" << scene->sceneBVHRoot->depth << std::endl;
 }
 
 int main(int argc, const char* argv[]) {

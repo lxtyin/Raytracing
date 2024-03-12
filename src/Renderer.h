@@ -25,14 +25,6 @@ class Renderer: public RenderPass {
         int triangleIndex = -1;
     };
 
-
-    /**
-     * 当前渲染目标
-     * 渲染时需要从scene中提取出所有的mesh，随后基于此构建要传递给GPU的信息
-     * 在场景更新（增删mesh，改变instance的父子结构）时重构
-     */
-    std::vector<std::pair<Mesh*, mat4>> targetMeshes;
-
     std::vector<GLuint64> textureHandlesBuffer;
     std::vector<float> materialBuffer;
     std::vector<Triangle> triangleBuffer;
@@ -45,38 +37,40 @@ class Renderer: public RenderPass {
     GLuint meshInfoSSBO;
     GLuint meshBVHSSBO;
     GLuint sceneBVHSSBO;
-    std::map<Mesh*, uint> meshIndexMap;
-    std::map<Triangle*, uint> triangleIndexMap;
 
 
-    // old
-    std::vector<vec3> lightidx_buff;
-    uint lightidx_texbuff = 0;
-    int light_num;
+    /**
+     * reload meshInfos in O(numMeshes). Including transforms, materials/textures
+     */
+    void reload_meshInfos(Scene* scene);
+
+    /**
+     * reload all triangles and meshBVH in O(numTriangles).
+     */
+    void reload_triangles(Scene *scene);
+
+    /**
+     * reload sceneBVH in O(numMeshes). Called when objects moved.
+     */
+    void reload_sceneBVH(Scene *scene);
+
 
 public:
 
     Renderer(const string &frag_shader_path, int attach_num = 0, bool to_screen = false);
 
+    /**
+     * reload all. O(numTriangles);
+     * called when add/remove meshes, or update instance hierarchy.
+     */
+    void reload_scene(Scene *scene);
 
     /**
-     * 生成texture buffer object (old code)
-     * @param buff 要加载的buff
-     * @return
+     * reload all except triangles. O(numMeshes);
+     * called when updating materials / textures / transforms.
      */
-    uint gen_buffer_texture(std::vector<vec3> &buff);
+    void reload_sceneinfos(Scene *scene);
 
-
-    void reload_materials(Scene *scene);
-
-    void reload_transforms(Scene *scene);
-
-    void reload_meshes(Scene *scene);
-
-    void reload_bvhnodes(Scene *scene);
-
-    /// 重新将scene中的内容加载到buff
-    void reload_scene(Scene *scene);
 
     void draw() override;
 };

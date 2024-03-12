@@ -16,10 +16,8 @@ void Scene::fetch_meshes(Instance* cur, mat4 transform2world, std::vector<std::p
     }
 }
 
-void Scene::build_sceneBVH() {
-    std::vector<std::pair<Mesh*, mat4>> allMeshes;
-    fetch_meshes(this, mat4(1), allMeshes);
 
+void Scene::build_sceneBVH() {
     std::vector<BVHPrimitive> primitives;
     for(auto &[u, mat]: allMeshes){
         BVHPrimitive p;
@@ -38,9 +36,13 @@ void Scene::build_sceneBVH() {
     }
 
     sceneBVHRoot = BVHNode::build(primitives);
-    std::cout << "BVH size:" << sceneBVHRoot->siz << std::endl;
-    std::cout << "BVH depth:" << sceneBVHRoot->depth << std::endl;
+}
+
+
+void Scene::update() {
+    allMeshes.clear();
+    fetch_meshes(this, mat4(1), allMeshes);
+    build_sceneBVH();
 }
 
 Scene::Scene(const string &nm): Instance(nm, nullptr) {}
-
