@@ -48,8 +48,11 @@ void mouse_callback(GLFWwindow* window, double xpos, double ypos) {
 
 void update(float dt) {
 
-//    scene->reload();
-//    pass1->reload_meshes(scene);
+//    scene->build_sceneBVH();
+    pass1->reload_meshes(scene);
+
+//    pass1->reload_transforms(scene);
+//    pass1->reload_bvhnodes(scene);
 
     static uint last_colorT = 0, last_wposT = 0;
 	static bool fast_shade = false;
@@ -212,8 +215,8 @@ void init() {
 	skybox = new Skybox("hdrs/kloofendal_48d_partly_cloudy_puresky_2k.hdr");
 
     camera->transform.rotation.y = M_PI;
-	camera->transform.position = vec3(-6.39289, 2.33742, 2.80014);
-	camera->transform.rotation = vec3(-0.85, 11.4216, 0);
+	camera->transform.position = vec3(-8.7711, 6.33925, 10.3415);
+	camera->transform.rotation = vec3(-0.69, 11.7516, 0);
     scene->build_sceneBVH();
     pass1->reload_scene(scene);
 }

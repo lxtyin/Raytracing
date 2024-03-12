@@ -5,9 +5,7 @@
 #include shader/basic/math.frag
 #include shader/basic/sobol.frag
 
-in float pixel_x;
-in float pixel_y;
-in vec2 screen_uv;
+in vec2 screen_uv;  // (0, 0) -> (W, H), 第一象限
 
 layout(location = 0) out vec3 color_out;
 layout(location = 1) out vec3 albedo_out;
@@ -454,10 +452,12 @@ vec3 shade(Ray ray, in Intersection first_isect) {
 
     for(int dep = 0; dep < MAX_DEPTH; dep++) {
 
-//        if(m1.is_emit) {
-//            result += history * m1.emission;
-//            break;
-//        }
+        MeshInfo hitMesh = meshInfoBuffer[isect.meshIndex];
+        if(hitMesh.emission.z > 0) {
+            result += history * hitMesh.emission.xyz;
+            break;
+        }
+
         Frame coord = create_coord(isect.normal);
         vec3 wi = to_local(coord, -ray.dir);
         vec3 wo, global_wo;
@@ -504,25 +504,27 @@ void main() {
 
     vec3 result = vec3(0);
 
+    uint seed = uint(
+    uint(screen_uv.x * SCREEN_W) * uint(1973) +
+    uint(screen_uv.y * SCREEN_H) * uint(9277) +
+    uint(frameCounter) * uint(26699)) | uint(1);
+
     for(int spp = 0;spp < SPP;spp++) {
 
-        uint seed = uint(
-        uint(pixel_x + SCREEN_W / 2) * uint(1973) +
-        uint(pixel_y + SCREEN_H / 2) * uint(9277) +
-        uint(frameCounter * SPP + spp) * uint(26699)) | uint(1);
-
         // 每次tracing为一个随机过程
-        sobolseed = seed;
+        sobolseed = seed + spp;
         sobolcurdim = 0u;
 
-        vec2 offset = rand2D();
+        // TODO: update it in compute shader, and check Sobol
+//        vec2 p = vec2(screen_uv.x * SCREEN_W,
+//        screen_uv.y * SCREEN_H);
+        vec2 p = vec2(screen_uv.x * SCREEN_W + rand() - 0.5,
+                    screen_uv.y * SCREEN_H + rand() - 0.5);
 
-
-        float dis_z = SCREEN_W * 0.5 / tan(fov / 2);
-        vec3 w_ori = vec3(v2w_mat * vec4(0, 0, 0, 1));
-        vec3 w_tar = vec3(v2w_mat * vec4(pixel_x, pixel_y, -dis_z, 1));
-        vec3 dir = normalize(w_tar - w_ori);
-        Ray ray = Ray(w_ori, dir);
+        float disz = SCREEN_W * 0.5 / tan(fov / 2);
+        vec3 ori = vec3(v2w_mat * vec4(0, 0, 0, 1));
+        vec3 dir = normalize(vec3(v2w_mat * vec4(p.x - SCREEN_W / 2, p.y - SCREEN_H / 2, -disz, 0)));
+        Ray ray = Ray(ori, dir);
 
         Intersection isect = intersect_sceneBVH(ray);
         if(!isect.exist) {
@@ -543,9 +545,6 @@ void main() {
         //    }
 
         result += shade(ray, isect);
-
-//        if(sobolcurdim > 10) result = vec3(1.0, 0, 0);
-//        else result = vec3(sobolcurdim * 1.0 / 10);
     }
     if(any(isnan(result))) result = vec3(0, 0, 0);
     color_out = result / SPP;

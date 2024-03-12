@@ -23,6 +23,75 @@ uint Renderer::gen_buffer_texture(std::vector<vec3> &buff) {
     return tex;
 }
 
+
+void Renderer::reload_materials(Scene *scene) {
+
+}
+
+void Renderer::reload_transforms(Scene *scene) {
+    // TODO: 拆分为两个update level
+    textureHandlesBuffer.clear();
+    materialBuffer.clear();
+    meshInfoBuffer.clear();
+    meshIndexMap.clear();
+
+    targetMeshes.clear();
+    scene->fetch_meshes(scene, mat4(1), targetMeshes);
+    std::map<Texture*, uint> textureIndexMap;
+
+    lightidx_buff.clear();
+    light_num = 0;
+    for(auto &[u, mat]: targetMeshes) {
+        assert(u->material);
+        auto umtexs = u->material->textures();
+        for(Texture *t: umtexs) {
+            if(!textureIndexMap.count(t)) {
+                textureIndexMap[t] = textureHandlesBuffer.size();
+                textureHandlesBuffer.push_back(t->textureHandle);
+            }
+        }
+        int materialPtr = u->material->insert_buffer(materialBuffer, textureIndexMap);
+
+        assert(!meshIndexMap.count(u));
+        meshIndexMap[u] = meshInfoBuffer.size();
+        MeshInfo y;
+        y.world2local = glm::inverse(mat);
+        y.emission = vec4(u->emission, u->isEmitter ? 1 : -1);// TODO Emission
+        y.materialPtr = materialPtr;
+        meshInfoBuffer.push_back(y);
+    }
+
+    if(textureHandleSSBO) glDeleteBuffers(1, &textureHandleSSBO);
+    glCreateBuffers(1, &textureHandleSSBO);
+    glNamedBufferStorage(
+            textureHandleSSBO,
+            sizeof(GLuint64) * textureHandlesBuffer.size(),
+            (const void *)textureHandlesBuffer.data(),
+            GL_DYNAMIC_STORAGE_BIT
+    );
+
+    if(materialSSBO) glDeleteBuffers(1, &materialSSBO);
+    glCreateBuffers(1, &materialSSBO);
+    glNamedBufferStorage(
+            materialSSBO,
+            sizeof(float) * materialBuffer.size(),
+            (const void *)materialBuffer.data(),
+            GL_DYNAMIC_STORAGE_BIT
+    );
+    if(meshInfoSSBO) glDeleteBuffers(1, &meshInfoSSBO);
+    glCreateBuffers(1, &meshInfoSSBO);
+    glNamedBufferStorage(
+            meshInfoSSBO,
+            sizeof(MeshInfo) * meshInfoBuffer.size(),
+            (const void *)meshInfoBuffer.data(),
+            GL_DYNAMIC_STORAGE_BIT
+    );
+
+    if(lightidx_texbuff) glDeleteTextures(1, &lightidx_texbuff);
+    lightidx_texbuff = gen_buffer_texture(lightidx_buff);
+}
+
+
 void Renderer::reload_meshes(Scene *scene) {
     // TODO: 拆分为两个update level
     textureHandlesBuffer.clear();
@@ -32,13 +101,13 @@ void Renderer::reload_meshes(Scene *scene) {
     meshIndexMap.clear();
     triangleIndexMap.clear();
 
-    std::vector<std::pair<Mesh*, mat4>> allMeshes;
-    scene->fetch_meshes(scene, mat4(1), allMeshes);
+    targetMeshes.clear();
+    scene->fetch_meshes(scene, mat4(1), targetMeshes);
     std::map<Texture*, uint> textureIndexMap;
 
     lightidx_buff.clear();
     light_num = 0;
-    for(auto &[u, mat]: allMeshes) {
+    for(auto &[u, mat]: targetMeshes) {
         assert(u->material);
         auto umtexs = u->material->textures();
         for(Texture *t: umtexs) {
@@ -58,7 +127,7 @@ void Renderer::reload_meshes(Scene *scene) {
         meshIndexMap[u] = meshInfoBuffer.size();
         MeshInfo y;
         y.world2local = glm::inverse(mat);
-        y.emission = vec4(0);// TODO Emission
+        y.emission = vec4(u->emission, u->isEmitter ? 1 : -1);// TODO Emission
         y.materialPtr = materialPtr;
         meshInfoBuffer.push_back(y);
     }
@@ -156,4 +225,3 @@ void Renderer::draw() {
 
 Renderer::Renderer(const string &frag_shader_path, int attach_num, bool to_screen)
 : RenderPass(frag_shader_path, attach_num, to_screen) { }
-

@@ -9,11 +9,15 @@
 #include "../material/Material.h"
 #include "../BVH.h"
 #include <vector>
+#include <memory>
 
 class Mesh {
 public:
     string name = "A Mesh";
     std::vector<Triangle> triangles;    /**< triangles in local space >**/
+
+    bool isEmitter = false;
+    vec3 emission;
 
     BVHNode *meshBVHRoot;
     Material* material;        /**< material resource. */

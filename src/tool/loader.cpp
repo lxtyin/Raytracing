@@ -110,6 +110,12 @@ namespace AssimpLoader{
         if(mesh->mMaterialIndex >= 0){
             aiMaterial *mat = scene->mMaterials[mesh->mMaterialIndex];
             result->material = processMaterial(mat, scene);
+
+            aiColor3D color;
+            if(AI_SUCCESS == mat->Get(AI_MATKEY_EMISSIVE_INTENSITY, color)) {
+                result->isEmitter = true;
+                result->emission = vec3(color.r, color.g, color.b);
+            }
         }
         return result;
     }
