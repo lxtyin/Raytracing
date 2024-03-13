@@ -35,8 +35,12 @@ uint sobolcurdim = 0u;
 
 // returns random value in [0, 1]
 float rand() {
-    // assert dim <= 10
 //    return float(wang_hash(sobolseed)) / 4294967296.0;
     return sobol(sobolcurdim++, sobolseed);
 }
 
+vec2 rand2D() {
+//    return float(wang_hash(sobolseed)) / 4294967296.0;
+    sobolcurdim += 2;
+    return vec2(sobol(sobolcurdim - 2, sobolseed), sobol(sobolcurdim - 1, sobolseed));
+}

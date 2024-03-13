@@ -3,6 +3,7 @@
 //
 
 #include "Scene.h"
+#include "imgui/imgui.h"
 #include <iostream>
 
 
@@ -49,4 +50,18 @@ Scene::Scene(const string &nm): Instance(nm, nullptr) {}
 
 Scene::~Scene() {
     if(sceneBVHRoot) delete sceneBVHRoot;
+}
+
+void Scene::insert_gui() {
+    if(ImGui::TreeNode("Scene")) {
+        for(auto *m: meshes) {
+            if(m->material) {
+                m->material->insert_gui();
+            }
+        }
+        for(auto *cd: children) {
+            cd->insert_gui();
+        }
+        ImGui::TreePop();
+    }
 }

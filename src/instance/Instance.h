@@ -10,7 +10,7 @@
 #include <vector>
 
 class Instance {
-
+protected:
     Instance *parent = nullptr;
     std::vector<Instance*> children;
 
@@ -22,7 +22,7 @@ public:
     Instance() = default;
     explicit Instance(const string &nm, Instance *p = nullptr);
 
-    void insert_gui();
+    virtual void insert_gui();
 
 	mat4 matrix_to_global();
 

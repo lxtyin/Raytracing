@@ -4,8 +4,8 @@ vec3 eval_RoughConductor(in BSDFQueryRecord bRec) {
     if(bRec.wi.z <= 0 || bRec.wo.z <= 0) return vec3(0.0);
 
     vec3 albedo = vec3(materialBuffer[bRec.mptr + 1],
-    materialBuffer[bRec.mptr + 2],
-    materialBuffer[bRec.mptr + 3]);
+                       materialBuffer[bRec.mptr + 2],
+                       materialBuffer[bRec.mptr + 3]);
     float alpha = materialBuffer[bRec.mptr + 4];
     int albedo_map = roundint(materialBuffer[bRec.mptr + 5]);
     if(albedo_map >= 0) {
@@ -33,7 +33,7 @@ float pdf_RoughConductor(in BSDFQueryRecord bRec) {
 
     vec3 H = normalize(bRec.wi + bRec.wo);
     float LdotH = dot(bRec.wo, H);
-    float pdf = eval_GGX(alpha, H);
+    float pdf = pdf_GGX(alpha, H);
     return pdf / (4 * LdotH);
 }
 

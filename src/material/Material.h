@@ -9,6 +9,7 @@
 #include "../texture/Texture.h"
 #include <map>
 
+
 class Material {
 public:
     string name = "A Material";

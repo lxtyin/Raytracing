@@ -16,11 +16,6 @@ layout(location = 3) out vec3 worldpos_out;
 // memory
 // ---------------------------------------------- //
 
-uniform samplerBuffer triangles;
-uniform samplerBuffer lightidxs;
-uniform samplerBuffer bvhnodes;
-uniform int light_t_num;
-
 uniform mat4 v2w_mat;
 
 uniform int SPP = 1;
@@ -133,9 +128,9 @@ vec3 to_world(vec3 v, vec3 n) {
 // ---------------------------------------------- //
 
 // 获取第i个三角形光源的index
-int get_light_t_index(int i) {
-    return roundint(texelFetch(lightidxs, i).x);
-}
+//int get_light_t_index(int i) {
+//    return roundint(texelFetch(lightidxs, i).x);
+//}
 
 // 参数中u，v为重心坐标，输出为纹理映射（uv）的插值
 vec2 interpolate_uv(in Triangle tr1, float u, float v) {

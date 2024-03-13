@@ -1,5 +1,7 @@
 
 // utils material function
+
+
 vec3 sample_GGX(float alpha, out float pdf) {
     float alpha2 = alpha * alpha;
     float x = rand();
@@ -19,6 +21,24 @@ float eval_GGX(float alpha, vec3 h) {
     float pdf = alpha2 * cos_theta / pow2(cos2 * (alpha2 - 1.) + 1.) / PI;
     return pdf;
 }
+float pdf_GGX(float alpha, vec3 h) {
+    return eval_GGX(alpha, h);
+}
+
+float G_GGX(float alpha, float cosI) {
+    float k = pow2(alpha + 1) / 8;
+    return cosI / (cosI * (1 - k) + k);
+}
+
+
+vec3 sample_uniformsphere(out float pdf) {
+    vec2 s = rand2D();
+    float z = s.x * 2 - 1;
+    float r = sqrt(1 - z * z), phi = s.y * 2 * PI;
+    pdf = 0.25 * INV_PI;
+    return vec3(cos(s.y) * r, sin(s.y) * r, z);
+}
+
 
 vec3 SchlickFresnel(vec3 f0, float c) {
     return f0 + (vec3(1) - f0) * pow5(1 - c);
@@ -28,15 +48,14 @@ float SchlickFresnel(float f0, float c) {
     return f0 + (1 - f0) * pow5(1 - c);
 }
 
-// unupdated
-float fresnel(float cosI, float etaI, float etaT) {
-    float sinI = sqrt(1.0 - cosI * cosI);
-    float sinT = etaI / etaT * sinI;
-    if(sinT > 1) return 1; // Full reflect
+float fresnel(float cosI, float eta) {
+    cosI = abs(cosI);
+    float sinT = 1.0 / eta * sqrt(1.0 - cosI * cosI);
+    if(sinT > 1) return 1.0; // total internal reflection
     float cosT = sqrt(1.0 - sinT * sinT);
-    float Rl = pow2((etaI * cosI - etaT * cosT) / (etaI * cosI + etaT * cosT));
-    float Rp = pow2((etaI * cosT - etaT * cosI) / (etaI * cosT + etaT * cosI));
-    return (Rl + Rp) / 2;
+    float Rs = pow2((cosI - eta * cosT) / (cosI + eta * cosT));
+    float Rp = pow2((cosT - eta * cosI) / (cosT + eta * cosI));
+    return (Rs + Rp) / 2;
 }
 
 
@@ -47,31 +66,33 @@ struct BSDFQueryRecord {
     vec2 uv;
 };
 
-
 // Material
-// eval: returns bsdf (without cos), legal input is required.
-// pdf: returns pdf, legal input is required
+// same as mitsuba, wo is light direction.
+// eval: returns bsdf (without cos)
+// pdf: returns pdf
 // sample: returns eval(), out pdf
 
-
 #include shader/materials/RoughConductor.frag
-
+#include shader/materials/RoughDielectric.frag
 
 vec3 eval_material(in BSDFQueryRecord bRec) {
     int type = roundint(materialBuffer[bRec.mptr]);
     if(type == 1) return eval_RoughConductor(bRec);
+    else if(type == 2) return eval_RoughDielectric(bRec);
     else return vec3(0.0);
 }
 
 float pdf_material(in BSDFQueryRecord bRec) {
     int type = roundint(materialBuffer[bRec.mptr]);
     if(type == 1) return pdf_RoughConductor(bRec);
+    else if(type == 2) return pdf_RoughDielectric(bRec);
     else return 0.0;
 }
 
 vec3 sample_material(in out BSDFQueryRecord bRec, out float pdf) {
     int type = roundint(materialBuffer[bRec.mptr]);
     if(type == 1) return sample_RoughConductor(bRec, pdf);
+    else if(type == 2) return sample_RoughDielectric(bRec, pdf);
     else {
         pdf = -1;
         return vec3(0.0);

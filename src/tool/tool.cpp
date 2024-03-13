@@ -30,6 +30,16 @@ string read_file(const string &path){
 }
 
 string read_shader(const string& path) {
+//	string text = read_file(path);
+//	std::istringstream iss(text);
+//	string result = "", line;
+//	while(getline(iss, line)) {
+//		if(line.substr(0, 8) == "#include") {
+//            string target = line.substr(8, line.size() - 8);
+//            result += read_shader(target);
+//		} else result += line + '\n';
+//	}
+//	return result;
 	string text = read_file(path);
 	std::istringstream iss(text);
 	string result = "";

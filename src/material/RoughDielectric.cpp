@@ -1,19 +1,18 @@
 //
-// Created by 19450 on 2024/3/4.
+// Created by 19450 on 2024/3/12.
 //
 
-#include "RoughConductor.h"
+#include "RoughDielectric.h"
 #include "imgui/imgui.h"
-#include "../tool/tool.h"
-#include <map>
 
-void RoughConductor::insert_gui() {
+void RoughDielectric::insert_gui() {
     if(ImGui::TreeNode(name.c_str())) {
         float col1[3] = { albedo.x, albedo.y, albedo.z };
         ImGui::ColorEdit3("albedo", col1);
         albedo = {col1[0], col1[1], col1[2]};
 
         ImGui::SliderFloat("roughness", &roughness, 0.001, 1);
+        ImGui::SliderFloat("ior", &indexOfRefraction, 1.0, 3.0);
 
         if(albedo_map) {
             ImGui::Text("Albedo map");
@@ -25,7 +24,7 @@ void RoughConductor::insert_gui() {
     }
 }
 
-int RoughConductor::insert_buffer(std::vector<float> &materialBuffer, const std::map<Texture*, uint> &textureIndexMap) {
+int RoughDielectric::insert_buffer(std::vector<float> &materialBuffer, const std::map<Texture*, uint> &textureIndexMap) {
     int ptr = materialBuffer.size();
     materialBuffer.emplace_back((float)materialType);
     materialBuffer.emplace_back(albedo.x);
@@ -35,15 +34,14 @@ int RoughConductor::insert_buffer(std::vector<float> &materialBuffer, const std:
     if(albedo_map) {
         materialBuffer.emplace_back((float)textureIndexMap.at(albedo_map));
     } else materialBuffer.emplace_back(-1.0f);
+    materialBuffer.emplace_back(indexOfRefraction);
     return ptr;
 }
 
-std::vector<Texture *> RoughConductor::textures() {
+std::vector<Texture *> RoughDielectric::textures() {
     std::vector<Texture*> result;
     if(albedo_map) {
         result.push_back(albedo_map);
     }
     return result;
 }
-
-

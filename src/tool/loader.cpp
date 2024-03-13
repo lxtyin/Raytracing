@@ -3,6 +3,7 @@
 #include "loader.h"
 #include "exglm.hpp"
 #include "../material/RoughConductor.h"
+#include "../material/RoughDielectric.h"
 #include "common.h"
 using namespace std;
 
@@ -36,6 +37,7 @@ namespace AssimpLoader{
     }
 
     Material* processMaterial(aiMaterial *mat, const aiScene *scene){
+
         RoughConductor* result = new RoughConductor();
         result->name = mat->GetName().C_Str();
 
@@ -47,30 +49,8 @@ namespace AssimpLoader{
             result->albedo = vec3(color.r, color.g, color.b);
         }
         if(AI_SUCCESS == mat->Get(AI_MATKEY_ROUGHNESS_FACTOR, res)){
-            result->alpha = std::max(0.001f, res);
+            result->roughness = std::max(0.001f, res);
         }
-//        if(AI_SUCCESS == mat->Get(AI_MATKEY_METALLIC_FACTOR, res)){
-//            result->metallic = res;
-//        }
-//        if(AI_SUCCESS == mat->Get(AI_MATKEY_SPECULAR_FACTOR, res)){
-//            result->specular = res;
-//        }
-
-//        if(AI_SUCCESS == mat->Get(AI_MATKEY_COLOR_EMISSIVE, color)){
-//            result->emission = vec3(color.r, color.g, color.b);
-////            if(glm::length(result->emission) > 1) {
-////                result->is_emit = true;
-////            }
-//        }
-        if(AI_SUCCESS == mat->Get(AI_MATKEY_TEXTURE(aiTextureType_DIFFUSE_ROUGHNESS, 0), str)) {
-//            result->roughness_map = processImage(str.C_Str(), scene);
-        }
-        if(AI_SUCCESS == mat->Get(AI_MATKEY_TEXTURE(aiTextureType_METALNESS, 0), str)) {
-//            result->metalness_map = processImage(str.C_Str(), scene);
-        }
-//        if(AI_SUCCESS == mat->Get(AI_MATKEY_TEXTURE(aiTextureType_NORMALS, 0), str)){
-//            result->normal_map = processImage(str.C_Str(), scene);
-//        }
         if(AI_SUCCESS == mat->Get(AI_MATKEY_TEXTURE(aiTextureType_BASE_COLOR, 0), str)){
             result->albedo_map = processImage(str.C_Str(), scene);
         }
