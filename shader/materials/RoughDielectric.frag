@@ -48,7 +48,7 @@ vec3 eval_RoughDielectric(in BSDFQueryRecord bRec) {
 
 float pdf_RoughDielectric(in BSDFQueryRecord bRec) {
 
-//    return 0.25 * INV_PI;
+    return 0.25 * INV_PI;
 
     float alpha = materialBuffer[bRec.mptr + 4];
     float eta = materialBuffer[bRec.mptr + 6];
@@ -76,9 +76,11 @@ float pdf_RoughDielectric(in BSDFQueryRecord bRec) {
 
 vec3 sample_RoughDielectric(in out BSDFQueryRecord bRec, out float pdf) {
 
-//    bRec.wo = sample_uniformsphere(pdf);
-//    bRec.wo.z *= sign(bRec.wo.z);
-//    return eval_RoughDielectric(bRec);
+    bRec.wo = sample_uniformsphere(pdf);
+    bRec.wo.z *= sign(bRec.wo.z);
+    pdf = 0.25 * INV_PI;
+    return eval_RoughDielectric(bRec);
+
     vec3 albedo = vec3(materialBuffer[bRec.mptr + 1],
     materialBuffer[bRec.mptr + 2],
     materialBuffer[bRec.mptr + 3]);

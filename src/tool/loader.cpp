@@ -109,10 +109,15 @@ namespace AssimpLoader{
         cur->transform.rotation = 180.0f / M_PI * vec3(rotation.x, rotation.y, rotation.z);
         cur->transform.scale    = vec3(scale.x,    scale.y,    scale.z    );
 
-        for(int i = 0; i < node->mNumMeshes; i++) {
-            aiMesh *mesh = scene->mMeshes[node->mMeshes[i]];
-            cur->meshes.push_back(processMesh(mesh, scene));
+        assert(node->mNumMeshes <= 1);
+        if(node->mNumMeshes == 1) {
+            aiMesh *mesh = scene->mMeshes[node->mMeshes[0]];
+            cur->mesh = processMesh(mesh, scene);
         }
+//        for(int i = 0; i < node->mNumMeshes; i++) {
+//            aiMesh *mesh = scene->mMeshes[node->mMeshes[i]];
+//            cur->meshes.push_back(processMesh(mesh, scene));
+//        }
         for(int i = 0; i < node->mNumChildren; i++) {
             cur->add_child(processNode(node->mChildren[i], scene));
         }

@@ -16,6 +16,7 @@ public:
     Texture *albedo_map = nullptr;
     float indexOfRefraction = 1.3;
 
+    int material_type() override;
     void insert_gui() override;
     std::vector<Texture*> textures() override;
     int insert_buffer(std::vector<float> &materialBuffer, const std::map<Texture*, uint> &textureIndexMap) override;

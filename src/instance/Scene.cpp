@@ -3,13 +3,12 @@
 //
 
 #include "Scene.h"
-#include "imgui/imgui.h"
 #include <iostream>
 
 
 void Scene::fetch_meshes(Instance* cur, mat4 transform2world, std::vector<std::pair<Mesh*, mat4>> &allMeshes) {
-    for(auto *m: cur->meshes) {
-        allMeshes.emplace_back(std::make_pair(m, transform2world));
+    if(cur->mesh) {
+        allMeshes.emplace_back(std::make_pair(cur->mesh, transform2world));
     }
     Instance *child;
     for(int i = 0; (child = cur->get_child(i)) != nullptr; i++){
@@ -50,18 +49,4 @@ Scene::Scene(const string &nm): Instance(nm, nullptr) {}
 
 Scene::~Scene() {
     if(sceneBVHRoot) delete sceneBVHRoot;
-}
-
-void Scene::insert_gui() {
-    if(ImGui::TreeNode("Scene")) {
-        for(auto *m: meshes) {
-            if(m->material) {
-                m->material->insert_gui();
-            }
-        }
-        for(auto *cd: children) {
-            cd->insert_gui();
-        }
-        ImGui::TreePop();
-    }
 }

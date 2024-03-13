@@ -34,7 +34,6 @@ public:
      */
     void update();
 
-    void insert_gui() override;
 
     ~Scene();
 };

@@ -14,6 +14,8 @@ class Material {
 public:
     string name = "A Material";
 
+    virtual int material_type() = 0;
+
     virtual void insert_gui() = 0;
 
     /**

@@ -9,11 +9,18 @@
 #include "src/tool/loader.h"
 #include "src/texture/Skybox.h"
 #include "src/instance/Camera.h"
-#include "imgui/imgui.h"
-#include "imgui/backend/imgui_impl_glfw.h"
-#include "imgui/backend/imgui_impl_opengl3.h"
 #include <opencv2/opencv.hpp>
+#include "src/TinyUI.h"
 using namespace std;
+
+
+/**
+ * TODO
+ * 改正btdf
+ * Remake 管线，后期mapping和降噪
+ * ReSTIR GI
+ */
+
 
 // 一些状态 ------
 GLFWwindow *window;
@@ -22,7 +29,6 @@ RenderPass *pass_mix, *pass_fw, *pass_fh;
 Scene *scene;
 Camera *camera;
 Skybox* skybox;
-bool show_imgui = true;
 uint frameCounter = 0;
 
 // ----
@@ -77,50 +83,50 @@ void update(float dt) {
         }
         pass1->draw();
 
-//        glm::mat4 viewPort = glm::matbyrow({
-//                                                   1./SCREEN_W, 0, 			0,	 0.5,
-//                                                   0, 			 1./SCREEN_H, 	0,	 0.5,
-//                                                   0, 			 0, 			0,	 0,
-//                                                   0, 			 0, 			0,	 1
-//                                           });
-//        back_projection = viewPort * camera->projection() * camera->w2v_matrix();
-//
-//        pass_mix->use();
-//        {
-//            pass_mix->bind_texture("cur_colorT", pass1->attach_textures[0]);
-//            pass_mix->bind_texture("cur_wposT", pass1->attach_textures[3]);
-//            pass_mix->bind_texture("last_colorT", last_colorT);
-//            pass_mix->bind_texture("last_wposT", last_wposT);
-//            glUniform1ui(glGetUniformLocation(pass_mix->shaderProgram, "frameCounter"), frameCounter);
-//            glUniformMatrix4fv(glGetUniformLocation(pass_mix->shaderProgram, "back_proj"), 1, GL_FALSE, glm::value_ptr(back_projection));
-//            glUniform1i(glGetUniformLocation(pass_mix->shaderProgram, "is_motionvector_enabled"), Config::is_motionvector_enabled);
-//        }
-//        pass_mix->draw();
-//
-//        last_colorT = pass_mix->attach_textures[1];
-//        last_wposT = pass1->attach_textures[3];
-//
-//        pass_fw->use();
-//        {
-//            glUniform1i(glGetUniformLocation(pass_fw->shaderProgram, "SCREEN_W"), SCREEN_W);
-//            glUniform1i(glGetUniformLocation(pass_fw->shaderProgram, "SCREEN_H"), SCREEN_H);
-//            glUniform1i(glGetUniformLocation(pass_fw->shaderProgram, "is_filter_enabled"), Config::is_filter_enabled);
-//            pass_fw->bind_texture("prevpass_color", pass_mix->attach_textures[0]);
-//            pass_fw->bind_texture("prevpass_albedo", pass1->attach_textures[1]);
-//            pass_fw->bind_texture("prevpass_normal", pass1->attach_textures[2]);
-//        }
-//        pass_fw->draw();
-//
-//        pass_fh->use();
-//        {
-//            glUniform1i(glGetUniformLocation(pass_fh->shaderProgram, "SCREEN_W"), SCREEN_W);
-//            glUniform1i(glGetUniformLocation(pass_fh->shaderProgram, "SCREEN_H"), SCREEN_H);
-//            glUniform1i(glGetUniformLocation(pass_fh->shaderProgram, "is_filter_enabled"), Config::is_filter_enabled);
-//            pass_fh->bind_texture("prevpass_color", pass_fw->attach_textures[0]);
-//            pass_fh->bind_texture("prevpass_albedo", pass1->attach_textures[1]);
-//            pass_fh->bind_texture("prevpass_normal", pass1->attach_textures[2]);
-//        }
-//        pass_fh->draw();
+        glm::mat4 viewPort = glm::matbyrow({
+                                                   1./SCREEN_W, 0, 			0,	 0.5,
+                                                   0, 			 1./SCREEN_H, 	0,	 0.5,
+                                                   0, 			 0, 			0,	 0,
+                                                   0, 			 0, 			0,	 1
+                                           });
+        back_projection = viewPort * camera->projection() * camera->w2v_matrix();
+
+        pass_mix->use();
+        {
+            pass_mix->bind_texture("cur_colorT", pass1->attach_textures[0]);
+            pass_mix->bind_texture("cur_wposT", pass1->attach_textures[3]);
+            pass_mix->bind_texture("last_colorT", last_colorT);
+            pass_mix->bind_texture("last_wposT", last_wposT);
+            glUniform1ui(glGetUniformLocation(pass_mix->shaderProgram, "frameCounter"), frameCounter);
+            glUniformMatrix4fv(glGetUniformLocation(pass_mix->shaderProgram, "back_proj"), 1, GL_FALSE, glm::value_ptr(back_projection));
+            glUniform1i(glGetUniformLocation(pass_mix->shaderProgram, "is_motionvector_enabled"), Config::is_motionvector_enabled);
+        }
+        pass_mix->draw();
+
+        last_colorT = pass_mix->attach_textures[1];
+        last_wposT = pass1->attach_textures[3];
+
+        pass_fw->use();
+        {
+            glUniform1i(glGetUniformLocation(pass_fw->shaderProgram, "SCREEN_W"), SCREEN_W);
+            glUniform1i(glGetUniformLocation(pass_fw->shaderProgram, "SCREEN_H"), SCREEN_H);
+            glUniform1i(glGetUniformLocation(pass_fw->shaderProgram, "is_filter_enabled"), Config::is_filter_enabled);
+            pass_fw->bind_texture("prevpass_color", pass_mix->attach_textures[0]);
+            pass_fw->bind_texture("prevpass_albedo", pass1->attach_textures[1]);
+            pass_fw->bind_texture("prevpass_normal", pass1->attach_textures[2]);
+        }
+        pass_fw->draw();
+
+        pass_fh->use();
+        {
+            glUniform1i(glGetUniformLocation(pass_fh->shaderProgram, "SCREEN_W"), SCREEN_W);
+            glUniform1i(glGetUniformLocation(pass_fh->shaderProgram, "SCREEN_H"), SCREEN_H);
+            glUniform1i(glGetUniformLocation(pass_fh->shaderProgram, "is_filter_enabled"), Config::is_filter_enabled);
+            pass_fh->bind_texture("prevpass_color", pass_fw->attach_textures[0]);
+            pass_fh->bind_texture("prevpass_albedo", pass1->attach_textures[1]);
+            pass_fh->bind_texture("prevpass_normal", pass1->attach_textures[2]);
+        }
+        pass_fh->draw();
     }
     //--------------------------------------
 
@@ -128,7 +134,7 @@ void update(float dt) {
 
 	// Menu
 	if(glfwGetKeyDown(window, GLFW_KEY_E)) {
-		show_imgui = show_imgui ^ 1;
+//		show_imgui = show_imgui ^ 1;
 	}
 	// Output camera pose
 	if(glfwGetKeyDown(window, GLFW_KEY_P)) {
@@ -170,10 +176,11 @@ void update(float dt) {
 	if(!(camera->transform == before)) frameCounter = 0;
 }
 
-void init() {
+void init_scene() {
 
     // passes
-    pass1    = new Renderer("shader/pathtracing2024.frag", 0, true);
+    pass1    = new Renderer("shader/pathtracing2024.frag", 4);
+    pass_mix = new RenderPass("shader/postprocessing/mixAndMap.frag", 0, true);
 
 //    pass1    = new Renderer("shader/pathtracing2024.frag", 4);
 //    pass_mix = new RenderPass("shader/postprocessing/mixAndMap.frag", 2);
@@ -229,7 +236,7 @@ int main(int argc, const char* argv[]) {
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);//使用核心渲染模式
 
     //创建窗口，放入上下文中
-    window = glfwCreateWindow(SCREEN_W, SCREEN_H, "My Window", NULL, NULL);
+    window = glfwCreateWindow(WINDOW_W, WINDOW_H, "My Window", NULL, NULL);
     glfwSetWindowPos(window, 500, 200);
     glfwMakeContextCurrent(window);
     glfwSwapInterval(1); // Enable vsync
@@ -241,28 +248,23 @@ int main(int argc, const char* argv[]) {
 
     glDisable(GL_DEPTH_TEST);
 
-    IMGUI_CHECKVERSION();
-    ImGui::CreateContext();
-    ImGuiIO& io = ImGui::GetIO(); (void)io;
-    io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
-    ImGui::StyleColorsDark();
-    ImGui_ImplGlfw_InitForOpenGL(window, true);
-    ImGui_ImplOpenGL3_Init("#version 130");
-
-    init();
+    TinyUI::init(window);
+    init_scene();
 
     float last_time = glfwGetTime(), detaTime;
 	float fps = 60, counter_time = 0, counter_frame = 0;
     while(!glfwWindowShouldClose(window)) {
-        detaTime = glfwGetTime() - last_time;
-        last_time += detaTime;
-        glfwPollEvents();	//检查有没有发生事件，调用相应回调函数
 
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+        glViewport(0, WINDOW_H - SCREEN_H, SCREEN_W, SCREEN_H);
         update(detaTime);
 
-        ImGui_ImplOpenGL3_NewFrame();
-        ImGui_ImplGlfw_NewFrame();
-        ImGui::NewFrame();
+        glViewport(0, 0, WINDOW_W, WINDOW_H);
+        TinyUI::update(scene);
+
+        last_time += detaTime;
+        detaTime = glfwGetTime() - last_time;
 
         counter_frame ++;
         counter_time += detaTime;
@@ -271,28 +273,11 @@ int main(int argc, const char* argv[]) {
             counter_frame = counter_time = 0;
 		}
 
-//        ImGui::ShowDemoWindow(&show_imgui);
-        if (show_imgui) {
-            ImGui::Begin("Editor", &show_imgui);
-			ImGui::Text(str_format("FPS: %.2f", fps).c_str());
-			Config::insert_gui();
-            scene->insert_gui();
-            ImGui::End();
-        }
-        ImGui::Render();
-
-		int display_w, display_h;
-        glfwGetFramebufferSize(window, &display_w, &display_h);
-        glViewport(0, 0, display_w, display_h);
-        ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
-
         glfwSwapBuffers(window); //交换两层颜色缓冲
+        glfwPollEvents();	//检查有没有发生事件，调用相应回调函数
     }
 
-    //释放资源
-    ImGui_ImplOpenGL3_Shutdown();
-    ImGui_ImplGlfw_Shutdown();
-    ImGui::DestroyContext();
+    TinyUI::terminate();
     glfwTerminate();
     return 0;
 }

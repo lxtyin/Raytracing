@@ -8,8 +8,10 @@
 #include "imgui/imgui.h"
 #include "common.h"
 
-const int SCREEN_W = 1080;
-const int SCREEN_H = 720;
+const int SCREEN_W = 640;
+const int SCREEN_H = 480;
+const int WINDOW_W = 1000;
+const int WINDOW_H = 700;
 #define SCREEN_FOV (M_PI / 3)
 
 class Config {
@@ -19,12 +21,11 @@ class Config {
 	static bool is_motionvector_enabled;
 
 	static void insert_gui() {
-		if(ImGui::TreeNode("Config")) {
-			ImGui::Checkbox("Use Filter", &is_filter_enabled);
-			ImGui::Checkbox("Use Motion Vector", &is_motionvector_enabled);
-			ImGui::SliderInt("Samples per pixel", &SPP, 1, 32);
-			ImGui::TreePop();
-		}
+        ImGui::SeparatorText("Config");
+
+        ImGui::Checkbox("Use Filter", &is_filter_enabled);
+        ImGui::Checkbox("Use Motion Vector", &is_motionvector_enabled);
+        ImGui::SliderInt("Samples per pixel", &SPP, 1, 32);
 	}
 };
 

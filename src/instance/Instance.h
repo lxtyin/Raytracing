@@ -11,18 +11,20 @@
 
 class Instance {
 protected:
+
+    friend class TinyUI;
+
     Instance *parent = nullptr;
     std::vector<Instance*> children;
 
 public:
     std::vector<Mesh*> meshes;
+    Mesh* mesh = nullptr;
     string name = "A Instance";
     Transform transform;                 /**< transform to parent. */
 
     Instance() = default;
     explicit Instance(const string &nm, Instance *p = nullptr);
-
-    virtual void insert_gui();
 
 	mat4 matrix_to_global();
 
