@@ -30,6 +30,9 @@ vec3 eval_RoughDielectric(in BSDFQueryRecord bRec) {
     float D = eval_GGX(alpha, H);
     float F = fresnel(dot(bRec.wi, H), eta);
     float G = G_GGX(alpha, abs(bRec.wi.z)) * G_GGX(alpha, abs(bRec.wo.z));
+    if(sign(dot(bRec.wi, H)) != sign(bRec.wi.z) ||
+        sign(dot(bRec.wo, H)) != sign(bRec.wo.z)) G = 0.0;
+
     if(isreflect) {
         return albedo * F * D * G / abs(4 * bRec.wi.z * bRec.wo.z);
     } else {
@@ -40,6 +43,8 @@ vec3 eval_RoughDielectric(in BSDFQueryRecord bRec) {
         float deno = pow2(cosIH + eta * cosOH);
         float value = ((1 - F) * D * G * eta * eta
                     * cosIH * cosOH) / (bRec.wi.z * bRec.wo.z * deno);
+//        float value = (D * G * eta * eta
+//        * cosIH * cosOH) / (bRec.wi.z * bRec.wo.z * deno);
 
         return sqrt(albedo) * abs(value);
     }
@@ -56,28 +61,29 @@ float pdf_RoughDielectric(in BSDFQueryRecord bRec) {
 
     bool isreflect = sign(bRec.wi.z) == sign(bRec.wo.z);
     vec3 H;
-    float pdf = -1;
+    float dwh_dwo;
     if(isreflect) {
         H = normalize(bRec.wi + bRec.wo);
-        pdf = 1.0 / abs(4 * dot(bRec.wi, H));
+        dwh_dwo = 1.0 / abs(4 * dot(bRec.wi, H));
     } else {
 //        if(sign(dot(bRec.wi, H)) == sign(dot(bRec.wo, H))) return 0.0;
         H = normalize(bRec.wi + eta * bRec.wo);
         float deno = pow2(dot(bRec.wi, H) + eta * dot(bRec.wo, H));
-        pdf = eta * eta * abs(dot(bRec.wo, H)) / deno;
+        dwh_dwo = eta * eta * abs(dot(bRec.wo, H)) / deno;
     }
     H *= sign(H.z);
 
     float F = fresnel(dot(bRec.wi, H), eta);
-    if(!isreflect) F = 1 - F;
 
-    return pdf * pdf_GGX(alpha, H) * F;
+    float pdf = pdf_GGX(alpha, H);
+    if(isreflect) pdf *= F;
+    else pdf *= 1 - F;
+    return pdf * dwh_dwo;
 }
 
 vec3 sample_RoughDielectric(in out BSDFQueryRecord bRec, out float pdf) {
 
     bRec.wo = sample_uniformsphere(pdf);
-    bRec.wo.z *= sign(bRec.wo.z);
     pdf = 0.25 * INV_PI;
     return eval_RoughDielectric(bRec);
 
@@ -100,24 +106,35 @@ vec3 sample_RoughDielectric(in out BSDFQueryRecord bRec, out float pdf) {
     float F = fresnel(dot(bRec.wi, H), eta);
     float D = eval_GGX(alpha, H);
     float G = G_GGX(alpha, abs(bRec.wi.z)) * G_GGX(alpha, abs(bRec.wo.z));
+    if(sign(dot(bRec.wi, H)) != sign(bRec.wi.z) ||
+        sign(dot(bRec.wo, H)) != sign(bRec.wo.z)) G = 0.0;
 
-    if(rand() > F) {
+    float dwh_dwo;
+    if(rand() < F) {
+        // reflect
+        bRec.eta = 1.0;
+        bRec.wo = reflect(-bRec.wi, H);
+        if(sign(bRec.wi.z) != sign(bRec.wo.z)) return vec3(0.0);
+
+        pdf = pdf_RoughDielectric(bRec);
+        return eval_RoughDielectric(bRec);
+
+        pdf = F * pdfH / abs(4 * dot(bRec.wi, H));
+        return abs(albedo * F * D * G / (4 * bRec.wi.z * bRec.wo.z));
+    } else {
         // transmission
+        bRec.eta = eta;
         bRec.wo = refract(-bRec.wi, H, eta);
         if(sign(bRec.wi.z) == sign(bRec.wo.z)) return vec3(0.0);
 
         float deno = pow2(dot(bRec.wi, H) + eta * dot(bRec.wo, H));
         float value = ((1 - F) * D * G * eta * eta
-                * dot(bRec.wi, H) * dot(bRec.wo, H)) / (bRec.wi.z * bRec.wo.z * deno);
+        * dot(bRec.wi, H) * dot(bRec.wo, H)) / (bRec.wi.z * bRec.wo.z * deno);
+
+        pdf = pdf_RoughDielectric(bRec);
+        return eval_RoughDielectric(bRec);
 
         pdf = (1 - F) * pdfH * eta * eta * abs(dot(bRec.wo, H)) / deno;
-        return albedo * abs(value);
-    } else {
-        // reflect
-        vec3 wo = reflect(-bRec.wi, H);
-        if(sign(bRec.wi.z) != sign(bRec.wo.z)) return vec3(0.0);
-
-        pdf = F * pdfH / abs(4 * dot(bRec.wi, H));
-        return abs(sqrt(albedo) * F * D * G / (4 * bRec.wi.z * bRec.wo.z));
+        return sqrt(albedo) * abs(value);
     }
 }

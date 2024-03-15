@@ -22,7 +22,7 @@ void TinyUI::init(GLFWwindow *window) {
 }
 
 
-void TinyUI::update(Scene *scene) {
+void TinyUI::update(Scene *scene, float fps) {
     ImGui_ImplOpenGL3_NewFrame();
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
@@ -30,18 +30,16 @@ void TinyUI::update(Scene *scene) {
 //    ImGui::ShowDemoWindow(&showUI);
     if (showUI) {
         ImGui::Begin("Hierarchy", &showUI);
-//        ImGui::Text(str_format("FPS: %.2f", fps).c_str())
         insert_instance_Hierarchy(scene);
         ImGui::End();
 
         ImGui::Begin("Editor", &showUI);
-//        ImGui::Text(str_format("FPS: %.2f", fps).c_str());
         if(selectedInstance) insert_instance_Editor(selectedInstance);
         ImGui::End();
 
 
         ImGui::Begin("Settings", &showUI);
-//        ImGui::Text(str_format("FPS: %.2f", fps).c_str());;
+        ImGui::Text(str_format("FPS: %.2f", fps).c_str());
         Config::insert_gui();
         ImGui::End();
     }

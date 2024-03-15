@@ -14,7 +14,7 @@ public:
     vec3 albedo = vec3(0.5);
     float roughness = 0.5;
     Texture *albedo_map = nullptr;
-    float indexOfRefraction = 1.3;
+    float interiorIOR = 1.3; // consider exterior_ior = 1.0, eta = interior_ior / exterior_ior
 
     int material_type() override;
     void insert_gui() override;

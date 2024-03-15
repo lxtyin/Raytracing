@@ -60,10 +60,14 @@ float fresnel(float cosI, float eta) {
 
 
 struct BSDFQueryRecord {
-    // 同mitsuba：wo 光源方向 (L), wi 观察方向 (V)
+    // light direction L = wo; view direction V = wi
     vec3 wi, wo;
     int mptr;
     vec2 uv;
+
+    // wo_ior / wi_ior
+    // For tracking basic radiance: L * ior ^ 2
+    float eta;
 };
 
 // Material
@@ -73,7 +77,7 @@ struct BSDFQueryRecord {
 // sample: returns eval(), out pdf
 
 #include shader/materials/RoughConductor.frag
-#include shader/materials/RoughDielectric.frag
+#include shader/materials/RoughDielectric2.frag
 
 vec3 eval_material(in BSDFQueryRecord bRec) {
     int type = roundint(materialBuffer[bRec.mptr]);

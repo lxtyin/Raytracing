@@ -29,7 +29,7 @@ public:
      */
     static void init(GLFWwindow *window);
 
-    static void update(Scene *scene);
+    static void update(Scene *scene, float fps);
 
     static void terminate();
 

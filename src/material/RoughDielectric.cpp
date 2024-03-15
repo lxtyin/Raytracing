@@ -11,7 +11,7 @@ void RoughDielectric::insert_gui() {
     albedo = {col1[0], col1[1], col1[2]};
 
     ImGui::SliderFloat("roughness", &roughness, 0.001, 1);
-    ImGui::SliderFloat("ior", &indexOfRefraction, 1.0, 3.0);
+    ImGui::SliderFloat("interiorIOR", &interiorIOR, 1.0, 3.0);
 
     if(albedo_map) {
         ImGui::Text("Albedo map");
@@ -30,7 +30,7 @@ int RoughDielectric::insert_buffer(std::vector<float> &materialBuffer, const std
     if(albedo_map) {
         materialBuffer.emplace_back((float)textureIndexMap.at(albedo_map));
     } else materialBuffer.emplace_back(-1.0f);
-    materialBuffer.emplace_back(indexOfRefraction);
+    materialBuffer.emplace_back(interiorIOR);
     return ptr;
 }
 

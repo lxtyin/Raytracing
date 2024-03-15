@@ -13,6 +13,7 @@ layout(location = 2) out vec3 normal_out;
 layout(location = 3) out vec3 worldpos_out;
 
 
+
 // memory
 // ---------------------------------------------- //
 
@@ -366,6 +367,7 @@ vec3 shade(Ray ray, in Intersection first_isect) {
     Intersection isect = first_isect;
     if(!isect.exist) return get_background_color(ray.dir);
 
+    float total_eta = 1.0;
     for(int dep = 0; dep < MAX_DEPTH; dep++) {
 
         MeshInfo hitMesh = meshInfoBuffer[isect.meshIndex];
@@ -380,7 +382,7 @@ vec3 shade(Ray ray, in Intersection first_isect) {
         float pdf;
         global_wo = skybox_sample(pdf);
 
-        BSDFQueryRecord bRec = BSDFQueryRecord(wi, to_local(coord, global_wo), isect.materialPtr, isect.uv);
+        BSDFQueryRecord bRec = BSDFQueryRecord(wi, to_local(coord, global_wo), isect.materialPtr, isect.uv, 1.0);
 
         // direct light
         if(pdf > 0) {

@@ -50,6 +50,7 @@ vec3 sample_RoughConductor(in out BSDFQueryRecord bRec, out float pdf) {
 
     vec3 H = sample_GGX(alpha, pdf);
     bRec.wo = reflect(-bRec.wi, H);
+    bRec.eta = 1.0;
     if(bRec.wi.z * bRec.wo.z <= 0) {
         pdf = -1;
         return vec3(0);
