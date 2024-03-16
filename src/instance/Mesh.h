@@ -17,7 +17,7 @@ public:
     std::vector<Triangle> triangles;    /**< triangles in local space >**/
 
     bool isEmitter = false;
-    vec3 emission;
+    vec3 emission = vec3(0.0);
 
     BVHNode *meshBVHRoot;
     Material* material;        /**< material resource. */

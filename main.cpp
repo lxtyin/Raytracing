@@ -2,8 +2,9 @@
 #include "glad/glad.h"
 #include "src/tool/exglfw.h"
 #include "glm/gtc/type_ptr.hpp"
-#include "src/RenderPass.h"
-#include "src/Renderer.h"
+#include "src/renderpass/DirectDisplayer.h"
+#include "src/renderpass/Renderer.h"
+#include "src/renderpass/Renderer2.h"
 #include "src/tool/tool.h"
 #include "src/Config.h"
 #include "src/tool/loader.h"
@@ -17,23 +18,70 @@ using namespace std;
 /**
  * TODO
  * Remake 管线，后期mapping和降噪
+ * 改正emission->material
  * 改正btdf
  * 修改shader reader
  * Ray hit
  * ReSTIR GI
  */
 
-
 // 一些状态 ------
 GLFWwindow *window;
 Renderer *pass1;
-RenderPass *pass_mix, *pass_fw, *pass_fh;
+DirectDisplayer *pass2;
 Scene *scene;
 Camera *camera;
 Skybox* skybox;
 uint frameCounter = 0;
 
 // ----
+
+void APIENTRY glDebugOutput(GLenum source,
+                            GLenum type,
+                            GLuint id,
+                            GLenum severity,
+                            GLsizei length,
+                            const GLchar *message,
+                            void *userParam)
+{
+    // 忽略一些不重要的错误/警告代码
+    if(id == 131169 || id == 131185 || id == 131218 || id == 131204) return;
+
+    std::cout << "---------------" << std::endl;
+    std::cout << "Debug message (" << id << "): " <<  message << std::endl;
+
+    switch (source)
+    {
+        case GL_DEBUG_SOURCE_API:             std::cout << "Source: API"; break;
+        case GL_DEBUG_SOURCE_WINDOW_SYSTEM:   std::cout << "Source: Window System"; break;
+        case GL_DEBUG_SOURCE_SHADER_COMPILER: std::cout << "Source: Shader Compiler"; break;
+        case GL_DEBUG_SOURCE_THIRD_PARTY:     std::cout << "Source: Third Party"; break;
+        case GL_DEBUG_SOURCE_APPLICATION:     std::cout << "Source: Application"; break;
+        case GL_DEBUG_SOURCE_OTHER:           std::cout << "Source: Other"; break;
+    } std::cout << std::endl;
+
+    switch (type)
+    {
+        case GL_DEBUG_TYPE_ERROR:               std::cout << "Type: Error"; break;
+        case GL_DEBUG_TYPE_DEPRECATED_BEHAVIOR: std::cout << "Type: Deprecated Behaviour"; break;
+        case GL_DEBUG_TYPE_UNDEFINED_BEHAVIOR:  std::cout << "Type: Undefined Behaviour"; break;
+        case GL_DEBUG_TYPE_PORTABILITY:         std::cout << "Type: Portability"; break;
+        case GL_DEBUG_TYPE_PERFORMANCE:         std::cout << "Type: Performance"; break;
+        case GL_DEBUG_TYPE_MARKER:              std::cout << "Type: Marker"; break;
+        case GL_DEBUG_TYPE_PUSH_GROUP:          std::cout << "Type: Push Group"; break;
+        case GL_DEBUG_TYPE_POP_GROUP:           std::cout << "Type: Pop Group"; break;
+        case GL_DEBUG_TYPE_OTHER:               std::cout << "Type: Other"; break;
+    } std::cout << std::endl;
+
+    switch (severity)
+    {
+        case GL_DEBUG_SEVERITY_HIGH:         std::cout << "Severity: high"; break;
+        case GL_DEBUG_SEVERITY_MEDIUM:       std::cout << "Severity: medium"; break;
+        case GL_DEBUG_SEVERITY_LOW:          std::cout << "Severity: low"; break;
+        case GL_DEBUG_SEVERITY_NOTIFICATION: std::cout << "Severity: notification"; break;
+    } std::cout << std::endl;
+    std::cout << std::endl;
+}
 
 void mouse_callback(GLFWwindow* window, double xpos, double ypos) {
     static double mouse_lastX = xpos, mouse_lastY = ypos;
@@ -57,7 +105,7 @@ void mouse_callback(GLFWwindow* window, double xpos, double ypos) {
 void update(float dt) {
 
     scene->update();
-    pass1->reload_scene(scene);
+    pass1->reload_sceneinfos(scene);
 
     static uint last_colorT = 0, last_wposT = 0;
 	static bool fast_shade = true;
@@ -71,11 +119,12 @@ void update(float dt) {
         pass1->use();
         {
             glUniform1i(glGetUniformLocation(pass1->shaderProgram, "fast_shade"), fast_shade);
-            pass1->bind_texture("skybox", skybox->textureObject);
-            pass1->bind_texture("skybox_samplecache", skybox->skyboxsamplerObject);
+            pass1->bind_texture("skybox", skybox->textureObject, 0);
+            pass1->bind_texture("skybox_samplecache", skybox->skyboxsamplerObject, 1);
             glUniformMatrix4fv(glGetUniformLocation(pass1->shaderProgram, "v2w_mat"), 1, GL_FALSE, glm::value_ptr(camera->v2w_matrix()));
             glUniform1i(glGetUniformLocation(pass1->shaderProgram, "SCREEN_W"), SCREEN_W);
             glUniform1i(glGetUniformLocation(pass1->shaderProgram, "SCREEN_H"), SCREEN_H);
+            glUniform1i(glGetUniformLocation(pass1->shaderProgram, "MAX_DEPTH"), 2);
             glUniform1i(glGetUniformLocation(pass1->shaderProgram, "SPP"), Config::SPP);
             glUniform1ui(glGetUniformLocation(pass1->shaderProgram, "frameCounter"), frameCounter);
             glUniform1f(glGetUniformLocation(pass1->shaderProgram, "skybox_Light_SUM"), skybox->lightSum);
@@ -84,6 +133,13 @@ void update(float dt) {
             glUniform1i(glGetUniformLocation(pass1->shaderProgram, "SKY_H"), skybox->height);
         }
         pass1->draw();
+
+        pass2->use();
+        {
+            glUniform1i(glGetUniformLocation(pass2->shaderProgram, "SCREEN_W"), SCREEN_W);
+            glUniform1i(glGetUniformLocation(pass2->shaderProgram, "SCREEN_H"), SCREEN_H);
+        }
+        pass2->draw(pass1->colorBufferSSBO);
 
 //        glm::mat4 viewPort = glm::matbyrow({
 //                                                   1./SCREEN_W, 0, 			0,	 0.5,
@@ -181,7 +237,8 @@ void update(float dt) {
 void init_scene() {
 
     // passes
-    pass1    = new Renderer("shader/pathtracing2024.frag", 0, true);
+    pass1    = new Renderer("shader/pathtracing.glsl");
+    pass2    = new DirectDisplayer("shader/postprocessing/direct.frag");
 //    pass_mix = new RenderPass("shader/postprocessing/mixAndMap.frag", 0, true);
 
 //    pass1    = new Renderer("shader/pathtracing2024.frag", 4);
@@ -253,27 +310,28 @@ int main(int argc, const char* argv[]) {
     TinyUI::init(window);
     init_scene();
 
+
     float last_time = glfwGetTime(), detaTime;
 	float fps = 60, counter_time = 0, counter_frame = 0;
     while(!glfwWindowShouldClose(window)) {
 
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
+        detaTime = glfwGetTime() - last_time;
+        last_time += detaTime;
+
+        counter_frame ++;
+        counter_time += detaTime;
+        if(counter_time > 1) {
+            fps = counter_frame / counter_time;
+            counter_frame = counter_time = 0;
+        }
+
         glViewport(0, WINDOW_H - SCREEN_H, SCREEN_W, SCREEN_H);
         update(detaTime);
 
         glViewport(0, 0, WINDOW_W, WINDOW_H);
         TinyUI::update(scene, fps);
-
-        last_time += detaTime;
-        detaTime = glfwGetTime() - last_time;
-
-        counter_frame ++;
-        counter_time += detaTime;
-		if(counter_time > 1) {
-            fps = counter_frame / counter_time;
-            counter_frame = counter_time = 0;
-		}
 
         glfwSwapBuffers(window); //交换两层颜色缓冲
         glfwPollEvents();	//检查有没有发生事件，调用相应回调函数

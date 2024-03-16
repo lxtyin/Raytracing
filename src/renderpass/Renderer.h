@@ -5,12 +5,13 @@
 #ifndef PATH_TRACING_RENDERER_H
 #define PATH_TRACING_RENDERER_H
 
-#include "instance/Scene.h"
+#include "../instance/Scene.h"
+#include "../texture/Texture.h"
 #include "RenderPass.h"
-#include "texture/Texture.h"
 #include <map>
 
-class Renderer: public RenderPass {
+
+class Renderer: public VertexFragmentRenderPass {
     struct MeshInfo {
         mat4 world2local;
         vec4 emission;
@@ -38,7 +39,6 @@ class Renderer: public RenderPass {
     GLuint meshBVHSSBO;
     GLuint sceneBVHSSBO;
 
-
     /**
      * reload meshInfos in O(numMeshes). Including transforms, materials/textures
      */
@@ -53,11 +53,15 @@ class Renderer: public RenderPass {
      * reload sceneBVH in O(numMeshes). Called when objects moved.
      */
     void reload_sceneBVH(Scene *scene);
-
-
 public:
+    /**
+     * GBuffers, store in texture order (Down is x and right is y).
+     */
+    GLuint colorBufferSSBO;
+    GLuint normalBufferSSBO;
+    GLuint positionBufferSSBO;
 
-    Renderer(const string &frag_shader_path, int attach_num = 0, bool to_screen = false);
+    Renderer(const string &shaderPath);
 
     /**
      * reload all. O(numTriangles);
@@ -72,9 +76,8 @@ public:
     void reload_sceneinfos(Scene *scene);
 
 
-    void draw() override;
+    void draw();
 };
-
 
 
 #endif //PATH_TRACING_RENDERER_H

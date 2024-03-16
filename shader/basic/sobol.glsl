@@ -1,7 +1,7 @@
 
-#include shader/basic/sobol_matrix
+#include shader/basic/sobol_matrix.glsl
 
-const uniform float inv32 = 1.0 / float(0xFFFFFFFFU);
+const float inv32 = 1.0 / float(0xFFFFFFFFU);
 
 float sobol(uint d, uint i) {
     uint r = 0;
@@ -40,7 +40,7 @@ float rand() {
 }
 
 vec2 rand2D() {
-//    return float(wang_hash(sobolseed)) / 4294967296.0;
+//    return vec2(rand(), rand());
     sobolcurdim += 2;
     return vec2(sobol(sobolcurdim - 2, sobolseed), sobol(sobolcurdim - 1, sobolseed));
 }

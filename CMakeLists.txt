@@ -19,6 +19,8 @@ file(GLOB SRC_FILES
         ${PROJECT_SOURCE_DIR}/src/material/*.cpp
         ${PROJECT_SOURCE_DIR}/src/texture/*.h
         ${PROJECT_SOURCE_DIR}/src/texture/*.cpp
+        ${PROJECT_SOURCE_DIR}/src/renderpass/*.h
+        ${PROJECT_SOURCE_DIR}/src/renderpass/*.cpp
         ${PROJECT_SOURCE_DIR}/src/glad/*.c
         )
 

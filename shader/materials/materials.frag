@@ -77,7 +77,7 @@ struct BSDFQueryRecord {
 // sample: returns eval(), out pdf
 
 #include shader/materials/RoughConductor.frag
-#include shader/materials/RoughDielectric2.frag
+#include shader/materials/RoughDielectric.frag
 
 vec3 eval_material(in BSDFQueryRecord bRec) {
     int type = roundint(materialBuffer[bRec.mptr]);

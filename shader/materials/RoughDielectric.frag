@@ -66,7 +66,6 @@ float pdf_RoughDielectric(in BSDFQueryRecord bRec) {
         H = normalize(bRec.wi + bRec.wo);
         dwh_dwo = 1.0 / abs(4 * dot(bRec.wi, H));
     } else {
-//        if(sign(dot(bRec.wi, H)) == sign(dot(bRec.wo, H))) return 0.0;
         H = normalize(bRec.wi + eta * bRec.wo);
         float deno = pow2(dot(bRec.wi, H) + eta * dot(bRec.wo, H));
         dwh_dwo = eta * eta * abs(dot(bRec.wo, H)) / deno;

@@ -1,38 +1,12 @@
+// compute shader ver.
 
 #version 460 core
 #extension GL_ARB_bindless_texture : require
 
+in vec2 screen_uv;
+
 #include shader/basic/math.frag
 #include shader/basic/sobol.frag
-
-in vec2 screen_uv;  // (0, 0) -> (W, H), 第一象限
-
-layout(location = 0) out vec3 color_out;
-layout(location = 1) out vec3 albedo_out;
-layout(location = 2) out vec3 normal_out;
-layout(location = 3) out vec3 worldpos_out;
-
-
-
-// memory
-// ---------------------------------------------- //
-
-uniform mat4 v2w_mat;
-
-uniform int SPP = 1;
-uniform int MAX_DEPTH = 2;
-uniform float fov = PI / 3;
-uniform bool fast_shade = true; // 仅渲染diffuse_color
-
-uniform int SCREEN_W;
-uniform int SCREEN_H;
-uniform sampler2D skybox;
-uniform sampler2D skybox_samplecache;
-uniform float skybox_Light_SUM;
-uniform int SKY_W;
-uniform int SKY_H;
-uniform uint frameCounter;
-
 
 layout(binding = 0, std430) readonly buffer ssbo0 {
     sampler2D textureBuffer[];
@@ -47,6 +21,7 @@ struct Triangle {
     vec3 normal[3];
     vec2 uv[3];
 };
+
 struct TriangleX {
     float ver[9];
     float normal[9];
@@ -88,14 +63,44 @@ layout(binding = 4, std430) readonly buffer ssbo4 {
 };
 layout(binding = 5, std430) readonly buffer ssbo5 {
     BVHNode sceneBVHBuffer[];
-    // 在scene BVH中，用 -meshIndex 表示叶子节点（0~M-1），应转移到 meshBVH 中求交
+// 在scene BVH中，用 -meshIndex 表示叶子节点（0~M-1），应转移到 meshBVH 中求交
 };
+
+layout(binding = 6) writeonly buffer ssbo6 {
+    float colorBuffer[];
+};
+
+layout(binding = 7) writeonly buffer ssbo7 {
+    float normalBuffer[];
+};
+
+layout(binding = 8) writeonly buffer ssbo8 {
+    float positionBuffer[];
+};
+
+// Input infos ===
+
+uniform mat4 v2w_mat;
+
+uniform int SPP = 1;
+uniform int MAX_DEPTH = 2;
+uniform float fov = PI / 3;
+uniform int fast_shade = 1; // 仅渲染diffuse_color
+
+uniform int SCREEN_W;
+uniform int SCREEN_H;
+uniform sampler2D skybox;
+uniform sampler2D skybox_samplecache;
+uniform float skybox_Light_SUM;
+uniform int SKY_W;
+uniform int SKY_H;
+uniform uint frameCounter;
 
 #include shader/materials/materials.frag
 
+
 // math
 // ---------------------------------------------- //
-
 struct Frame {
     vec3 s, t, n;
 };
@@ -124,9 +129,6 @@ vec3 to_world(vec3 v, vec3 n) {
     vec3 b = normalize(cross(n, t));
     return normalize(v.x * t + v.y * b + v.z * n);
 }
-
-// data source
-// ---------------------------------------------- //
 
 // 获取第i个三角形光源的index
 //int get_light_t_index(int i) {
@@ -194,13 +196,14 @@ Intersection intersect_triangle(Ray ray, int triangleIndex) {
     vec3 nor = normalize(tri.normal[0].xyz * (1 - u - v) + tri.normal[1].xyz * u + tri.normal[2].xyz * v);
 
     // TODO: geo/shading frame
-//    vec2 D1 = tri.uv[1] - tri.uv[0];
-//    vec2 D2 = tri.uv[2] - tri.uv[0];
-//    frame.t = 1.0 / (D1.x * D2.y - D2.x * D1.y) * (E1 * D1.x - E2 * D2.x);
+    //    vec2 D1 = tri.uv[1] - tri.uv[0];
+    //    vec2 D2 = tri.uv[2] - tri.uv[0];
+    //    frame.t = 1.0 / (D1.x * D2.y - D2.x * D1.y) * (E1 * D1.x - E2 * D2.x);
 
     // returns in local frame, then updated to world frame.
     return Intersection(exist, pos, nor, t, interpolate_uv(tri, u, v), -1, -1, triangleIndex);
 }
+
 
 int stack_h = 0;
 int stack[256];
@@ -210,8 +213,8 @@ void intersect_meshBVH(int meshIndex, Ray _ray, inout Intersection result) {
 
     mat4 w2l = meshInfoBuffer[meshIndex].world2local;
     mat3 rot = mat3(normalize(w2l[0].xyz),
-                    normalize(w2l[1].xyz),
-                    normalize(w2l[2].xyz));
+    normalize(w2l[1].xyz),
+    normalize(w2l[2].xyz));
 
     Ray ray;
     ray.ori = (w2l * vec4(_ray.ori, 1)).xyz;
@@ -225,7 +228,7 @@ void intersect_meshBVH(int meshIndex, Ray _ray, inout Intersection result) {
             // leaf
             Intersection isect = intersect_triangle(ray, cur.triangleIndex);
             if(isect.exist && isect.t < result.t){
-//                // M^-1 * v = M^T * v -> v * M
+                //                // M^-1 * v = M^T * v -> v * M
                 isect.normal = isect.normal * rot;
                 isect.position = _ray.ori + isect.t * _ray.dir;
                 result = isect;
@@ -310,18 +313,17 @@ void sample_triangle(in Triangle t, out vec3 position, out vec3 normal) {
 //}
 
 // 球面均匀采样
-vec3 spherical_sample(out float pdf) {
-    float z = rand() * 2 - 1;
-    float r = max(0.0, sqrt(1.0 - z * z));
-    float phi = 2 * PI * rand();
-    vec3 wo = vec3(r * cos(phi), r * sin(phi), z);
-    pdf = 0.25 * INV_PI;
-    return wo;
-}
-float spherical_sample_pdf() {
-    return 0.25 * INV_PI;
-}
-
+//vec3 spherical_sample(out float pdf) {
+//    float z = rand() * 2 - 1;
+//    float r = max(0.0, sqrt(1.0 - z * z));
+//    float phi = 2 * PI * rand();
+//    vec3 wo = vec3(r * cos(phi), r * sin(phi), z);
+//    pdf = 0.25 * INV_PI;
+//    return wo;
+//}
+//float spherical_sample_pdf() {
+//    return 0.25 * INV_PI;
+//}
 
 vec3 get_background_color(vec3 v) {
     vec2 uv = vec2(atan(v.z, v.x), asin(v.y)); // atan returns [-pi, pi] if input (x, y)
@@ -355,7 +357,6 @@ float skybox_sample_pdf(vec3 v) {
 }
 
 
-
 // path tracing
 // ---------------------------------------------- //
 
@@ -368,10 +369,11 @@ vec3 shade(Ray ray, in Intersection first_isect) {
     if(!isect.exist) return get_background_color(ray.dir);
 
     float total_eta = 1.0;
+    // TODO: Why uniform variable cause error?
     for(int dep = 0; dep < MAX_DEPTH; dep++) {
-
         MeshInfo hitMesh = meshInfoBuffer[isect.meshIndex];
-        if(hitMesh.emission.z > 0) {
+
+        if(hitMesh.emission.w > 0) {
             result += history * hitMesh.emission.xyz;
             break;
         }
@@ -414,30 +416,27 @@ vec3 shade(Ray ray, in Intersection first_isect) {
 }
 
 void main() {
+    uvec2 pixelIndex = uvec2(uint((1.0 - screen_uv.y) * SCREEN_H), uint(screen_uv.x * SCREEN_W)); // 纹理坐标 下x右y
+    uint pixelPtr = pixelIndex.x * SCREEN_W + pixelIndex.y;
 
-    // tmp
-    albedo_out = vec3(1, 1, 1);
-    normal_out = vec3(1, 1, 1);
-    worldpos_out = vec3(1, 1, 1);
+    // TODO Gbuffers
 
     vec3 result = vec3(0);
 
     uint seed = uint(
-    uint(screen_uv.x * SCREEN_W) * uint(1973) +
-    uint(screen_uv.y * SCREEN_H) * uint(9277) +
+    pixelIndex.x * uint(1973) +
+    pixelIndex.y * uint(9277) +
     uint(frameCounter) * uint(26699)) | uint(1);
 
     for(int spp = 0;spp < SPP;spp++) {
-
         // 每次tracing为一个随机过程
         sobolseed = seed + spp;
         sobolcurdim = 0u;
 
         // TODO: update it in compute shader, and check Sobol
-//        vec2 p = vec2(screen_uv.x * SCREEN_W,
-//        screen_uv.y * SCREEN_H);
-        vec2 p = vec2(screen_uv.x * SCREEN_W + rand() - 0.5,
-                    screen_uv.y * SCREEN_H + rand() - 0.5);
+        //        vec2 p = vec2(screenPos.x, screenPos.y);
+        vec2 p = vec2(pixelIndex.y + rand(),
+        (SCREEN_H - pixelIndex.x) - rand());
 
         float disz = SCREEN_W * 0.5 / tan(fov / 2);
         vec3 ori = vec3(v2w_mat * vec4(0, 0, 0, 1));
@@ -446,27 +445,23 @@ void main() {
 
         Intersection isect = intersect_sceneBVH(ray);
         if(!isect.exist) {
-            worldpos_out = vec3(10000);
             result += get_background_color(ray.dir);
             continue;
         }
-
-        if(fast_shade) {
+        if(fast_shade == 1) {
             vec3 albedo = vec3(materialBuffer[isect.materialPtr + 1],
-                            materialBuffer[isect.materialPtr + 2],
-                            materialBuffer[isect.materialPtr + 3]);
+            materialBuffer[isect.materialPtr + 2],
+            materialBuffer[isect.materialPtr + 3]);
             result += albedo;
         } else {
             result += shade(ray, isect);
         }
-        //    Triangle tr1 = get_triangle(isect.t_index);
-        //    Material m1 = get_material(tr1.m_index);
-        //    vec2 uv = interpolate_uv(tr1, isect.u, isect.v);
-        //    albedo_out = get_diffuse_color(m1, uv);
-        //    normal_out = isect.normal;
-
     }
     if(any(isnan(result))) result = vec3(0, 0, 0);
-    color_out = result / SPP;
+    result /= SPP;
 
+    colorBuffer[pixelPtr * 3 + 0] = result.x;
+    colorBuffer[pixelPtr * 3 + 1] = result.y;
+    colorBuffer[pixelPtr * 3 + 2] = result.z;
+    return;
 }
