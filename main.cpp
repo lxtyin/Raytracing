@@ -22,6 +22,7 @@ using namespace std;
  * 改正btdf
  * 修改shader reader
  * Ray hit
+ * UI按钮setting
  * ReSTIR GI
  */
 
@@ -238,7 +239,7 @@ void init_scene() {
 
     // passes
     pass1    = new Renderer("shader/pathtracing.glsl");
-    pass2    = new DirectDisplayer("shader/postprocessing/direct.frag");
+    pass2    = new DirectDisplayer("shader/postprocessing/direct.glsl");
 //    pass_mix = new RenderPass("shader/postprocessing/mixAndMap.frag", 0, true);
 
 //    pass1    = new Renderer("shader/pathtracing2024.frag", 4);
@@ -264,8 +265,9 @@ void init_scene() {
 //		m2->spec_trans = 0.8;
 		scene->add_child(o1);
 
-//        Instance *o2 = AssimpLoader::load_model("model/casa_obj.glb");
+//        Instance *o2 = AssimpLoader::load_model("model/guilherme_-_suite.glb");
 //        o2->transform.rotation = vec3(-M_PI / 2, -M_PI / 2, 0);
+//        o2->transform.scale = vec3(10);
 //        scene->add_child(o2);
 
 //        Instance *light= AssimpLoader::load_model("model/light.obj");

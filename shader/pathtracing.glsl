@@ -79,10 +79,13 @@ layout(binding = 6) buffer ssbo6 {
 layout(binding = 7) buffer ssbo7 {
     float normalBuffer[];
 };
-
 layout(binding = 8) buffer ssbo8 {
-    float positionBuffer[];
+    float depthBuffer[];
 };
+layout(binding = 9) buffer ssbo9 {
+    float meshIndexBuffer[];
+};
+
 
 // Input infos ===
 
@@ -200,7 +203,7 @@ Intersection intersect_triangle(Ray ray, int triangleIndex) {
     vec3 pos = ray.ori + t * ray.dir;
     vec3 nor = normalize(tri.normal[0].xyz * (1 - u - v) + tri.normal[1].xyz * u + tri.normal[2].xyz * v);
 
-    // TODO: geo/shading frame
+    // TODO: geo/shading frame (if tangent is required)
     //    vec2 D1 = tri.uv[1] - tri.uv[0];
     //    vec2 D2 = tri.uv[2] - tri.uv[0];
     //    frame.t = 1.0 / (D1.x * D2.y - D2.x * D1.y) * (E1 * D1.x - E2 * D2.x);
@@ -367,7 +370,7 @@ float skybox_sample_pdf(vec3 v) {
 
 vec3 shade(Ray ray, in Intersection first_isect) {
 
-    vec3 result = vec3(0);
+    vec3 result = vec3(0), resultDI = vec3(0);
     vec3 history = vec3(1); // 栈上乘积
 
     Intersection isect = first_isect;
@@ -397,6 +400,7 @@ vec3 shade(Ray ray, in Intersection first_isect) {
                 vec3 fr = eval_material(bRec);
                 vec3 recv_col = get_background_color(global_wo) * fr * abs(bRec.wo.z) / (pdf + pdf_material(bRec));
                 result += history * recv_col;
+                if(dep == 0) resultDI = recv_col;
             }
         }
 
@@ -416,7 +420,7 @@ vec3 shade(Ray ray, in Intersection first_isect) {
         }
     }
     if(result.x < 0 || result.y < 0 || result.z < 0) result = vec3(100000, 0, 0);
-    return result;
+    return result - resultDI;
 }
 
 void main() {
@@ -429,8 +433,11 @@ void main() {
     uint pixelPtr = pixelIndex.x * SCREEN_W + pixelIndex.y;
 #endif
 
-    // TODO Gbuffers
-    vec3 result = vec3(0);
+    vec3 colorout = vec3(0);
+    vec3 positionout = vec3(0);
+    vec3 normalout = vec3(0);
+    float depthout = 0;
+    float meshIndexout = 0;
 
     uint seed = uint(
     pixelIndex.x * uint(1973) +
@@ -454,23 +461,31 @@ void main() {
 
         Intersection isect = intersect_sceneBVH(ray);
         if(!isect.exist) {
-            result += get_background_color(ray.dir);
+            colorout += get_background_color(ray.dir);
+            normalout += vec3(0, 0, 1);
+            positionout += vec3(0, 0, 100000);
             continue;
         }
+        normalout += isect.normal;
+        positionout += isect.position;
         if(fast_shade == 1) {
             vec3 albedo = vec3(materialBuffer[isect.materialPtr + 1],
             materialBuffer[isect.materialPtr + 2],
             materialBuffer[isect.materialPtr + 3]);
-            result += albedo;
+            colorout += albedo;
         } else {
-            result += shade(ray, isect);
+            colorout += shade(ray, isect);
         }
     }
-    if(any(isnan(result))) result = vec3(0, 0, 0);
-    result /= SPP;
+    if(any(isnan(colorout))) colorout = vec3(10000, 0, 0);
+    colorout /= SPP;
+    normalout /= SPP;
 
-    colorBuffer[pixelPtr * 3 + 0] = result.x;
-    colorBuffer[pixelPtr * 3 + 1] = result.y;
-    colorBuffer[pixelPtr * 3 + 2] = result.z + MAX_DEPTH / 10000;
+    colorBuffer[pixelPtr * 3 + 0] = colorout.x;
+    colorBuffer[pixelPtr * 3 + 1] = colorout.y;
+    colorBuffer[pixelPtr * 3 + 2] = colorout.z;
+    normalBuffer[pixelPtr * 3 + 0] = normalout.x;
+    normalBuffer[pixelPtr * 3 + 1] = normalout.y;
+    normalBuffer[pixelPtr * 3 + 2] = normalout.z;
     return;
 }

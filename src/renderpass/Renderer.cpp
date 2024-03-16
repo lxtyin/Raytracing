@@ -199,7 +199,6 @@ void Renderer::draw() {
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, positionBufferSSBO);
     glBufferData(GL_SHADER_STORAGE_BUFFER, framesize * sizeof(float), placeholder, GL_DYNAMIC_COPY);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 8, positionBufferSSBO);
-    // TODO: 开销很大
 
     glBindVertexArray(VAO);
     glDrawArrays(GL_TRIANGLES, 0, 6);
