@@ -4,7 +4,8 @@
 #include "glm/gtc/type_ptr.hpp"
 #include "src/renderpass/DirectDisplayer.h"
 #include "src/renderpass/Renderer.h"
-#include "src/renderpass/ToneMapMix.h"
+#include "src/renderpass/ToneMappingGamma.h"
+#include "src/renderpass/TAA.h"
 #include "src/tool/tool.h"
 #include "src/Config.h"
 #include "src/tool/loader.h"
@@ -27,13 +28,15 @@ using namespace std;
  */
 
 GLFWwindow *window;
-Renderer *pass1;
-ToneMapMix *pass2;
-DirectDisplayer *pass3;
 Scene *scene;
 Camera *camera;
 Skybox* skybox;
 uint frameCounter = 0;
+
+Renderer *pass1;
+ToneMappingGamma *pass2;
+TAA *pass3;
+DirectDisplayer *pass4;
 
 // ----
 
@@ -126,7 +129,7 @@ void update(float dt) {
             glUniformMatrix4fv(glGetUniformLocation(pass1->shaderProgram, "v2wMat"), 1, GL_FALSE, glm::value_ptr(camera->v2w_matrix()));
             glUniform1i(glGetUniformLocation(pass1->shaderProgram, "SCREEN_W"), SCREEN_W);
             glUniform1i(glGetUniformLocation(pass1->shaderProgram, "SCREEN_H"), SCREEN_H);
-            glUniform1i(glGetUniformLocation(pass1->shaderProgram, "MAX_DEPTH"), 2);
+            glUniform1i(glGetUniformLocation(pass1->shaderProgram, "MAX_DEPTH"), 3);
             glUniform1i(glGetUniformLocation(pass1->shaderProgram, "SPP"), Config::SPP);
             glUniform1ui(glGetUniformLocation(pass1->shaderProgram, "frameCounter"), frameCounter);
             glUniform1f(glGetUniformLocation(pass1->shaderProgram, "skybox_Light_SUM"), skybox->lightSum);
@@ -144,14 +147,21 @@ void update(float dt) {
             glUniform1i(glGetUniformLocation(pass2->shaderProgram, "SCREEN_W"), SCREEN_W);
             glUniform1i(glGetUniformLocation(pass2->shaderProgram, "SCREEN_H"), SCREEN_H);
         }
-        pass2->draw(curFrame, lastFrame);
+        pass2->draw(curFrame);
 
         pass3->use();
+        {
+            glUniform1i(glGetUniformLocation(pass2->shaderProgram, "SCREEN_W"), SCREEN_W);
+            glUniform1i(glGetUniformLocation(pass2->shaderProgram, "SCREEN_H"), SCREEN_H);
+        }
+        pass3->draw(curFrame, lastFrame);
+
+        pass4->use();
         {
             glUniform1i(glGetUniformLocation(pass3->shaderProgram, "SCREEN_W"), SCREEN_W);
             glUniform1i(glGetUniformLocation(pass3->shaderProgram, "SCREEN_H"), SCREEN_H);
         }
-        pass3->draw(curFrame.colorGBufferSSBO);
+        pass4->draw(curFrame.colorGBufferSSBO);
 
         tmp = curFrame;
         curFrame = lastFrame;
@@ -259,8 +269,9 @@ void init_scene() {
 
     // passes
     pass1    = new Renderer("shader/pathtracing.glsl");
-    pass2    = new ToneMapMix("shader/postprocessing/ToneMapMix.glsl");
-    pass3    = new DirectDisplayer("shader/postprocessing/direct.glsl");
+    pass2    = new ToneMappingGamma("shader/postprocessing/ToneMappingGamma.glsl");
+    pass3    = new TAA("shader/postprocessing/TAA.glsl");
+    pass4    = new DirectDisplayer("shader/postprocessing/direct.glsl");
 //    pass_mix = new RenderPass("shader/postprocessing/mixAndMap.frag", 0, true);
 
 //    pass1    = new Renderer("shader/pathtracing2024.frag", 4);

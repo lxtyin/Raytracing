@@ -70,7 +70,6 @@ public:
      */
     void reload_sceneinfos(Scene *scene);
 
-
     void draw(GBuffer &gbuffer);
 };
 

@@ -10,7 +10,7 @@
 class GBuffer {
 public:
     /**
-     * GBuffers, store in texture order (Down is x and right is y).
+     * GBuffers, store in texture space (Quadrant 1).
      * The buffers will not be released automaticly
      */
     GLuint colorGBufferSSBO;           // 3 per pixel

@@ -10,12 +10,6 @@ uniform int SCREEN_H;
 layout(binding = 0, std430) buffer ssbo0 {
     float colorGBuffer[];
 };
-layout(binding = 1, std430) readonly buffer ssbo1 {
-    float historyColorGBuffer[];
-};
-layout(binding = 2, std430) readonly buffer ssbo2 {
-    float motionGBuffer[];
-};
 
 vec3 ACESToneMapping(vec3 color) {
     const float A = 2.51;
@@ -47,30 +41,11 @@ void main() {
         colorGBuffer[pixelPtr * 3 + 1],
         colorGBuffer[pixelPtr * 3 + 2]
     );
-    vec2 motion = vec2(
-        motionGBuffer[pixelPtr * 2 + 0],
-        motionGBuffer[pixelPtr * 2 + 1]
-    );
 
     cur = ACESToneMapping(cur);
     cur = igamma(cur);
 
-    // TAA
-    vec3 result;
-    uvec2 lastPixelIndex = uvec2(pixelIndex - motion);
-    uint lastPixelPtr = lastPixelIndex.y * SCREEN_W + lastPixelIndex.x;
-    if(lastPixelIndex.x >= SCREEN_W || lastPixelIndex.y >= SCREEN_H) {
-        result = cur;
-    } else {
-        vec3 lastcolor = vec3(
-            historyColorGBuffer[lastPixelPtr * 3 + 0],
-            historyColorGBuffer[lastPixelPtr * 3 + 1],
-            historyColorGBuffer[lastPixelPtr * 3 + 2]
-        );
-        result = mix(lastcolor, cur, 0.1);
-    }
-
-    colorGBuffer[pixelPtr * 3 + 0] = result.x;
-    colorGBuffer[pixelPtr * 3 + 1] = result.y;
-    colorGBuffer[pixelPtr * 3 + 2] = result.z;
+    colorGBuffer[pixelPtr * 3 + 0] = cur.x;
+    colorGBuffer[pixelPtr * 3 + 1] = cur.y;
+    colorGBuffer[pixelPtr * 3 + 2] = cur.z;
 }

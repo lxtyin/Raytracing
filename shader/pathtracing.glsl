@@ -104,11 +104,9 @@ uniform int SKY_W;
 uniform int SKY_H;
 uniform uint frameCounter;
 
-
 uniform int fast_shade = 1; // 仅渲染diffuse_color
 
-
-#include shader/materials/materials.frag
+#include shader/materials/materials.glsl
 
 
 // math
@@ -449,6 +447,7 @@ void main() {
     // TODO check sobol
     vec2 jitter = vec2(sobol(0, frameCounter), sobol(1, frameCounter));
     vec2 p = pixelIndex + jitter;
+//    vec2 p = pixelIndex;
 
     float disz = SCREEN_W * 0.5 / tan(fov / 2);
     vec3 ori = vec3(v2wMat * vec4(0, 0, 0, 1));
