@@ -12,6 +12,7 @@ const int SCREEN_W = 640;
 const int SCREEN_H = 480;
 const int WINDOW_W = 1000;
 const int WINDOW_H = 700;
+// FOV for X axis.
 #define SCREEN_FOV (M_PI / 3)
 
 class Config {

@@ -62,7 +62,6 @@ Texture::Texture(int w, int h, int c, std::vector<uchar> &&d):
         width(w), height(h), channel(c){
     data = d;
     load_to_gpu();
-
 }
 
 void Texture::savephoto(const string& path) {
@@ -70,15 +69,8 @@ void Texture::savephoto(const string& path) {
     if(channel == 1) format = CV_8U;
     if(channel == 3) format = CV_8UC3, convert = cv::COLOR_RGB2BGR;
     if(channel == 4) format = CV_8UC4, convert = cv::COLOR_RGBA2BGRA;
-    cv::Mat img(width, height, format);
-    memcpy(img.data, data.data(), width * height * channel);
 
-    cv::Mat fliped, cvted;
-    cv::flip(img, fliped, 0);
-    if(!convert) {
-        cv::imwrite(path, fliped);
-    } else {
-        cv::cvtColor(fliped, cvted, convert);
-        cv::imwrite(path, cvted);
-    }
+    cv::Mat img(height, width, format, data.data());
+    cv::cvtColor(img, img, convert);
+    cv::imwrite(path, img);
 }

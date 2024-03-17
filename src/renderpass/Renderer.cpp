@@ -168,7 +168,7 @@ void Renderer::reload_sceneinfos(Scene *scene) {
     reload_sceneBVH(scene);
 }
 
-void Renderer::draw() {
+void Renderer::draw(GBuffer &gbuffer) {
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, textureHandleSSBO);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, materialSSBO);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, triangleSSBO);
@@ -176,36 +176,16 @@ void Renderer::draw() {
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 4, meshBVHSSBO);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 5, sceneBVHSSBO);
 
-
-    // Bind GBuffers
-    uint framesize = SCREEN_H * SCREEN_W * 3;
-    float *placeholder = new float[framesize];
-
-    if(colorBufferSSBO) glDeleteBuffers(1, &colorBufferSSBO);
-    if(normalBufferSSBO) glDeleteBuffers(1, &normalBufferSSBO);
-    if(positionBufferSSBO) glDeleteBuffers(1, &positionBufferSSBO);
-    glGenBuffers(1, &colorBufferSSBO);
-    glGenBuffers(1, &normalBufferSSBO);
-    glGenBuffers(1, &positionBufferSSBO);
-
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, colorBufferSSBO);
-    glBufferData(GL_SHADER_STORAGE_BUFFER, framesize * sizeof(float), placeholder, GL_DYNAMIC_COPY);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 6, colorBufferSSBO);
-
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, normalBufferSSBO);
-    glBufferData(GL_SHADER_STORAGE_BUFFER, framesize * sizeof(float), placeholder, GL_DYNAMIC_COPY);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 7, normalBufferSSBO);
-
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, positionBufferSSBO);
-    glBufferData(GL_SHADER_STORAGE_BUFFER, framesize * sizeof(float), placeholder, GL_DYNAMIC_COPY);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 8, positionBufferSSBO);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 6, gbuffer.colorGBufferSSBO);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 7, gbuffer.normalGBufferSSBO);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 8, gbuffer.depthGBufferSSBO);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 9, gbuffer.meshIndexGBufferSSBO);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 10, gbuffer.motionGBufferSSBO);
 
     glBindVertexArray(VAO);
     glDrawArrays(GL_TRIANGLES, 0, 6);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     glBindVertexArray(0);
-
-    delete[] placeholder;
 
     // Run compute shader
 //    glDispatchCompute((SCREEN_H + 31) / 32,
@@ -213,8 +193,8 @@ void Renderer::draw() {
 //                      1); // TODO: separate spp
 //    glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
 
-//    cout << colorBufferSSBO << "R: ";
-//    glBindBuffer(GL_SHADER_STORAGE_BUFFER, colorBufferSSBO);
+//    cout << colorGBufferSSBO << "R: ";
+//    glBindBuffer(GL_SHADER_STORAGE_BUFFER, colorGBufferSSBO);
 //    float* tmpdata = (float*)glMapBufferRange(GL_SHADER_STORAGE_BUFFER, 0, framesize * sizeof(float), GL_MAP_READ_BIT);
 //    for(int i = 0;i < 10;i++) std::cout << tmpdata[i] << ' ';
 //    std::cout << std::endl;

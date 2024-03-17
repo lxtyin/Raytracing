@@ -73,28 +73,28 @@ layout(binding = 5, std430) readonly buffer ssbo5 {
 };
 
 layout(binding = 6) buffer ssbo6 {
-    float colorBuffer[];
+    float colorGBuffer[];
 };
-
 layout(binding = 7) buffer ssbo7 {
-    float normalBuffer[];
+    float normalGBuffer[];
 };
 layout(binding = 8) buffer ssbo8 {
-    float depthBuffer[];
+    float depthGBuffer[];
 };
 layout(binding = 9) buffer ssbo9 {
-    float meshIndexBuffer[];
+    float meshIndexGBuffer[];
+};
+layout(binding = 10) buffer ssbo10 {
+    float motionGBuffer[];
 };
 
 
 // Input infos ===
 
-uniform mat4 v2w_mat;
-uniform int SPP = 1;
+uniform mat4 v2wMat;
+uniform mat4 backprojMat; // Last frame matrix to project worldposition -> [-1, 1]
 uniform int MAX_DEPTH = 2;
 uniform float fov = PI / 3;
-uniform int fast_shade = 1; // 仅渲染diffuse_color
-
 uniform int SCREEN_W;
 uniform int SCREEN_H;
 uniform sampler2D skybox;
@@ -103,6 +103,10 @@ uniform float skybox_Light_SUM;
 uniform int SKY_W;
 uniform int SKY_H;
 uniform uint frameCounter;
+
+
+uniform int fast_shade = 1; // 仅渲染diffuse_color
+
 
 #include shader/materials/materials.frag
 
@@ -420,12 +424,12 @@ vec3 shade(Ray ray, in Intersection first_isect) {
         }
     }
     if(result.x < 0 || result.y < 0 || result.z < 0) result = vec3(100000, 0, 0);
-    return result - resultDI;
+    return result;
 }
 
 void main() {
 #ifdef COMPUTE_SHADER
-    uvec3 pixelIndex = gl_GlobalInvocationID;
+    uvec2 pixelIndex = gl_GlobalInvocationID.xy;
     if(pixelIndex.y >= SCREEN_W || pixelIndex.x >= SCREEN_H) return;
     uint pixelPtr = pixelIndex.x * SCREEN_W + pixelIndex.y;
 #else
@@ -433,59 +437,70 @@ void main() {
     uint pixelPtr = pixelIndex.x * SCREEN_W + pixelIndex.y;
 #endif
 
-    vec3 colorout = vec3(0);
-    vec3 positionout = vec3(0);
-    vec3 normalout = vec3(0);
-    float depthout = 0;
-    float meshIndexout = 0;
-
     uint seed = uint(
     pixelIndex.x * uint(1973) +
     pixelIndex.y * uint(9277) +
     uint(frameCounter) * uint(26699)) | uint(1);
 
-    for(int spp = 0;spp < SPP;spp++) {
-        // 每次tracing为一个随机过程
-        sobolseed = seed + spp;
-        sobolcurdim = 0u;
+    // 每次tracing为一个随机过程
+    sobolseed = seed;
+    sobolcurdim = 0u;
 
-        // TODO: update it in compute shader, and check Sobol
-        //        vec2 p = vec2(screenPos.x, screenPos.y);
-        vec2 p = vec2(pixelIndex.y + rand(),
-                    (SCREEN_H - pixelIndex.x) - rand());
+    // TODO check sobol
+    vec2 jitter = vec2(sobol(0, frameCounter), sobol(1, frameCounter));
+    vec2 p = vec2(pixelIndex.y + jitter.y,
+                (SCREEN_H - pixelIndex.x) - jitter.x);
 
-        float disz = SCREEN_W * 0.5 / tan(fov / 2);
-        vec3 ori = vec3(v2w_mat * vec4(0, 0, 0, 1));
-        vec3 dir = normalize(vec3(v2w_mat * vec4(p.x - SCREEN_W / 2, p.y - SCREEN_H / 2, -disz, 0)));
-        Ray ray = Ray(ori, dir);
+    float disz = SCREEN_W * 0.5 / tan(fov / 2);
+    vec3 ori = vec3(v2wMat * vec4(0, 0, 0, 1));
+    vec3 dir = normalize(vec3(v2wMat * vec4(p.x - SCREEN_W / 2, p.y - SCREEN_H / 2, -disz, 0)));
+    Ray ray = Ray(ori, dir);
 
-        Intersection isect = intersect_sceneBVH(ray);
-        if(!isect.exist) {
-            colorout += get_background_color(ray.dir);
-            normalout += vec3(0, 0, 1);
-            positionout += vec3(0, 0, 100000);
-            continue;
-        }
-        normalout += isect.normal;
-        positionout += isect.position;
+    Intersection isect = intersect_sceneBVH(ray);
+
+    vec3 colorout = vec3(0);
+    vec3 normalout = vec3(0);
+    float depthout = 0;
+    float meshIndexout = 0;
+    vec2 motionout = vec2(0, 0);
+
+    if(!isect.exist) {
+        colorout = get_background_color(ray.dir);
+        normalout = vec3(0, 0, 1);
+        depthout = 100000;
+        meshIndexout = 100000; // mark for no TAA and filter.
+        isect.position = dir * 100000;
+    } else {
+        normalout = isect.normal;
+        depthout = isect.t;
+        meshIndexout = isect.meshIndex;
         if(fast_shade == 1) {
             vec3 albedo = vec3(materialBuffer[isect.materialPtr + 1],
             materialBuffer[isect.materialPtr + 2],
             materialBuffer[isect.materialPtr + 3]);
-            colorout += albedo;
+            colorout = albedo;
         } else {
-            colorout += shade(ray, isect);
+            colorout = shade(ray, isect);
         }
+        if(any(isnan(colorout))) colorout = vec3(10000, 0, 0);
     }
-    if(any(isnan(colorout))) colorout = vec3(10000, 0, 0);
-    colorout /= SPP;
-    normalout /= SPP;
 
-    colorBuffer[pixelPtr * 3 + 0] = colorout.x;
-    colorBuffer[pixelPtr * 3 + 1] = colorout.y;
-    colorBuffer[pixelPtr * 3 + 2] = colorout.z;
-    normalBuffer[pixelPtr * 3 + 0] = normalout.x;
-    normalBuffer[pixelPtr * 3 + 1] = normalout.y;
-    normalBuffer[pixelPtr * 3 + 2] = normalout.z;
+    // calculate motion vector
+    vec4 lastNDC = backprojMat * vec4(isect.position, 1);
+    lastNDC /= lastNDC.w;
+    vec2 last_suv = (vec2(lastNDC.x, lastNDC.y * SCREEN_W / SCREEN_H) + 1.0) / 2;
+    vec2 last_pixel = vec2((1.0 - last_suv.y) * SCREEN_H, last_suv.x * SCREEN_W);
+    motionout = vec2(pixelIndex) - last_pixel;
+
+    colorGBuffer[pixelPtr * 3 + 0] = colorout.x;
+    colorGBuffer[pixelPtr * 3 + 1] = colorout.y;
+    colorGBuffer[pixelPtr * 3 + 2] = colorout.z;
+    normalGBuffer[pixelPtr * 3 + 0] = normalout.x;
+    normalGBuffer[pixelPtr * 3 + 1] = normalout.y;
+    normalGBuffer[pixelPtr * 3 + 2] = normalout.z;
+    depthGBuffer[pixelPtr] = depthout;
+    meshIndexGBuffer[pixelPtr] = meshIndexout;
+    motionGBuffer[pixelPtr * 2 + 0] = motionout.x;
+    motionGBuffer[pixelPtr * 2 + 1] = motionout.y;
     return;
 }

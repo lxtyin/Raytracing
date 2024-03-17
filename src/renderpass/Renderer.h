@@ -8,6 +8,7 @@
 #include "../instance/Scene.h"
 #include "../texture/Texture.h"
 #include "RenderPass.h"
+#include "GBuffer.h"
 #include <map>
 
 
@@ -54,12 +55,6 @@ class Renderer: public VertexFragmentRenderPass {
      */
     void reload_sceneBVH(Scene *scene);
 public:
-    /**
-     * GBuffers, store in texture order (Down is x and right is y).
-     */
-    GLuint colorBufferSSBO;
-    GLuint normalBufferSSBO;
-    GLuint positionBufferSSBO;
 
     Renderer(const string &shaderPath);
 
@@ -76,7 +71,7 @@ public:
     void reload_sceneinfos(Scene *scene);
 
 
-    void draw();
+    void draw(GBuffer &gbuffer);
 };
 
 

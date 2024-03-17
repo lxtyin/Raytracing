@@ -4,7 +4,7 @@
 #include "glm/gtc/type_ptr.hpp"
 #include "src/renderpass/DirectDisplayer.h"
 #include "src/renderpass/Renderer.h"
-#include "src/renderpass/Renderer2.h"
+#include "src/renderpass/ToneMapMix.h"
 #include "src/tool/tool.h"
 #include "src/Config.h"
 #include "src/tool/loader.h"
@@ -26,10 +26,10 @@ using namespace std;
  * ReSTIR GI
  */
 
-// 一些状态 ------
 GLFWwindow *window;
 Renderer *pass1;
-DirectDisplayer *pass2;
+ToneMapMix *pass2;
+DirectDisplayer *pass3;
 Scene *scene;
 Camera *camera;
 Skybox* skybox;
@@ -108,9 +108,10 @@ void update(float dt) {
     scene->update();
     pass1->reload_sceneinfos(scene);
 
-    static uint last_colorT = 0, last_wposT = 0;
 	static bool fast_shade = true;
-	static glm::mat4 back_projection(1);
+	static glm::mat4 back_projection = camera->projection() * camera->w2v_matrix();
+    static GBuffer curFrame, lastFrame, tmp;
+    static bool first_tmp = true;
 
 	frameCounter++;
 
@@ -122,7 +123,7 @@ void update(float dt) {
             glUniform1i(glGetUniformLocation(pass1->shaderProgram, "fast_shade"), fast_shade);
             pass1->bind_texture("skybox", skybox->textureObject, 0);
             pass1->bind_texture("skybox_samplecache", skybox->skyboxsamplerObject, 1);
-            glUniformMatrix4fv(glGetUniformLocation(pass1->shaderProgram, "v2w_mat"), 1, GL_FALSE, glm::value_ptr(camera->v2w_matrix()));
+            glUniformMatrix4fv(glGetUniformLocation(pass1->shaderProgram, "v2wMat"), 1, GL_FALSE, glm::value_ptr(camera->v2w_matrix()));
             glUniform1i(glGetUniformLocation(pass1->shaderProgram, "SCREEN_W"), SCREEN_W);
             glUniform1i(glGetUniformLocation(pass1->shaderProgram, "SCREEN_H"), SCREEN_H);
             glUniform1i(glGetUniformLocation(pass1->shaderProgram, "MAX_DEPTH"), 2);
@@ -132,24 +133,39 @@ void update(float dt) {
             glUniform1f(glGetUniformLocation(pass1->shaderProgram, "fov"), SCREEN_FOV);
             glUniform1i(glGetUniformLocation(pass1->shaderProgram, "SKY_W"), skybox->width);
             glUniform1i(glGetUniformLocation(pass1->shaderProgram, "SKY_H"), skybox->height);
+            glUniformMatrix4fv(glGetUniformLocation(pass1->shaderProgram, "backprojMat"), 1, GL_FALSE, glm::value_ptr(back_projection));
         }
-        pass1->draw();
+        pass1->draw(curFrame);
+        if(first_tmp) pass1->draw(lastFrame);
+        first_tmp = false;
 
         pass2->use();
         {
             glUniform1i(glGetUniformLocation(pass2->shaderProgram, "SCREEN_W"), SCREEN_W);
             glUniform1i(glGetUniformLocation(pass2->shaderProgram, "SCREEN_H"), SCREEN_H);
         }
-        pass2->draw(pass1->colorBufferSSBO);
+        pass2->draw(curFrame, lastFrame);
 
-//        glm::mat4 viewPort = glm::matbyrow({
-//                                                   1./SCREEN_W, 0, 			0,	 0.5,
-//                                                   0, 			 1./SCREEN_H, 	0,	 0.5,
-//                                                   0, 			 0, 			0,	 0,
-//                                                   0, 			 0, 			0,	 1
-//                                           });
+        pass3->use();
+        {
+            glUniform1i(glGetUniformLocation(pass3->shaderProgram, "SCREEN_W"), SCREEN_W);
+            glUniform1i(glGetUniformLocation(pass3->shaderProgram, "SCREEN_H"), SCREEN_H);
+        }
+        pass3->draw(curFrame.colorGBufferSSBO);
+
+        tmp = curFrame;
+        curFrame = lastFrame;
+        lastFrame = tmp;
+
+        glm::mat4 viewPort = glm::matbyrow({
+                                                   1./SCREEN_W, 0, 			0,	 0.5,
+                                                   0, 			 1./SCREEN_H, 	0,	 0.5,
+                                                   0, 			 0, 			0,	 0,
+                                                   0, 			 0, 			0,	 1
+                                           });
 //        back_projection = viewPort * camera->projection() * camera->w2v_matrix();
-//
+        back_projection = camera->projection() * camera->w2v_matrix();
+
 //        pass_mix->use();
 //        {
 //            pass_mix->bind_texture("cur_colorT", pass1->attach_textures[0]);
@@ -208,13 +224,17 @@ void update(float dt) {
 	// screen shot.
 	if(glfwGetKeyDown(window, GLFW_KEY_T)) {
         string file_path = str_format("screenshots/%s.png", localtimestring().c_str());
-        cv::Mat screenshot(SCREEN_W, SCREEN_H, CV_8UC3);
-        glReadPixels(0, 0, SCREEN_W, SCREEN_H, GL_BGR, GL_UNSIGNED_BYTE, screenshot.data);
-        cv::Mat fliped;
-        cv::flip(screenshot, fliped, 0);
-        cv::imwrite(file_path, fliped);
 
-        cout << "ScreenShot " << file_path << '\n';
+        int framesize = SCREEN_H * SCREEN_W;
+        glBindBuffer(GL_SHADER_STORAGE_BUFFER, curFrame.colorGBufferSSBO);
+        float* tmpdata = (float*)glMapBufferRange(GL_SHADER_STORAGE_BUFFER, 0, framesize * 3 * sizeof(float), GL_MAP_READ_BIT);
+        std::vector<uchar> d(framesize * 3);
+        for(int i = 0;i < framesize * 3;i++) d[i] = std::min(255, int(tmpdata[i] * 255));
+        Texture t(SCREEN_W, SCREEN_H, 3, std::move(d));
+        t.savephoto(file_path);
+        glUnmapBuffer(GL_SHADER_STORAGE_BUFFER);
+
+        cout << "ScreenShot " << file_path << std::endl;
     }
 
     float speed = 10;
@@ -239,7 +259,8 @@ void init_scene() {
 
     // passes
     pass1    = new Renderer("shader/pathtracing.glsl");
-    pass2    = new DirectDisplayer("shader/postprocessing/direct.glsl");
+    pass2    = new ToneMapMix("shader/postprocessing/ToneMapMix.glsl");
+    pass3    = new DirectDisplayer("shader/postprocessing/direct.glsl");
 //    pass_mix = new RenderPass("shader/postprocessing/mixAndMap.frag", 0, true);
 
 //    pass1    = new Renderer("shader/pathtracing2024.frag", 4);
@@ -248,7 +269,7 @@ void init_scene() {
 //	pass_fh  = new RenderPass("shader/postprocessing/filter_h.frag", 0, true);
 
     scene = new Scene("Scene");
-    camera = new Camera(SCREEN_FOV);
+    camera = new Camera(SCREEN_FOV, 1000);
     {
         Instance *o1 = AssimpLoader::load_model("model/casa_obj.glb");
         o1->transform.rotation = vec3(-90, 0, 0);

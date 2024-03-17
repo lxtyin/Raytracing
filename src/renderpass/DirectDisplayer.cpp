@@ -11,9 +11,8 @@ DirectDisplayer::DirectDisplayer(const string &fragShaderPath) : VertexFragmentR
 
 
 void DirectDisplayer::draw(GLuint targetSSBO) {
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, targetSSBO);
-
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, targetSSBO);
+
     glBindVertexArray(VAO);
     glDrawArrays(GL_TRIANGLES, 0, 6);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
