@@ -430,11 +430,11 @@ vec3 shade(Ray ray, in Intersection first_isect) {
 void main() {
 #ifdef COMPUTE_SHADER
     uvec2 pixelIndex = gl_GlobalInvocationID.xy;
-    if(pixelIndex.y >= SCREEN_W || pixelIndex.x >= SCREEN_H) return;
-    uint pixelPtr = pixelIndex.x * SCREEN_W + pixelIndex.y;
+    if(pixelIndex.x >= SCREEN_W || pixelIndex.y >= SCREEN_H) return;
+    uint pixelPtr = pixelIndex.y * SCREEN_W + pixelIndex.x;
 #else
-    uvec2 pixelIndex = uvec2(uint((1.0 - screen_uv.y) * SCREEN_H), uint(screen_uv.x * SCREEN_W)); // 纹理坐标 下x右y
-    uint pixelPtr = pixelIndex.x * SCREEN_W + pixelIndex.y;
+    uvec2 pixelIndex = uvec2(uint(screen_uv.x * SCREEN_W), uint(screen_uv.y * SCREEN_H)); // 像素的纹理坐标 第一象限
+    uint pixelPtr = pixelIndex.y * SCREEN_W + pixelIndex.x;
 #endif
 
     uint seed = uint(
@@ -448,8 +448,7 @@ void main() {
 
     // TODO check sobol
     vec2 jitter = vec2(sobol(0, frameCounter), sobol(1, frameCounter));
-    vec2 p = vec2(pixelIndex.y + jitter.y,
-                (SCREEN_H - pixelIndex.x) - jitter.x);
+    vec2 p = pixelIndex + jitter;
 
     float disz = SCREEN_W * 0.5 / tan(fov / 2);
     vec3 ori = vec3(v2wMat * vec4(0, 0, 0, 1));
@@ -489,7 +488,7 @@ void main() {
     vec4 lastNDC = backprojMat * vec4(isect.position, 1);
     lastNDC /= lastNDC.w;
     vec2 last_suv = (vec2(lastNDC.x, lastNDC.y * SCREEN_W / SCREEN_H) + 1.0) / 2;
-    vec2 last_pixel = vec2((1.0 - last_suv.y) * SCREEN_H, last_suv.x * SCREEN_W);
+    vec2 last_pixel = vec2(last_suv.x * SCREEN_W, last_suv.y * SCREEN_H);
     motionout = vec2(pixelIndex) - last_pixel;
 
     colorGBuffer[pixelPtr * 3 + 0] = colorout.x;

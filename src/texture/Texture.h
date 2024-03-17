@@ -10,6 +10,7 @@ using std::string;
 using uint = unsigned int;
 using uchar = unsigned char;
 
+// Store in texture space. (Quadrant 1)
 class Texture: public GPUResource {
 public:
     GLuint textureObject = 0;

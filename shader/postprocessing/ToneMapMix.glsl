@@ -39,9 +39,8 @@ vec3 igamma(vec3 c) {
 }
 
 void main() {
-
-    uvec2 pixelIndex = uvec2(uint((1.0 - screen_uv.y) * SCREEN_H), uint(screen_uv.x * SCREEN_W)); // 纹理坐标 下x右y
-    uint pixelPtr = pixelIndex.x * SCREEN_W + pixelIndex.y;
+    uvec2 pixelIndex = uvec2(uint(screen_uv.x * SCREEN_W), uint(screen_uv.y * SCREEN_H)); // 像素的纹理坐标 第一象限
+    uint pixelPtr = pixelIndex.y * SCREEN_W + pixelIndex.x;
 
     vec3 cur = vec3(
         colorGBuffer[pixelPtr * 3 + 0],
@@ -59,8 +58,8 @@ void main() {
     // TAA
     vec3 result;
     uvec2 lastPixelIndex = uvec2(pixelIndex - motion);
-    uint lastPixelPtr = lastPixelIndex.x * SCREEN_W + lastPixelIndex.y;
-    if(lastPixelIndex.y >= SCREEN_W || lastPixelIndex.x >= SCREEN_H) {
+    uint lastPixelPtr = lastPixelIndex.y * SCREEN_W + lastPixelIndex.x;
+    if(lastPixelIndex.x >= SCREEN_W || lastPixelIndex.y >= SCREEN_H) {
         result = cur;
     } else {
         vec3 lastcolor = vec3(

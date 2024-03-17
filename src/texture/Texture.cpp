@@ -71,6 +71,7 @@ void Texture::savephoto(const string& path) {
     if(channel == 4) format = CV_8UC4, convert = cv::COLOR_RGBA2BGRA;
 
     cv::Mat img(height, width, format, data.data());
+    cv::flip(img, img, 0);
     cv::cvtColor(img, img, convert);
     cv::imwrite(path, img);
 }
