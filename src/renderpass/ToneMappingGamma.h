@@ -6,7 +6,6 @@
 #define PATH_TRACING_TONEMAPPINGGAMMA_H
 
 #include "RenderPass.h"
-#include "GBuffer.h"
 
 class ToneMappingGamma: public VertexFragmentRenderPass {
 public:

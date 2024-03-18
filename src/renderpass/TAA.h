@@ -6,8 +6,6 @@
 #define PATH_TRACING_TAA_H
 
 #include "RenderPass.h"
-#include "GBuffer.h"
-
 
 class TAA: public VertexFragmentRenderPass {
 public:

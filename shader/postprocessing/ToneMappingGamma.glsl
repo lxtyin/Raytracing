@@ -1,5 +1,5 @@
 
-// Input HDR -> Tonemapping -> gamma correct -> TAA -> Output LDR
+// Input HDR -> Tonemapping -> gamma correct -> Output LDR
 
 #version 460 core
 
@@ -33,8 +33,8 @@ vec3 igamma(vec3 c) {
 }
 
 void main() {
-    uvec2 pixelIndex = uvec2(uint(screen_uv.x * SCREEN_W), uint(screen_uv.y * SCREEN_H)); // 像素的纹理坐标 第一象限
-    uint pixelPtr = pixelIndex.y * SCREEN_W + pixelIndex.x;
+    ivec2 pixelIndex = ivec2(int(screen_uv.x * SCREEN_W), int(screen_uv.y * SCREEN_H)); // 像素的纹理坐标 第一象限
+    int pixelPtr = pixelIndex.y * SCREEN_W + pixelIndex.x;
 
     vec3 cur = vec3(
         colorGBuffer[pixelPtr * 3 + 0],

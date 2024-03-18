@@ -6,6 +6,7 @@
 #define PATH_TRACING_RENDERPASS_H
 
 #include "glad/glad.h"
+#include "../GBuffer.h"
 #include <string>
 using std::string;
 

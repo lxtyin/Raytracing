@@ -21,7 +21,7 @@ private:
 
     static void insert_instance_Editor(Instance *u);
 
-//    static void insert_material();
+    static void insert_configuration();
 
 public:
     /**
@@ -32,8 +32,6 @@ public:
     static void update(Scene *scene, float fps);
 
     static void terminate();
-
-
 };
 
 

@@ -82,12 +82,11 @@ layout(binding = 8) buffer ssbo8 {
     float depthGBuffer[];
 };
 layout(binding = 9) buffer ssbo9 {
-    float meshIndexGBuffer[];
-};
-layout(binding = 10) buffer ssbo10 {
     float motionGBuffer[];
 };
-
+layout(binding = 10) buffer ssbo10 {
+    float albedoGBuffer[];
+};
 
 // Input infos ===
 
@@ -459,29 +458,33 @@ void main() {
     vec3 colorout = vec3(0);
     vec3 normalout = vec3(0);
     float depthout = 0;
-    float meshIndexout = 0;
     vec2 motionout = vec2(0, 0);
+    vec3 albedoout = vec3(0);
 
     if(!isect.exist) {
         colorout = get_background_color(ray.dir);
+        albedoout = colorout;
         normalout = vec3(0, 0, 1);
         depthout = 100000;
-        meshIndexout = 100000; // mark for no TAA and filter.
         isect.position = dir * 100000;
     } else {
         normalout = isect.normal;
         depthout = isect.t;
-        meshIndexout = isect.meshIndex;
-        if(fast_shade == 1) {
-            vec3 albedo = vec3(materialBuffer[isect.materialPtr + 1],
-            materialBuffer[isect.materialPtr + 2],
-            materialBuffer[isect.materialPtr + 3]);
-            colorout = albedo;
-        } else {
-            colorout = shade(ray, isect);
-        }
-        if(any(isnan(colorout))) colorout = vec3(10000, 0, 0);
+
+        albedoout = vec3(materialBuffer[isect.materialPtr + 1],
+                materialBuffer[isect.materialPtr + 2],
+                materialBuffer[isect.materialPtr + 3]);
+
+        colorout = shade(ray, isect);
+
+//        if(fast_shade == 1) {
+//            vec3 albedo = vec3(materialBuffer[isect.materialPtr + 1],
+//            materialBuffer[isect.materialPtr + 2],
+//            materialBuffer[isect.materialPtr + 3]);
+//            colorout = albedo;
+//        }
     }
+    if(any(isnan(colorout))) colorout = vec3(10000, 0, 0);
 
     // calculate motion vector
     vec4 lastNDC = backprojMat * vec4(isect.position, 1);
@@ -497,8 +500,10 @@ void main() {
     normalGBuffer[pixelPtr * 3 + 1] = normalout.y;
     normalGBuffer[pixelPtr * 3 + 2] = normalout.z;
     depthGBuffer[pixelPtr] = depthout;
-    meshIndexGBuffer[pixelPtr] = meshIndexout;
     motionGBuffer[pixelPtr * 2 + 0] = motionout.x;
     motionGBuffer[pixelPtr * 2 + 1] = motionout.y;
+    albedoGBuffer[pixelPtr * 3 + 0] = albedoout.x;
+    albedoGBuffer[pixelPtr * 3 + 1] = albedoout.y;
+    albedoGBuffer[pixelPtr * 3 + 2] = albedoout.z;
     return;
 }

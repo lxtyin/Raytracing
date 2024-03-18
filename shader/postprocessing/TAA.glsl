@@ -1,5 +1,5 @@
 
-// Input HDR -> Tonemapping -> gamma correct -> TAA -> Output LDR
+// Input LDR -> TAA
 
 #version 460 core
 
@@ -60,8 +60,8 @@ vec3 readColorGBuffer(uvec2 uv) {
 }
 
 void main() {
-    uvec2 pixelIndex = uvec2(uint(screen_uv.x * SCREEN_W), uint(screen_uv.y * SCREEN_H)); // 像素的纹理坐标 第一象限
-    uint pixelPtr = pixelIndex.y * SCREEN_W + pixelIndex.x;
+    ivec2 pixelIndex = ivec2(int(screen_uv.x * SCREEN_W), int(screen_uv.y * SCREEN_H)); // 像素的纹理坐标 第一象限
+    int pixelPtr = pixelIndex.y * SCREEN_W + pixelIndex.x;
 
     vec3 cur = vec3(
         colorGBuffer[pixelPtr * 3 + 0],
@@ -88,9 +88,9 @@ void main() {
 //    vec3 aabbMax = mu + sigma;
 
     vec3 result;
-    uvec2 lastPixelIndex = uvec2(pixelIndex - motion);
-    uint lastPixelPtr = lastPixelIndex.y * SCREEN_W + lastPixelIndex.x;
-    if(lastPixelIndex.x >= SCREEN_W || lastPixelIndex.y >= SCREEN_H) {
+    ivec2 lastPixelIndex = ivec2(pixelIndex - motion);
+    int lastPixelPtr = lastPixelIndex.y * SCREEN_W + lastPixelIndex.x;
+    if(lastPixelIndex.x >= SCREEN_W || lastPixelIndex.y >= SCREEN_H || lastPixelIndex.x < 0 || lastPixelIndex.y < 0) {
         result = cur;
     } else {
         vec3 lastcolor = RGB2YCoCgR(vec3(
@@ -107,8 +107,9 @@ void main() {
         milen = min(milen, sigma.z / abs(dir.z));
         lastcolor = YCoCgR2RGB(mu + dir * milen);
 
-        result = mix(lastcolor, cur, 0.1);
+        result = mix(lastcolor, cur, 0.05);
     }
+    if(result.x < 0 || result.y < 0 || result.z < 0) result = vec3(10000, 0, 0);
 
     colorGBuffer[pixelPtr * 3 + 0] = result.x;
     colorGBuffer[pixelPtr * 3 + 1] = result.y;

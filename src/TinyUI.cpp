@@ -37,10 +37,9 @@ void TinyUI::update(Scene *scene, float fps) {
         if(selectedInstance) insert_instance_Editor(selectedInstance);
         ImGui::End();
 
-
         ImGui::Begin("Settings", &showUI);
         ImGui::Text(str_format("FPS: %.2f", fps).c_str());
-        Config::insert_gui();
+        insert_configuration();
         ImGui::End();
     }
     ImGui::Render();
@@ -111,4 +110,12 @@ void TinyUI::insert_instance_Editor(Instance *u) {
             u->mesh->material->insert_gui();
         }
     }
+}
+
+void TinyUI::insert_configuration() {
+    ImGui::SeparatorText("Config");
+
+    ImGui::Checkbox("Use TAA", &Config::useTAA);
+    ImGui::SliderInt("Filter Level", &Config::filterLevel, 0, 5);
+    ImGui::SliderInt("Samples per pixel", &Config::SPP, 1, 32);
 }

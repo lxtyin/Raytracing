@@ -6,6 +6,7 @@
 #include "src/renderpass/Renderer.h"
 #include "src/renderpass/ToneMappingGamma.h"
 #include "src/renderpass/TAA.h"
+#include "src/renderpass/FilterPass.h"
 #include "src/tool/tool.h"
 #include "src/Config.h"
 #include "src/tool/loader.h"
@@ -18,12 +19,13 @@ using namespace std;
 
 /**
  * TODO
- * Remake 管线，后期mapping和降噪
+ * 降噪
+ *    - TAA使用GBuffer Check，双线性插值？
+ *    - Variance
  * 改正emission->material
  * 改正btdf
  * 修改shader reader
  * Ray hit
- * UI按钮setting
  * ReSTIR GI
  */
 
@@ -33,10 +35,11 @@ Camera *camera;
 Skybox* skybox;
 uint frameCounter = 0;
 
-Renderer *pass1;
-ToneMappingGamma *pass2;
-TAA *pass3;
-DirectDisplayer *pass4;
+Renderer *renderPass;
+FilterPass *filterPass;
+ToneMappingGamma *mappingPass;
+TAA *taaPass;
+DirectDisplayer *directPass;
 
 // ----
 
@@ -109,7 +112,7 @@ void mouse_callback(GLFWwindow* window, double xpos, double ypos) {
 void update(float dt) {
 
     scene->update();
-    pass1->reload_sceneinfos(scene);
+    renderPass->reload_sceneinfos(scene);
 
 	static bool fast_shade = true;
 	static glm::mat4 back_projection = camera->projection() * camera->w2v_matrix();
@@ -121,47 +124,69 @@ void update(float dt) {
     // 渲染管线
 	// ---------------------------------------
     {
-        pass1->use();
+        renderPass->use();
         {
-            glUniform1i(glGetUniformLocation(pass1->shaderProgram, "fast_shade"), fast_shade);
-            pass1->bind_texture("skybox", skybox->textureObject, 0);
-            pass1->bind_texture("skybox_samplecache", skybox->skyboxsamplerObject, 1);
-            glUniformMatrix4fv(glGetUniformLocation(pass1->shaderProgram, "v2wMat"), 1, GL_FALSE, glm::value_ptr(camera->v2w_matrix()));
-            glUniform1i(glGetUniformLocation(pass1->shaderProgram, "SCREEN_W"), SCREEN_W);
-            glUniform1i(glGetUniformLocation(pass1->shaderProgram, "SCREEN_H"), SCREEN_H);
-            glUniform1i(glGetUniformLocation(pass1->shaderProgram, "MAX_DEPTH"), 3);
-            glUniform1i(glGetUniformLocation(pass1->shaderProgram, "SPP"), Config::SPP);
-            glUniform1ui(glGetUniformLocation(pass1->shaderProgram, "frameCounter"), frameCounter);
-            glUniform1f(glGetUniformLocation(pass1->shaderProgram, "skybox_Light_SUM"), skybox->lightSum);
-            glUniform1f(glGetUniformLocation(pass1->shaderProgram, "fov"), SCREEN_FOV);
-            glUniform1i(glGetUniformLocation(pass1->shaderProgram, "SKY_W"), skybox->width);
-            glUniform1i(glGetUniformLocation(pass1->shaderProgram, "SKY_H"), skybox->height);
-            glUniformMatrix4fv(glGetUniformLocation(pass1->shaderProgram, "backprojMat"), 1, GL_FALSE, glm::value_ptr(back_projection));
+            glUniform1i(glGetUniformLocation(renderPass->shaderProgram, "fast_shade"), fast_shade);
+            renderPass->bind_texture("skybox", skybox->textureObject, 0);
+            renderPass->bind_texture("skybox_samplecache", skybox->skyboxsamplerObject, 1);
+            glUniformMatrix4fv(glGetUniformLocation(renderPass->shaderProgram, "v2wMat"), 1, GL_FALSE, glm::value_ptr(camera->v2w_matrix()));
+            glUniform1i(glGetUniformLocation(renderPass->shaderProgram, "SCREEN_W"), SCREEN_W);
+            glUniform1i(glGetUniformLocation(renderPass->shaderProgram, "SCREEN_H"), SCREEN_H);
+            glUniform1i(glGetUniformLocation(renderPass->shaderProgram, "MAX_DEPTH"), 3);
+            glUniform1i(glGetUniformLocation(renderPass->shaderProgram, "SPP"), Config::SPP);
+            glUniform1ui(glGetUniformLocation(renderPass->shaderProgram, "frameCounter"), frameCounter);
+            glUniform1f(glGetUniformLocation(renderPass->shaderProgram, "skybox_Light_SUM"), skybox->lightSum);
+            glUniform1f(glGetUniformLocation(renderPass->shaderProgram, "fov"), SCREEN_FOV);
+            glUniform1i(glGetUniformLocation(renderPass->shaderProgram, "SKY_W"), skybox->width);
+            glUniform1i(glGetUniformLocation(renderPass->shaderProgram, "SKY_H"), skybox->height);
+            glUniformMatrix4fv(glGetUniformLocation(renderPass->shaderProgram, "backprojMat"), 1, GL_FALSE, glm::value_ptr(back_projection));
         }
-        pass1->draw(curFrame);
-        if(first_tmp) pass1->draw(lastFrame);
+        renderPass->draw(curFrame);
+        if(first_tmp) renderPass->draw(lastFrame);
         first_tmp = false;
 
-        pass2->use();
-        {
-            glUniform1i(glGetUniformLocation(pass2->shaderProgram, "SCREEN_W"), SCREEN_W);
-            glUniform1i(glGetUniformLocation(pass2->shaderProgram, "SCREEN_H"), SCREEN_H);
+        // separate passes a'trous wavelet filter
+        for(int i = 0;i < Config::filterLevel;i++) {
+            filterPass->use();
+            {
+                glUniform1i(glGetUniformLocation(filterPass->shaderProgram, "SCREEN_W"), SCREEN_W);
+                glUniform1i(glGetUniformLocation(filterPass->shaderProgram, "SCREEN_H"), SCREEN_H);
+                glUniform1i(glGetUniformLocation(filterPass->shaderProgram, "step"), 1 << i);
+                glUniform2i(glGetUniformLocation(filterPass->shaderProgram, "direction"), 0, 1);
+            }
+            filterPass->draw(curFrame);
+            filterPass->use();
+            {
+                glUniform1i(glGetUniformLocation(filterPass->shaderProgram, "SCREEN_W"), SCREEN_W);
+                glUniform1i(glGetUniformLocation(filterPass->shaderProgram, "SCREEN_H"), SCREEN_H);
+                glUniform1i(glGetUniformLocation(filterPass->shaderProgram, "step"), 1 << i);
+                glUniform2i(glGetUniformLocation(filterPass->shaderProgram, "direction"), 1, 0);
+            }
+            filterPass->draw(curFrame);
         }
-        pass2->draw(curFrame);
 
-        pass3->use();
+        mappingPass->use();
         {
-            glUniform1i(glGetUniformLocation(pass2->shaderProgram, "SCREEN_W"), SCREEN_W);
-            glUniform1i(glGetUniformLocation(pass2->shaderProgram, "SCREEN_H"), SCREEN_H);
+            glUniform1i(glGetUniformLocation(mappingPass->shaderProgram, "SCREEN_W"), SCREEN_W);
+            glUniform1i(glGetUniformLocation(mappingPass->shaderProgram, "SCREEN_H"), SCREEN_H);
         }
-        pass3->draw(curFrame, lastFrame);
+        mappingPass->draw(curFrame);
 
-        pass4->use();
-        {
-            glUniform1i(glGetUniformLocation(pass3->shaderProgram, "SCREEN_W"), SCREEN_W);
-            glUniform1i(glGetUniformLocation(pass3->shaderProgram, "SCREEN_H"), SCREEN_H);
+        if(Config::useTAA) {
+            taaPass->use();
+            {
+                glUniform1i(glGetUniformLocation(taaPass->shaderProgram, "SCREEN_W"), SCREEN_W);
+                glUniform1i(glGetUniformLocation(taaPass->shaderProgram, "SCREEN_H"), SCREEN_H);
+            }
+            taaPass->draw(curFrame, lastFrame);
         }
-        pass4->draw(curFrame.colorGBufferSSBO);
+
+        directPass->use();
+        {
+            glUniform1i(glGetUniformLocation(directPass->shaderProgram, "SCREEN_W"), SCREEN_W);
+            glUniform1i(glGetUniformLocation(directPass->shaderProgram, "SCREEN_H"), SCREEN_H);
+        }
+        directPass->draw(curFrame.colorGBufferSSBO);
 
         tmp = curFrame;
         curFrame = lastFrame;
@@ -173,13 +198,12 @@ void update(float dt) {
                                                    0, 			 0, 			0,	 0,
                                                    0, 			 0, 			0,	 1
                                            });
-//        back_projection = viewPort * camera->projection() * camera->w2v_matrix();
         back_projection = camera->projection() * camera->w2v_matrix();
 
 //        pass_mix->use();
 //        {
-//            pass_mix->bind_texture("cur_colorT", pass1->attach_textures[0]);
-//            pass_mix->bind_texture("cur_wposT", pass1->attach_textures[3]);
+//            pass_mix->bind_texture("cur_colorT", renderPass->attach_textures[0]);
+//            pass_mix->bind_texture("cur_wposT", renderPass->attach_textures[3]);
 //            pass_mix->bind_texture("last_colorT", last_colorT);
 //            pass_mix->bind_texture("last_wposT", last_wposT);
 //            glUniform1ui(glGetUniformLocation(pass_mix->shaderProgram, "frameCounter"), frameCounter);
@@ -189,7 +213,7 @@ void update(float dt) {
 //        pass_mix->draw();
 //
 //        last_colorT = pass_mix->attach_textures[1];
-//        last_wposT = pass1->attach_textures[3];
+//        last_wposT = renderPass->attach_textures[3];
 //
 //        pass_fw->use();
 //        {
@@ -197,8 +221,8 @@ void update(float dt) {
 //            glUniform1i(glGetUniformLocation(pass_fw->shaderProgram, "SCREEN_H"), SCREEN_H);
 //            glUniform1i(glGetUniformLocation(pass_fw->shaderProgram, "is_filter_enabled"), Config::is_filter_enabled);
 //            pass_fw->bind_texture("prevpass_color", pass_mix->attach_textures[0]);
-//            pass_fw->bind_texture("prevpass_albedo", pass1->attach_textures[1]);
-//            pass_fw->bind_texture("prevpass_normal", pass1->attach_textures[2]);
+//            pass_fw->bind_texture("prevpass_albedo", renderPass->attach_textures[1]);
+//            pass_fw->bind_texture("prevpass_normal", renderPass->attach_textures[2]);
 //        }
 //        pass_fw->draw();
 //
@@ -208,8 +232,8 @@ void update(float dt) {
 //            glUniform1i(glGetUniformLocation(pass_fh->shaderProgram, "SCREEN_H"), SCREEN_H);
 //            glUniform1i(glGetUniformLocation(pass_fh->shaderProgram, "is_filter_enabled"), Config::is_filter_enabled);
 //            pass_fh->bind_texture("prevpass_color", pass_fw->attach_textures[0]);
-//            pass_fh->bind_texture("prevpass_albedo", pass1->attach_textures[1]);
-//            pass_fh->bind_texture("prevpass_normal", pass1->attach_textures[2]);
+//            pass_fh->bind_texture("prevpass_albedo", renderPass->attach_textures[1]);
+//            pass_fh->bind_texture("prevpass_normal", renderPass->attach_textures[2]);
 //        }
 //        pass_fh->draw();
     }
@@ -268,13 +292,14 @@ void update(float dt) {
 void init_scene() {
 
     // passes
-    pass1    = new Renderer("shader/pathtracing.glsl");
-    pass2    = new ToneMappingGamma("shader/postprocessing/ToneMappingGamma.glsl");
-    pass3    = new TAA("shader/postprocessing/TAA.glsl");
-    pass4    = new DirectDisplayer("shader/postprocessing/direct.glsl");
+    renderPass    = new Renderer("shader/pathtracing.glsl");
+    filterPass = new FilterPass("shader/postprocessing/filter.glsl");
+    mappingPass    = new ToneMappingGamma("shader/postprocessing/ToneMappingGamma.glsl");
+    taaPass    = new TAA("shader/postprocessing/TAA.glsl");
+    directPass    = new DirectDisplayer("shader/postprocessing/direct.glsl");
 //    pass_mix = new RenderPass("shader/postprocessing/mixAndMap.frag", 0, true);
 
-//    pass1    = new Renderer("shader/pathtracing2024.frag", 4);
+//    renderPass    = new Renderer("shader/pathtracing2024.frag", 4);
 //    pass_mix = new RenderPass("shader/postprocessing/mixAndMap.frag", 2);
 //    pass_fw  = new RenderPass("shader/postprocessing/filter_w.frag", 1);
 //	pass_fh  = new RenderPass("shader/postprocessing/filter_h.frag", 0, true);
@@ -316,7 +341,7 @@ void init_scene() {
 	camera->transform.position = vec3(-12.1396, 9.27221, 13.2912);
 	camera->transform.rotation = vec3(-26.19, -45.8484, 0);
     scene->update();
-    pass1->reload_scene(scene);
+    renderPass->reload_scene(scene);
     std::cout << "BVH size:" << scene->sceneBVHRoot->siz << std::endl;
     std::cout << "BVH depth:" << scene->sceneBVHRoot->depth << std::endl;
 }

@@ -8,7 +8,6 @@
 #include "../instance/Scene.h"
 #include "../texture/Texture.h"
 #include "RenderPass.h"
-#include "GBuffer.h"
 #include <map>
 
 

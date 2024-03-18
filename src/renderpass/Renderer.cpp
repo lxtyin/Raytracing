@@ -179,8 +179,8 @@ void Renderer::draw(GBuffer &gbuffer) {
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 6, gbuffer.colorGBufferSSBO);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 7, gbuffer.normalGBufferSSBO);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 8, gbuffer.depthGBufferSSBO);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 9, gbuffer.meshIndexGBufferSSBO);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 10, gbuffer.motionGBufferSSBO);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 9, gbuffer.motionGBufferSSBO);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 10, gbuffer.albedoGBufferSSBO);
 
     glBindVertexArray(VAO);
     glDrawArrays(GL_TRIANGLES, 0, 6);
