@@ -3,16 +3,30 @@
 //
 
 #include "TAA.h"
+#include "../Config.h"
 
-TAA::TAA(const string &fragShaderPath) : VertexFragmentRenderPass(fragShaderPath) { }
+TAA::TAA(const string &fragShaderPath) : VertexFragmentRenderPass(fragShaderPath) {
+    firstFrame = true;
+}
 
-void TAA::draw(GBuffer &curFrame, GBuffer &lastFrame) {
+
+void TAA::draw(GBuffer &curFrame, bool saveFrame) {
+
+    if(firstFrame) {
+        firstFrame = false;
+        history.copyFrom(&curFrame);
+        return;
+    }
+
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, curFrame.colorGBufferSSBO); // inout
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, lastFrame.colorGBufferSSBO);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, history.colorGBufferSSBO);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, curFrame.motionGBufferSSBO);
 
     glBindVertexArray(VAO);
     glDrawArrays(GL_TRIANGLES, 0, 6);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     glBindVertexArray(0);
+
+    if(saveFrame) history.copyFrom(&curFrame);
+    else history.swap(&curFrame);
 }

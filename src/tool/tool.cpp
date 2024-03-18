@@ -69,3 +69,15 @@ string localtimestring() {
     std::strftime(timeString, sizeof(timeString), "%Y-%m-%d-%H-%M-%S", localTime);
     return string(timeString);
 }
+
+
+void copySSBO(GLuint frm, GLuint tar, uint siz) {
+    glBindBuffer(GL_COPY_READ_BUFFER, frm);
+    glBindBuffer(GL_COPY_WRITE_BUFFER, tar);
+
+    glBufferData(GL_COPY_WRITE_BUFFER, siz, NULL, GL_STATIC_COPY);
+    glCopyBufferSubData(GL_COPY_READ_BUFFER, GL_COPY_WRITE_BUFFER, 0, 0, siz);
+
+    glBindBuffer(GL_COPY_READ_BUFFER, 0);
+    glBindBuffer(GL_COPY_WRITE_BUFFER, 0);
+}

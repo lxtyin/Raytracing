@@ -9,9 +9,17 @@
 
 class TAA: public VertexFragmentRenderPass {
 public:
+    GBuffer history;
+
+    bool firstFrame;
+
     TAA(const string &fragShaderPath);
 
-    void draw(GBuffer &curFrame, GBuffer &lastFrame);
+    /**
+     * Note curFrame will be stolen if saveFrame = false;
+     * \saveFrame set false only if it is the final pass.
+     */
+    void draw(GBuffer &curFrame, bool saveFrame = true);
 };
 
 

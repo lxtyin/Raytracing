@@ -1,5 +1,6 @@
 #pragma once
 
+#include "glad/glad.h"
 #include <cstdio>
 #include <cstdarg>
 #include <string>
@@ -18,3 +19,5 @@ string read_file(const string &path);
 string read_shader(const string &path);
 
 string localtimestring();
+
+void copySSBO(GLuint frm, GLuint tar, uint siz);

@@ -21,6 +21,10 @@ public:
     GLuint momentGBufferSSBO;
     GLuint meshIndexGBufferSSBO;
 
+    void copyFrom(GBuffer *buffer); // copy data from another GBuffer
+
+    void swap(GBuffer *buffer); // avoid calling destructor
+
     GBuffer();
     ~GBuffer();
 };

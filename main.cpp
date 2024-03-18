@@ -115,8 +115,7 @@ void update(float dt) {
 
 	static bool fast_shade = true;
 	static glm::mat4 back_projection = camera->projection() * camera->w2v_matrix();
-    static GBuffer curFrame, lastFrame, tmp;
-    static bool first_tmp = true;
+    static GBuffer curFrame;
 
 	frameCounter++;
 
@@ -141,8 +140,6 @@ void update(float dt) {
             glUniformMatrix4fv(glGetUniformLocation(renderPass->shaderProgram, "backprojMat"), 1, GL_FALSE, glm::value_ptr(back_projection));
         }
         renderPass->draw(curFrame);
-        if(first_tmp) renderPass->draw(lastFrame);
-        first_tmp = false;
 
         mappingPass->use();
         {
@@ -157,7 +154,7 @@ void update(float dt) {
                 glUniform1i(glGetUniformLocation(taaPass->shaderProgram, "SCREEN_W"), SCREEN_W);
                 glUniform1i(glGetUniformLocation(taaPass->shaderProgram, "SCREEN_H"), SCREEN_H);
             }
-            taaPass->draw(curFrame, lastFrame);
+            taaPass->draw(curFrame);
         }
 
         // separate passes a'trous wavelet filter
@@ -178,10 +175,6 @@ void update(float dt) {
         }
         directPass->draw(curFrame.colorGBufferSSBO);
 
-        tmp = curFrame;
-        curFrame = lastFrame;
-        lastFrame = tmp;
-
         glm::mat4 viewPort = glm::matbyrow({
                                                    1./SCREEN_W, 0, 			0,	 0.5,
                                                    0, 			 1./SCREEN_H, 	0,	 0.5,
@@ -190,42 +183,6 @@ void update(float dt) {
                                            });
         back_projection = camera->projection() * camera->w2v_matrix();
 
-//        pass_mix->use();
-//        {
-//            pass_mix->bind_texture("cur_colorT", renderPass->attach_textures[0]);
-//            pass_mix->bind_texture("cur_wposT", renderPass->attach_textures[3]);
-//            pass_mix->bind_texture("last_colorT", last_colorT);
-//            pass_mix->bind_texture("last_wposT", last_wposT);
-//            glUniform1ui(glGetUniformLocation(pass_mix->shaderProgram, "frameCounter"), frameCounter);
-//            glUniformMatrix4fv(glGetUniformLocation(pass_mix->shaderProgram, "back_proj"), 1, GL_FALSE, glm::value_ptr(back_projection));
-//            glUniform1i(glGetUniformLocation(pass_mix->shaderProgram, "is_motionvector_enabled"), Config::is_motionvector_enabled);
-//        }
-//        pass_mix->draw();
-//
-//        last_colorT = pass_mix->attach_textures[1];
-//        last_wposT = renderPass->attach_textures[3];
-//
-//        pass_fw->use();
-//        {
-//            glUniform1i(glGetUniformLocation(pass_fw->shaderProgram, "SCREEN_W"), SCREEN_W);
-//            glUniform1i(glGetUniformLocation(pass_fw->shaderProgram, "SCREEN_H"), SCREEN_H);
-//            glUniform1i(glGetUniformLocation(pass_fw->shaderProgram, "is_filter_enabled"), Config::is_filter_enabled);
-//            pass_fw->bind_texture("prevpass_color", pass_mix->attach_textures[0]);
-//            pass_fw->bind_texture("prevpass_albedo", renderPass->attach_textures[1]);
-//            pass_fw->bind_texture("prevpass_normal", renderPass->attach_textures[2]);
-//        }
-//        pass_fw->draw();
-//
-//        pass_fh->use();
-//        {
-//            glUniform1i(glGetUniformLocation(pass_fh->shaderProgram, "SCREEN_W"), SCREEN_W);
-//            glUniform1i(glGetUniformLocation(pass_fh->shaderProgram, "SCREEN_H"), SCREEN_H);
-//            glUniform1i(glGetUniformLocation(pass_fh->shaderProgram, "is_filter_enabled"), Config::is_filter_enabled);
-//            pass_fh->bind_texture("prevpass_color", pass_fw->attach_textures[0]);
-//            pass_fh->bind_texture("prevpass_albedo", renderPass->attach_textures[1]);
-//            pass_fh->bind_texture("prevpass_normal", renderPass->attach_textures[2]);
-//        }
-//        pass_fh->draw();
     }
     //--------------------------------------
 

@@ -4,6 +4,7 @@
 
 #include "GBuffer.h"
 #include "Config.h"
+#include "tool/tool.h"
 
 GBuffer::GBuffer() {
     glGenBuffers(1, &colorGBufferSSBO);
@@ -36,7 +37,7 @@ GBuffer::GBuffer() {
     glBufferData(GL_SHADER_STORAGE_BUFFER, framesize * 2 * sizeof(float), placeholder, GL_DYNAMIC_COPY);
 
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, meshIndexGBufferSSBO);
-    glBufferData(GL_SHADER_STORAGE_BUFFER, framesize * 2 * sizeof(float), placeholder, GL_DYNAMIC_COPY);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, framesize * sizeof(float), placeholder, GL_DYNAMIC_COPY);
 
 
     delete[] placeholder;
@@ -51,6 +52,28 @@ GBuffer::~GBuffer() {
     glDeleteBuffers(1, &momentGBufferSSBO);
     glDeleteBuffers(1, &meshIndexGBufferSSBO);
 }
+
+void GBuffer::swap(GBuffer *buffer) {
+    std::swap(colorGBufferSSBO, buffer->colorGBufferSSBO);
+    std::swap(normalGBufferSSBO, buffer->normalGBufferSSBO);
+    std::swap(depthGBufferSSBO, buffer->depthGBufferSSBO);
+    std::swap(motionGBufferSSBO, buffer->motionGBufferSSBO);
+    std::swap(albedoGBufferSSBO, buffer->albedoGBufferSSBO);
+    std::swap(momentGBufferSSBO, buffer->momentGBufferSSBO);
+    std::swap(meshIndexGBufferSSBO, buffer->meshIndexGBufferSSBO);
+}
+
+void GBuffer::copyFrom(GBuffer *buffer) {
+    int framesize = SCREEN_W * SCREEN_H * sizeof(float);
+    copySSBO(buffer->colorGBufferSSBO, colorGBufferSSBO, framesize * 3);
+    copySSBO(buffer->normalGBufferSSBO, normalGBufferSSBO, framesize * 3);
+    copySSBO(buffer->depthGBufferSSBO, depthGBufferSSBO, framesize * 1);
+    copySSBO(buffer->motionGBufferSSBO, motionGBufferSSBO, framesize * 2);
+    copySSBO(buffer->albedoGBufferSSBO, albedoGBufferSSBO, framesize * 3);
+    copySSBO(buffer->momentGBufferSSBO, momentGBufferSSBO, framesize * 2);
+    copySSBO(buffer->meshIndexGBufferSSBO, meshIndexGBufferSSBO, framesize * 1);
+}
+
 
 
 
