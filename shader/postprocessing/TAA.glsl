@@ -1,5 +1,5 @@
 
-// Input LDR -> TAA
+// Input LDR -> TAA, using variance guided clip.
 
 #version 460 core
 
@@ -88,11 +88,13 @@ void main() {
 //    vec3 aabbMax = mu + sigma;
 
     vec3 result;
-    ivec2 lastPixelIndex = ivec2(pixelIndex - motion);
-    int lastPixelPtr = lastPixelIndex.y * SCREEN_W + lastPixelIndex.x;
-    if(lastPixelIndex.x >= SCREEN_W || lastPixelIndex.y >= SCREEN_H || lastPixelIndex.x < 0 || lastPixelIndex.y < 0) {
+    vec2 last_uv = screen_uv - motion;
+    if(last_uv.x >= 1 || last_uv.y >= 1 || last_uv.x < 0 || last_uv.y < 0) {
         result = cur;
     } else {
+        ivec2 lastPixelIndex = ivec2(int(last_uv.x * SCREEN_W), int(last_uv.y * SCREEN_H));
+        int lastPixelPtr = lastPixelIndex.y * SCREEN_W + lastPixelIndex.x;
+
         vec3 lastcolor = RGB2YCoCgR(vec3(
             historyColorGBuffer[lastPixelPtr * 3 + 0],
             historyColorGBuffer[lastPixelPtr * 3 + 1],

@@ -105,7 +105,6 @@ void mouse_callback(GLFWwindow* window, double xpos, double ypos) {
         camera->transform.rotation += vec3(-dy * 0.3, 0, 0);
         mouse_lastX = xpos;
         mouse_lastY = ypos;
-		frameCounter = 0;
     }
 }
 
@@ -130,10 +129,10 @@ void update(float dt) {
             renderPass->bind_texture("skybox", skybox->textureObject, 0);
             renderPass->bind_texture("skybox_samplecache", skybox->skyboxsamplerObject, 1);
             glUniformMatrix4fv(glGetUniformLocation(renderPass->shaderProgram, "v2wMat"), 1, GL_FALSE, glm::value_ptr(camera->v2w_matrix()));
+            glUniform1i(glGetUniformLocation(renderPass->shaderProgram, "SPP"), Config::SPP);
             glUniform1i(glGetUniformLocation(renderPass->shaderProgram, "SCREEN_W"), SCREEN_W);
             glUniform1i(glGetUniformLocation(renderPass->shaderProgram, "SCREEN_H"), SCREEN_H);
             glUniform1i(glGetUniformLocation(renderPass->shaderProgram, "MAX_DEPTH"), 3);
-            glUniform1i(glGetUniformLocation(renderPass->shaderProgram, "SPP"), Config::SPP);
             glUniform1ui(glGetUniformLocation(renderPass->shaderProgram, "frameCounter"), frameCounter);
             glUniform1f(glGetUniformLocation(renderPass->shaderProgram, "skybox_Light_SUM"), skybox->lightSum);
             glUniform1f(glGetUniformLocation(renderPass->shaderProgram, "fov"), SCREEN_FOV);
@@ -144,26 +143,6 @@ void update(float dt) {
         renderPass->draw(curFrame);
         if(first_tmp) renderPass->draw(lastFrame);
         first_tmp = false;
-
-        // separate passes a'trous wavelet filter
-        for(int i = 0;i < Config::filterLevel;i++) {
-            filterPass->use();
-            {
-                glUniform1i(glGetUniformLocation(filterPass->shaderProgram, "SCREEN_W"), SCREEN_W);
-                glUniform1i(glGetUniformLocation(filterPass->shaderProgram, "SCREEN_H"), SCREEN_H);
-                glUniform1i(glGetUniformLocation(filterPass->shaderProgram, "step"), 1 << i);
-                glUniform2i(glGetUniformLocation(filterPass->shaderProgram, "direction"), 0, 1);
-            }
-            filterPass->draw(curFrame);
-            filterPass->use();
-            {
-                glUniform1i(glGetUniformLocation(filterPass->shaderProgram, "SCREEN_W"), SCREEN_W);
-                glUniform1i(glGetUniformLocation(filterPass->shaderProgram, "SCREEN_H"), SCREEN_H);
-                glUniform1i(glGetUniformLocation(filterPass->shaderProgram, "step"), 1 << i);
-                glUniform2i(glGetUniformLocation(filterPass->shaderProgram, "direction"), 1, 0);
-            }
-            filterPass->draw(curFrame);
-        }
 
         mappingPass->use();
         {
@@ -179,6 +158,17 @@ void update(float dt) {
                 glUniform1i(glGetUniformLocation(taaPass->shaderProgram, "SCREEN_H"), SCREEN_H);
             }
             taaPass->draw(curFrame, lastFrame);
+        }
+
+        // separate passes a'trous wavelet filter
+        for(int i = 0;i < Config::filterLevel;i++) {
+            filterPass->use();
+            {
+                glUniform1i(glGetUniformLocation(filterPass->shaderProgram, "SCREEN_W"), SCREEN_W);
+                glUniform1i(glGetUniformLocation(filterPass->shaderProgram, "SCREEN_H"), SCREEN_H);
+                glUniform1i(glGetUniformLocation(filterPass->shaderProgram, "step"), 1 << i);
+            }
+            filterPass->draw(curFrame);
         }
 
         directPass->use();
@@ -286,7 +276,6 @@ void update(float dt) {
     if(glfwGetKey(window, GLFW_KEY_LEFT_SHIFT))  camera->transform.position += vec3(0, -speed * dt, 0);
 	if(glfwGetKey(window, GLFW_KEY_Q)) glfwSetWindowShouldClose(window, GL_TRUE);
 
-	if(!(camera->transform == before)) frameCounter = 0;
 }
 
 void init_scene() {

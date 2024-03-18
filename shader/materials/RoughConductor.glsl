@@ -52,3 +52,14 @@ vec3 sample_RoughConductor(in out BSDFQueryRecord bRec, out float pdf) {
     pdf /= (4 * LdotH);
     return eval_RoughConductor(bRec);
 }
+
+vec3 albedo_RoughConductor(in BSDFQueryRecord bRec) {
+    vec3 albedo = vec3(materialBuffer[bRec.mptr + 1],
+    materialBuffer[bRec.mptr + 2],
+    materialBuffer[bRec.mptr + 3]);
+    int albedo_map = roundint(materialBuffer[bRec.mptr + 5]);
+    if(albedo_map >= 0) {
+        albedo = powv(texture(textureBuffer[albedo_map], bRec.uv).rgb, 2.2f);
+    }
+    return albedo;
+}

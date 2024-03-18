@@ -31,3 +31,7 @@ vec3 refract(vec3 I, vec3 N, float eta) {
     float c2 = sqrt(1 - s2 * s2);
     return -N * c2 + (I + N * c1) / eta;
 }
+
+float luminance(vec3 c) {
+    return c.x * 0.212671f + c.y * 0.715160f + c.z * 0.072169f;
+}

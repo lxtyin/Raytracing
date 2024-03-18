@@ -103,3 +103,9 @@ vec3 sample_material(in out BSDFQueryRecord bRec, out float pdf) {
     }
 }
 
+vec3 albedo_material(in BSDFQueryRecord bRec) {
+    int type = roundint(materialBuffer[bRec.mptr]);
+    if(type == 1) return albedo_RoughConductor(bRec);
+    else if(type == 2) return albedo_RoughDielectric(bRec);
+    else return vec3(0);
+}

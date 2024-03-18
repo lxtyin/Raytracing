@@ -137,3 +137,14 @@ vec3 sample_RoughDielectric(in out BSDFQueryRecord bRec, out float pdf) {
         return sqrt(albedo) * abs(value);
     }
 }
+
+vec3 albedo_RoughDielectric(in BSDFQueryRecord bRec) {
+    vec3 albedo = vec3(materialBuffer[bRec.mptr + 1],
+        materialBuffer[bRec.mptr + 2],
+        materialBuffer[bRec.mptr + 3]);
+    int albedo_map = roundint(materialBuffer[bRec.mptr + 5]);
+    if(albedo_map >= 0) {
+        albedo = powv(texture(textureBuffer[albedo_map], bRec.uv).rgb, 2.2f);
+    }
+    return albedo;
+}

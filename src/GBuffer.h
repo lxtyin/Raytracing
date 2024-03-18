@@ -16,8 +16,10 @@ public:
     GLuint colorGBufferSSBO;           // 3 per pixel
     GLuint normalGBufferSSBO;          // 3
     GLuint depthGBufferSSBO;           // 1
-    GLuint motionGBufferSSBO;          // 2, the unit is pixel.
+    GLuint motionGBufferSSBO;          // 2, motion in screen space ([0, 1]^2).
     GLuint albedoGBufferSSBO;
+    GLuint momentGBufferSSBO;
+    GLuint meshIndexGBufferSSBO;
 
     GBuffer();
     ~GBuffer();

@@ -11,6 +11,8 @@ GBuffer::GBuffer() {
     glGenBuffers(1, &depthGBufferSSBO);
     glGenBuffers(1, &motionGBufferSSBO);
     glGenBuffers(1, &albedoGBufferSSBO);
+    glGenBuffers(1, &momentGBufferSSBO);
+    glGenBuffers(1, &meshIndexGBufferSSBO);
 
     int framesize = SCREEN_H * SCREEN_W;
     float *placeholder = new float[framesize * 3];
@@ -30,6 +32,13 @@ GBuffer::GBuffer() {
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, albedoGBufferSSBO);
     glBufferData(GL_SHADER_STORAGE_BUFFER, framesize * 3 * sizeof(float), placeholder, GL_DYNAMIC_COPY);
 
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, momentGBufferSSBO);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, framesize * 2 * sizeof(float), placeholder, GL_DYNAMIC_COPY);
+
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, meshIndexGBufferSSBO);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, framesize * 2 * sizeof(float), placeholder, GL_DYNAMIC_COPY);
+
+
     delete[] placeholder;
 }
 
@@ -39,6 +48,8 @@ GBuffer::~GBuffer() {
     glDeleteBuffers(1, &depthGBufferSSBO);
     glDeleteBuffers(1, &motionGBufferSSBO);
     glDeleteBuffers(1, &albedoGBufferSSBO);
+    glDeleteBuffers(1, &momentGBufferSSBO);
+    glDeleteBuffers(1, &meshIndexGBufferSSBO);
 }
 
 
