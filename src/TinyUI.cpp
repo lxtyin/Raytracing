@@ -116,6 +116,7 @@ void TinyUI::insert_configuration() {
     ImGui::SeparatorText("Config");
 
     ImGui::Checkbox("Use TAA", &Config::useTAA);
+    ImGui::Checkbox("Use TemporalFilter", &Config::useTemporalFilter);
     ImGui::SliderInt("Filter Level", &Config::filterLevel, 0, 5);
     ImGui::SliderInt("Samples per pixel", &Config::SPP, 1, 32);
 }

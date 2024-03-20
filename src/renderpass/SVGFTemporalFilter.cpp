@@ -41,3 +41,8 @@ void SVGFTemporalFilter::draw(GBuffer &curFrame) {
     std::swap(historyLengthSSBO, nextLengthSSBO);
     history.copyFrom(&curFrame);
 }
+
+SVGFTemporalFilter::~SVGFTemporalFilter() {
+    glDeleteBuffers(1, &historyLengthSSBO);
+    glDeleteBuffers(1, &nextLengthSSBO);
+}

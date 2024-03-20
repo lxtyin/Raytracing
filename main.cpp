@@ -6,6 +6,7 @@
 #include "src/renderpass/Renderer.h"
 #include "src/renderpass/ToneMappingGamma.h"
 #include "src/renderpass/TAA.h"
+#include "src/renderpass/SVGFTemporalFilter.h"
 #include "src/renderpass/FilterPass.h"
 #include "src/tool/tool.h"
 #include "src/Config.h"
@@ -38,6 +39,7 @@ uint frameCounter = 0;
 Renderer *renderPass;
 FilterPass *filterPass;
 ToneMappingGamma *mappingPass;
+SVGFTemporalFilter *svgfTemporalFilterPass;
 TAA *taaPass;
 DirectDisplayer *directPass;
 
@@ -131,7 +133,7 @@ void update(float dt) {
             glUniform1i(glGetUniformLocation(renderPass->shaderProgram, "SPP"), Config::SPP);
             glUniform1i(glGetUniformLocation(renderPass->shaderProgram, "SCREEN_W"), SCREEN_W);
             glUniform1i(glGetUniformLocation(renderPass->shaderProgram, "SCREEN_H"), SCREEN_H);
-            glUniform1i(glGetUniformLocation(renderPass->shaderProgram, "MAX_DEPTH"), 3);
+            glUniform1i(glGetUniformLocation(renderPass->shaderProgram, "MAX_DEPTH"), 2);
             glUniform1ui(glGetUniformLocation(renderPass->shaderProgram, "frameCounter"), frameCounter);
             glUniform1f(glGetUniformLocation(renderPass->shaderProgram, "skybox_Light_SUM"), skybox->lightSum);
             glUniform1f(glGetUniformLocation(renderPass->shaderProgram, "fov"), SCREEN_FOV);
@@ -140,6 +142,27 @@ void update(float dt) {
             glUniformMatrix4fv(glGetUniformLocation(renderPass->shaderProgram, "backprojMat"), 1, GL_FALSE, glm::value_ptr(back_projection));
         }
         renderPass->draw(curFrame);
+
+        if(Config::useTemporalFilter) {
+            svgfTemporalFilterPass->use();
+            {
+                glUniform1i(glGetUniformLocation(svgfTemporalFilterPass->shaderProgram, "SCREEN_W"), SCREEN_W);
+                glUniform1i(glGetUniformLocation(svgfTemporalFilterPass->shaderProgram, "SCREEN_H"), SCREEN_H);
+            }
+            svgfTemporalFilterPass->draw(curFrame);
+        }
+
+        // a'trous wavelet filter
+        for(int i = 0;i < Config::filterLevel;i++) {
+            filterPass->use();
+            {
+                glUniform1i(glGetUniformLocation(filterPass->shaderProgram, "SCREEN_W"), SCREEN_W);
+                glUniform1i(glGetUniformLocation(filterPass->shaderProgram, "SCREEN_H"), SCREEN_H);
+                glUniformMatrix4fv(glGetUniformLocation(filterPass->shaderProgram, "w2vMat"), 1, GL_FALSE, glm::value_ptr(camera->w2v_matrix()));
+                glUniform1i(glGetUniformLocation(filterPass->shaderProgram, "step"), 1 << i);
+            }
+            filterPass->draw(curFrame);
+        }
 
         mappingPass->use();
         {
@@ -157,16 +180,6 @@ void update(float dt) {
             taaPass->draw(curFrame);
         }
 
-        // separate passes a'trous wavelet filter
-        for(int i = 0;i < Config::filterLevel;i++) {
-            filterPass->use();
-            {
-                glUniform1i(glGetUniformLocation(filterPass->shaderProgram, "SCREEN_W"), SCREEN_W);
-                glUniform1i(glGetUniformLocation(filterPass->shaderProgram, "SCREEN_H"), SCREEN_H);
-                glUniform1i(glGetUniformLocation(filterPass->shaderProgram, "step"), 1 << i);
-            }
-            filterPass->draw(curFrame);
-        }
 
         directPass->use();
         {
@@ -239,6 +252,7 @@ void init_scene() {
 
     // passes
     renderPass    = new Renderer("shader/pathtracing.glsl");
+    svgfTemporalFilterPass = new SVGFTemporalFilter("shader/postprocessing/SVGF_TemporalFilter.glsl");
     filterPass = new FilterPass("shader/postprocessing/filter.glsl");
     mappingPass    = new ToneMappingGamma("shader/postprocessing/ToneMappingGamma.glsl");
     taaPass    = new TAA("shader/postprocessing/TAA.glsl");
@@ -252,6 +266,7 @@ void init_scene() {
 
     scene = new Scene("Scene");
     camera = new Camera(SCREEN_FOV, 1000);
+    scene->add_child(camera);
     {
         Instance *o1 = AssimpLoader::load_model("model/casa_obj.glb");
         o1->transform.rotation = vec3(-90, 0, 0);

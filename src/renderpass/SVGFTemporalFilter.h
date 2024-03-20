@@ -15,6 +15,7 @@ public:
     GLuint nextLengthSSBO;
 
     SVGFTemporalFilter(const string &fragShaderPath);
+    ~SVGFTemporalFilter();
 
     void draw(GBuffer &curFrame);
 };

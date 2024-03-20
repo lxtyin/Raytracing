@@ -509,7 +509,6 @@ void main() {
     normalGBuffer[pixelPtr * 3 + 1] = normalout.y;
     normalGBuffer[pixelPtr * 3 + 2] = normalout.z;
     depthGBuffer[pixelPtr] = depthout;
-    meshIndexGBuffer[pixelPtr] = isect.meshIndex;
     motionGBuffer[pixelPtr * 2 + 0] = motionout.x;
     motionGBuffer[pixelPtr * 2 + 1] = motionout.y;
     albedoGBuffer[pixelPtr * 3 + 0] = albedoout.x;
@@ -517,6 +516,7 @@ void main() {
     albedoGBuffer[pixelPtr * 3 + 2] = albedoout.z;
     momentGBuffer[pixelPtr * 2 + 0] = lum;
     momentGBuffer[pixelPtr * 2 + 1] = lum * lum;
+    meshIndexGBuffer[pixelPtr] = isect.meshIndex;
 
     return;
 }

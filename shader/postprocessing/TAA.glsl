@@ -1,5 +1,6 @@
 
-// Input LDR -> TAA, using variance guided clip.
+// Input LDR -> TAA.
+// This version use variance guided clip, in YCoCg color space. So only LDR input is supported.
 
 #version 460 core
 
@@ -39,26 +40,6 @@ vec3 YCoCgR2RGB(vec3 YCoCgRColor) {
     return rgbColor;
 }
 
-vec3 vmin(vec3 a, vec3 b) {
-    return vec3(min(a.x, b.x), min(a.y, b.y), min(a.z, b.z));
-}
-vec3 vmax(vec3 a, vec3 b) {
-    return vec3(max(a.x, b.x), max(a.y, b.y), max(a.z, b.z));
-}
-float lenv(vec3 x) {
-    return x.x * x.x + x.y * x.y + x.z * x.z;
-}
-
-vec3 readColorGBuffer(uvec2 uv) {
-    if(uv.x >= SCREEN_W || uv.y >= SCREEN_H) return vec3(0);
-    uint pixelPtr = uv.y * SCREEN_W + uv.x;
-    return vec3(
-        colorGBuffer[pixelPtr * 3 + 0],
-        colorGBuffer[pixelPtr * 3 + 1],
-        colorGBuffer[pixelPtr * 3 + 2]
-    );
-}
-
 void main() {
     ivec2 pixelIndex = ivec2(int(screen_uv.x * SCREEN_W), int(screen_uv.y * SCREEN_H)); // 像素的纹理坐标 第一象限
     int pixelPtr = pixelIndex.y * SCREEN_W + pixelIndex.x;
@@ -73,16 +54,24 @@ void main() {
         motionGBuffer[pixelPtr * 2 + 1]
     );
 
-    // TAA
+    // variance guide clip
     vec3 mu = vec3(0), var = vec3(0);
+    int nv = 0;
     for(int i = 0;i < 9;i++) {
-        vec3 r = readColorGBuffer(pixelIndex + uvec2(i / 3, i % 3));
-        r = RGB2YCoCgR(r);
+        ivec2 index = pixelIndex + ivec2(i / 3 - 1, i % 3 - 1);
+        if(index.x < 0 || index.x >= SCREEN_W || index.y < 0 || index.y >= SCREEN_H) continue;
+        int ptr = index.y * SCREEN_W + index.x;
+        vec3 r = RGB2YCoCgR(vec3(
+            colorGBuffer[ptr * 3 + 0],
+            colorGBuffer[ptr * 3 + 1],
+            colorGBuffer[ptr * 3 + 2]
+        ));
+        nv++;
         mu += r;
         var += r * r;
     }
-    mu /= 9;
-    var = var / 9 - mu * mu;
+    mu /= nv;
+    var = max(vec3(0), var / nv - mu * mu);
     vec3 sigma = sqrt(var);
 //    vec3 aabbMin = mu - sigma;
 //    vec3 aabbMax = mu + sigma;

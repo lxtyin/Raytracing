@@ -9,7 +9,11 @@
 
 class FilterPass: public VertexFragmentRenderPass {
 public:
+
+    GLuint colorOutputSSBO;
+
     FilterPass(const string &fragShaderPath);
+    ~FilterPass();
 
     void draw(GBuffer &curFrame);
 };

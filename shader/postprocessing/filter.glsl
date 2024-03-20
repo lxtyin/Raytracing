@@ -7,9 +7,10 @@
 in vec2 screen_uv;
 uniform int SCREEN_W;
 uniform int SCREEN_H;
+uniform mat4 w2vMat;
 uniform int step;           // for differen level of a'trous wavelet filter.
 
-layout(binding = 0, std430) buffer ssbo0 {
+layout(binding = 0, std430) readonly buffer ssbo0 {
     float colorGBuffer[];
 };
 layout(binding = 1, std430) readonly buffer ssbo1 {
@@ -21,17 +22,9 @@ layout(binding = 2, std430) readonly buffer ssbo2 {
 layout(binding = 3, std430) readonly buffer ssbo3 {
     float momentGBuffer[];
 };
-
-
-vec3 readColorGBuffer(uvec2 uv) {
-    if(uv.x >= SCREEN_W || uv.y >= SCREEN_H) return vec3(0);
-    uint pixelPtr = uv.y * SCREEN_W + uv.x;
-    return vec3(
-        colorGBuffer[pixelPtr * 3 + 0],
-        colorGBuffer[pixelPtr * 3 + 1],
-        colorGBuffer[pixelPtr * 3 + 2]
-    );
-}
+layout(binding = 4, std430) buffer ssbo4 {
+    float colorOutput[];
+};
 
 const float kernel[3] = {1.0, 2.0 / 3.0, 1.0 / 6};
 
@@ -49,18 +42,23 @@ void main() {
         normalGBuffer[pixelPtr * 3 + 1],
         normalGBuffer[pixelPtr * 3 + 2]
     );
+    vec2 moment = vec2(
+        momentGBuffer[pixelPtr * 2 + 0],
+        momentGBuffer[pixelPtr * 2 + 1]
+    );
     float depth = depthGBuffer[pixelPtr];
 
-    // calculate variance
-    float mu = 0, var = 0;
-    for(int i = 0;i < 9;i++) {
-        float r = luminance(readColorGBuffer(pixelIndex + uvec2(i / 3, i % 3)));
-        mu += r;
-        var += r * r;
-    }
-    mu /= 9;
-    var = max(0, var / 9 - mu * mu);
-    float sigma = sqrt(var);
+    vec3 clipspaceN = normalize(mat3(w2vMat) * normal);
+    vec2 gradZ = vec2(clipspaceN.x, clipspaceN.y);
+
+    // estimate variance
+    float variance = max(0, moment.y - moment.x * moment.x);
+    float sigma = sqrt(variance);
+
+//    colorOutput[pixelPtr * 3 + 0] = variance;
+//    colorOutput[pixelPtr * 3 + 1] = variance;
+//    colorOutput[pixelPtr * 3 + 2] = variance;
+//    return;
 
     // filter
     float totalWeight = 0;
@@ -82,11 +80,14 @@ void main() {
                 normalGBuffer[ptr * 3 + 2]
             );
             float _depth = depthGBuffer[ptr];
+            float dz = abs(dot(gradZ, vec2(i, j) * step));
 
             // No depth now.
             float w = kernel[abs(i)] * kernel[abs(j)] *
                     pow(max(0, dot(normal, _normal)), 128) *
+                    exp(-abs(depth - _depth) / (dz + 0.00001)) *
                     exp(-abs(luminance(color) - luminance(_color)) / (sigma * 4.0 + 0.00001));
+
             totalWeight += w;
             result += w * _color;
         }
@@ -94,8 +95,8 @@ void main() {
     result /= totalWeight;
     if(any(isnan(result)) || any(isinf(result))) result = vec3(10000, 0, 0);
 
-    colorGBuffer[pixelPtr * 3 + 0] = result.x;
-    colorGBuffer[pixelPtr * 3 + 1] = result.y;
-    colorGBuffer[pixelPtr * 3 + 2] = result.z;
+    colorOutput[pixelPtr * 3 + 0] = result.x;
+    colorOutput[pixelPtr * 3 + 1] = result.y;
+    colorOutput[pixelPtr * 3 + 2] = result.z;
 }
 

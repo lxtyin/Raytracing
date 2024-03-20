@@ -20,11 +20,13 @@ class Config {
  public:
 	static int SPP;
 	static bool useTAA;
+    static bool useTemporalFilter;
 	static int filterLevel;
 };
 
 inline int Config::SPP = 1;
 inline bool Config::useTAA = false;
+inline bool Config::useTemporalFilter = false;
 inline int Config::filterLevel = 0;
 
 
