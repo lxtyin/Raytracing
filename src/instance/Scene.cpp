@@ -22,6 +22,7 @@ void Scene::build_sceneBVH() {
     for(auto &[u, mat]: allMeshes){
         BVHPrimitive p;
         p.meshPtr = u;
+        u->meshBVHRoot->world2local = glm::inverse(mat);
         AABB cube = u->meshBVHRoot->aabb;
         for(int i = 0;i < 8;i++) {
             vec3 point = {

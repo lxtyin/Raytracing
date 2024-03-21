@@ -20,6 +20,7 @@ public:
     GLuint albedoGBufferSSBO;
     GLuint momentGBufferSSBO;
     GLuint meshIndexGBufferSSBO;
+    GLuint numSamplesGBufferSSBO;
 
     void copyFrom(GBuffer *buffer); // copy data from another GBuffer
 

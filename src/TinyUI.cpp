@@ -10,6 +10,7 @@
 
 bool TinyUI::showUI = true;
 Instance* TinyUI::selectedInstance = nullptr;
+std::set<Instance*> TinyUI::toopenList;
 
 void TinyUI::init(GLFWwindow *window) {
     IMGUI_CHECKVERSION();
@@ -57,6 +58,10 @@ void TinyUI::insert_instance_Hierarchy(Instance *u) {
     if(selectedInstance == u) node_flags |= ImGuiTreeNodeFlags_Selected;
     if(u->children.size() == 0) node_flags |= ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_Bullet;
 
+    if(toopenList.count(u)) {
+        toopenList.erase(u);
+        ImGui::SetNextItemOpen(true);
+    }
     bool node_open = ImGui::TreeNodeEx((void*)u, node_flags, u->name.c_str());
 
     if(ImGui::IsItemClicked()) selectedInstance = u;
@@ -118,5 +123,14 @@ void TinyUI::insert_configuration() {
     ImGui::Checkbox("Use TAA", &Config::useTAA);
     ImGui::Checkbox("Use TemporalFilter", &Config::useTemporalFilter);
     ImGui::SliderInt("Filter Level", &Config::filterLevel, 0, 5);
-    ImGui::SliderInt("Samples per pixel", &Config::SPP, 1, 32);
+    ImGui::SliderInt("Samples per pixel", &Config::SPP, 1, 16);
+}
+
+void TinyUI::selectInstance(Instance *instance) {
+    selectedInstance = instance;
+    Instance *ptr = instance;
+    while(ptr) {
+        toopenList.insert(ptr);
+        ptr = ptr->get_parent();
+    }
 }

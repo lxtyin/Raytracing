@@ -14,6 +14,7 @@ GBuffer::GBuffer() {
     glGenBuffers(1, &albedoGBufferSSBO);
     glGenBuffers(1, &momentGBufferSSBO);
     glGenBuffers(1, &meshIndexGBufferSSBO);
+    glGenBuffers(1, &numSamplesGBufferSSBO);
 
     int framesize = SCREEN_H * SCREEN_W;
     float *placeholder = new float[framesize * 3];
@@ -39,6 +40,8 @@ GBuffer::GBuffer() {
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, meshIndexGBufferSSBO);
     glBufferData(GL_SHADER_STORAGE_BUFFER, framesize * sizeof(float), placeholder, GL_DYNAMIC_COPY);
 
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, numSamplesGBufferSSBO);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, framesize * sizeof(float), placeholder, GL_DYNAMIC_COPY);
 
     delete[] placeholder;
 }
@@ -51,6 +54,7 @@ GBuffer::~GBuffer() {
     glDeleteBuffers(1, &albedoGBufferSSBO);
     glDeleteBuffers(1, &momentGBufferSSBO);
     glDeleteBuffers(1, &meshIndexGBufferSSBO);
+    glDeleteBuffers(1, &numSamplesGBufferSSBO);
 }
 
 void GBuffer::swap(GBuffer *buffer) {
@@ -61,6 +65,7 @@ void GBuffer::swap(GBuffer *buffer) {
     std::swap(albedoGBufferSSBO, buffer->albedoGBufferSSBO);
     std::swap(momentGBufferSSBO, buffer->momentGBufferSSBO);
     std::swap(meshIndexGBufferSSBO, buffer->meshIndexGBufferSSBO);
+    std::swap(numSamplesGBufferSSBO, buffer->numSamplesGBufferSSBO);
 }
 
 void GBuffer::copyFrom(GBuffer *buffer) {
@@ -72,6 +77,7 @@ void GBuffer::copyFrom(GBuffer *buffer) {
     copySSBO(buffer->albedoGBufferSSBO, albedoGBufferSSBO, framesize * 3);
     copySSBO(buffer->momentGBufferSSBO, momentGBufferSSBO, framesize * 2);
     copySSBO(buffer->meshIndexGBufferSSBO, meshIndexGBufferSSBO, framesize * 1);
+    copySSBO(buffer->numSamplesGBufferSSBO, numSamplesGBufferSSBO, framesize * 1);
 }
 
 

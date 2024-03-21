@@ -93,9 +93,15 @@ layout(binding = 11) buffer ssbo11 {
 layout(binding = 12) buffer ssbo12 {
     float meshIndexGBuffer[];
 };
+layout(binding = 13) buffer ssbo13 {
+    float numSamplesGBuffer[];
+};
+
 
 // Input infos ===
 
+// In supple trace, adding samples until numSamples = SPP, only color and moment is updated.
+uniform bool suppleTrace;
 uniform mat4 v2wMat;
 uniform mat4 backprojMat; // Last frame matrix to project worldposition -> [-1, 1]
 uniform int MAX_DEPTH = 2;
@@ -109,7 +115,6 @@ uniform int SKY_W;
 uniform int SKY_H;
 uniform uint frameCounter;
 uniform int SPP;
-uniform int fast_shade = 1; // 仅渲染diffuse_color
 
 #include shader/materials/materials.glsl
 
@@ -459,8 +464,8 @@ void main() {
         sobolseed = seed + spp;
         sobolcurdim = 0u;
 
-//        vec2 jitter = vec2(sobol(spp * 2, frameCounter), sobol(spp * 2 + 1, frameCounter));
-        vec2 p = pixelIndex + rand2D();
+        vec2 jitter = vec2(sobol(spp * 2, frameCounter), sobol(spp * 2 + 1, frameCounter));
+        vec2 p = pixelIndex + jitter;
 
         float disz = SCREEN_W * 0.5 / tan(fov / 2);
         vec3 ori = vec3(v2wMat * vec4(0, 0, 0, 1));
@@ -476,16 +481,23 @@ void main() {
         }
     }
     colorout /= SPP;
-    if(any(isnan(colorout))) colorout = vec3(100, 0, 0);
+    if(any(isnan(colorout))) colorout = vec3(1000, 0, 0);
 
+    // TODO: let the last sample be in the center.
+    vec2 p = pixelIndex + vec2(0.5);
+    float disz = SCREEN_W * 0.5 / tan(fov / 2);
+    vec3 ori = vec3(v2wMat * vec4(0, 0, 0, 1));
+    vec3 dir = normalize(vec3(v2wMat * vec4(p.x - SCREEN_W / 2, p.y - SCREEN_H / 2, -disz, 0)));
+    ray = Ray(ori, dir);
+    isect = intersect_sceneBVH(ray);
 
     // get GBuffers use last sample.
     if(!isect.exist) {
         albedoout = colorout;
         normalout = normalize(-ray.dir);
-        depthout = 100000;
-        isect.position = ray.dir * 100000;
-        isect.meshIndex = 100000;
+        depthout = 1000;
+        isect.position = ray.ori + ray.dir * 1000;
+        isect.meshIndex = 1000;
     } else {
         BSDFQueryRecord bRec = BSDFQueryRecord(-ray.dir, -ray.dir, isect.materialPtr, isect.uv, 1.0);
         albedoout = albedo_material(bRec);
@@ -517,6 +529,7 @@ void main() {
     momentGBuffer[pixelPtr * 2 + 0] = lum;
     momentGBuffer[pixelPtr * 2 + 1] = lum * lum;
     meshIndexGBuffer[pixelPtr] = isect.meshIndex;
+    numSamplesGBuffer[pixelPtr] = SPP;
 
     return;
 }

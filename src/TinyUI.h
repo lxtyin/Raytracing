@@ -10,12 +10,15 @@
 #include "imgui/imgui.h"
 #include "imgui/backend/imgui_impl_glfw.h"
 #include "imgui/backend/imgui_impl_opengl3.h"
+#include <set>
 
 class TinyUI {
 private:
     static bool showUI;
 
     static Instance *selectedInstance;
+
+    static std::set<Instance*> toopenList;
 
     static void insert_instance_Hierarchy(Instance *u);
 
@@ -32,6 +35,11 @@ public:
     static void update(Scene *scene, float fps);
 
     static void terminate();
+
+    /**
+     * select an instance and show it in hierarchy.
+     */
+    static void selectInstance(Instance* instance);
 };
 
 

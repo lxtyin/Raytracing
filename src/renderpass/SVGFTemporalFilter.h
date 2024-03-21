@@ -9,13 +9,9 @@
 
 class SVGFTemporalFilter: public VertexFragmentRenderPass {
 public:
-
     GBuffer history;
-    GLuint historyLengthSSBO;
-    GLuint nextLengthSSBO;
 
     SVGFTemporalFilter(const string &fragShaderPath);
-    ~SVGFTemporalFilter();
 
     void draw(GBuffer &curFrame);
 };

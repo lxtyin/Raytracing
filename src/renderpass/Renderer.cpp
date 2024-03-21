@@ -183,6 +183,7 @@ void Renderer::draw(GBuffer &gbuffer) {
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 10, gbuffer.albedoGBufferSSBO);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 11, gbuffer.momentGBufferSSBO);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 12, gbuffer.meshIndexGBufferSSBO);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 13, gbuffer.numSamplesGBufferSSBO);
 
 
     glBindVertexArray(VAO);
@@ -193,7 +194,7 @@ void Renderer::draw(GBuffer &gbuffer) {
     // Run compute shader
 //    glDispatchCompute((SCREEN_H + 31) / 32,
 //                      (SCREEN_W + 31) / 32,
-//                      1); // TODO: separate spp
+//                      1);
 //    glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
 
 //    cout << colorGBufferSSBO << "R: ";

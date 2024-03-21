@@ -110,12 +110,19 @@ void mouse_callback(GLFWwindow* window, double xpos, double ypos) {
     }
 }
 
+void mouse_clickcalback(GLFWwindow* window, int button, int state, int mod) {
+    if(button == GLFW_MOUSE_BUTTON_LEFT && state == GLFW_PRESS) {
+        Intersection isect;
+        for()
+
+    }
+}
+
 void update(float dt) {
 
     scene->update();
     renderPass->reload_sceneinfos(scene);
 
-	static bool fast_shade = true;
 	static glm::mat4 back_projection = camera->projection() * camera->w2v_matrix();
     static GBuffer curFrame;
 
@@ -126,7 +133,6 @@ void update(float dt) {
     {
         renderPass->use();
         {
-            glUniform1i(glGetUniformLocation(renderPass->shaderProgram, "fast_shade"), fast_shade);
             renderPass->bind_texture("skybox", skybox->textureObject, 0);
             renderPass->bind_texture("skybox_samplecache", skybox->skyboxsamplerObject, 1);
             glUniformMatrix4fv(glGetUniformLocation(renderPass->shaderProgram, "v2wMat"), 1, GL_FALSE, glm::value_ptr(camera->v2w_matrix()));
@@ -140,6 +146,7 @@ void update(float dt) {
             glUniform1i(glGetUniformLocation(renderPass->shaderProgram, "SKY_W"), skybox->width);
             glUniform1i(glGetUniformLocation(renderPass->shaderProgram, "SKY_H"), skybox->height);
             glUniformMatrix4fv(glGetUniformLocation(renderPass->shaderProgram, "backprojMat"), 1, GL_FALSE, glm::value_ptr(back_projection));
+//            glUniform1i(glGetUniformLocation(renderPass->shaderProgram, "suppleTrace"), false);
         }
         renderPass->draw(curFrame);
 
@@ -188,23 +195,17 @@ void update(float dt) {
         }
         directPass->draw(curFrame.colorGBufferSSBO);
 
-        glm::mat4 viewPort = glm::matbyrow({
-                                                   1./SCREEN_W, 0, 			0,	 0.5,
-                                                   0, 			 1./SCREEN_H, 	0,	 0.5,
-                                                   0, 			 0, 			0,	 0,
-                                                   0, 			 0, 			0,	 1
-                                           });
         back_projection = camera->projection() * camera->w2v_matrix();
 
     }
     //--------------------------------------
 
-	if(glfwGetKeyDown(window, GLFW_KEY_R)) fast_shade = !fast_shade, frameCounter = 0;
-
 	// Menu
 	if(glfwGetKeyDown(window, GLFW_KEY_E)) {
-//		show_imgui = show_imgui ^ 1;
+        //TODO just debug
+        TinyUI::selectInstance(scene->get_child(1)->get_child(0));
 	}
+
 	// Output camera pose
 	if(glfwGetKeyDown(window, GLFW_KEY_P)) {
 		Transform t = camera->transform;

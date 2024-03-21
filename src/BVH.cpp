@@ -80,3 +80,28 @@ BVHNode::~BVHNode() {
     if(ls && !ls->meshPtr) delete ls;
     if(rs && !rs->meshPtr) delete rs;
 }
+
+void BVHNode::rayIntersect(Ray ray, Intersection &isect) {
+    if(meshPtr != nullptr) {
+        ray.ori = world2local * vec4(ray.ori, 1);
+        ray.dir = world2local * vec4(ray.dir, 0); // keep scale.
+    }
+
+    if(trianglePtr != nullptr) {
+        float t2 = Intersection::rayIntersectTriangle(ray, *trianglePtr);
+        if(t2 > 0 && (t2 < isect.t || isect.t < 0)) {
+            isect.t = t2;
+            isect.triangle = trianglePtr;
+        }
+        return;
+    }
+
+    float t1 = Intersection::rayIntersectAABB(ray, aabb);
+    if(t1 > 0 && (t1 < isect.t || isect.t < 0)) {
+        if(ls) ls->rayIntersect(ray, isect);
+        if(rs) rs->rayIntersect(ray, isect);
+    }
+}
+
+
+

@@ -20,7 +20,8 @@ void FilterPass::draw(GBuffer &curFrame) {
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, curFrame.normalGBufferSSBO);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, curFrame.depthGBufferSSBO);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, curFrame.momentGBufferSSBO);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 4, colorOutputSSBO);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 4, curFrame.numSamplesGBufferSSBO);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 5, colorOutputSSBO);
 
     glBindVertexArray(VAO);
     glDrawArrays(GL_TRIANGLES, 0, 6);

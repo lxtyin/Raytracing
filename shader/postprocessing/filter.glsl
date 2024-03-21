@@ -22,7 +22,10 @@ layout(binding = 2, std430) readonly buffer ssbo2 {
 layout(binding = 3, std430) readonly buffer ssbo3 {
     float momentGBuffer[];
 };
-layout(binding = 4, std430) buffer ssbo4 {
+layout(binding = 4, std430) readonly buffer ssbo4 {
+    float numSamplesGBuffer[];
+};
+layout(binding = 5, std430) buffer ssbo5 {
     float colorOutput[];
 };
 
@@ -46,6 +49,7 @@ void main() {
         momentGBuffer[pixelPtr * 2 + 0],
         momentGBuffer[pixelPtr * 2 + 1]
     );
+    float numSamples = numSamplesGBuffer[pixelPtr];
     float depth = depthGBuffer[pixelPtr];
 
     vec3 clipspaceN = normalize(mat3(w2vMat) * normal);
@@ -55,9 +59,9 @@ void main() {
     float variance = max(0, moment.y - moment.x * moment.x);
     float sigma = sqrt(variance);
 
-//    colorOutput[pixelPtr * 3 + 0] = variance;
-//    colorOutput[pixelPtr * 3 + 1] = variance;
-//    colorOutput[pixelPtr * 3 + 2] = variance;
+//    colorOutput[pixelPtr * 3 + 0] = numSamples / 10;
+//    colorOutput[pixelPtr * 3 + 1] = numSamples / 10;
+//    colorOutput[pixelPtr * 3 + 2] = numSamples / 10;
 //    return;
 
     // filter

@@ -8,6 +8,7 @@
 #include "Triangle.h"
 #include "../material/Material.h"
 #include "../BVH.h"
+#include "Instance.h"
 #include <vector>
 #include <memory>
 
