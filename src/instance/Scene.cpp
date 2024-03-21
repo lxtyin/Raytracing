@@ -3,12 +3,14 @@
 //
 
 #include "Scene.h"
+#include "Mesh.h"
+#include "../BVH.h"
 #include <iostream>
 
 
-void Scene::fetch_meshes(Instance* cur, mat4 transform2world, std::vector<std::pair<Mesh*, mat4>> &allMeshes) {
+void Scene::fetch_meshes(Instance* cur, mat4 transform2world, std::vector<std::pair<Instance*, mat4>> &allMeshes) {
     if(cur->mesh) {
-        allMeshes.emplace_back(std::make_pair(cur->mesh, transform2world));
+        allMeshes.emplace_back(std::make_pair(cur, transform2world));
     }
     Instance *child;
     for(int i = 0; (child = cur->get_child(i)) != nullptr; i++){
@@ -21,9 +23,8 @@ void Scene::build_sceneBVH() {
     std::vector<BVHPrimitive> primitives;
     for(auto &[u, mat]: allMeshes){
         BVHPrimitive p;
-        p.meshPtr = u;
-        u->meshBVHRoot->world2local = glm::inverse(mat);
-        AABB cube = u->meshBVHRoot->aabb;
+        p.instancePtr = u;
+        AABB cube = u->mesh->meshBVHRoot->aabb;
         for(int i = 0;i < 8;i++) {
             vec3 point = {
                 (i & 1) ? cube.mi[0] : cube.mx[0],

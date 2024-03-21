@@ -5,20 +5,19 @@
 #ifndef OPENGL_INSTANCE_H
 #define OPENGL_INSTANCE_H
 
-#include "Mesh.h"
 #include "../Transform.h"
 #include <vector>
 
+class Mesh;
+
 class Instance {
 protected:
-
     friend class TinyUI;
 
     Instance *parent = nullptr;
     std::vector<Instance*> children;
 
 public:
-    std::vector<Mesh*> meshes;
     Mesh* mesh = nullptr;
     string name = "A Instance";
     Transform transform;                 /**< transform to parent. */
@@ -26,7 +25,7 @@ public:
     Instance() = default;
     explicit Instance(const string &nm, Instance *p = nullptr);
 
-	mat4 matrix_to_global();
+	mat4 matrix_to_global(); // O(Hierarchy depth), not large
 
     Instance* get_parent();
 

@@ -4,6 +4,9 @@
 layout(binding = 0, std430) readonly buffer ssbo0 {
     float colorBuffer[];
 };
+layout(binding = 0, std430) readonly buffer ssbo0 {
+    float colorBuffer[];
+};
 
 in vec2 screen_uv;
 out vec4 FragColor;

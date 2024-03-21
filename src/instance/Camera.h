@@ -9,10 +9,10 @@
 
 // perspective camera.
 class Camera: public Instance {
-
-	float fov;
-	float near, far;
  public:
+
+    float fov;
+    float near, far;
 
 	Camera(float _near, float _far);
 

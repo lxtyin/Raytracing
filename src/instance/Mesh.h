@@ -6,11 +6,13 @@
 #define PATH_TRACING_MESH_H
 
 #include "Triangle.h"
-#include "../material/Material.h"
-#include "../BVH.h"
-#include "Instance.h"
 #include <vector>
 #include <memory>
+#include <string>
+using std::string;
+
+class Material;
+class BVHNode;
 
 class Mesh {
 public:
@@ -21,7 +23,7 @@ public:
     vec3 emission = vec3(0.0);
 
     BVHNode *meshBVHRoot;
-    Material* material;        /**< material resource. */
+    Material *material;        /**< material resource. */
 
     void build_meshBVH();
 

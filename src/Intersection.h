@@ -6,7 +6,8 @@
 #define PATH_TRACING_INTERSECTION_H
 
 #include "glad/glad.h"
-#include "instance/Mesh.h"
+#include "instance/Triangle.h"
+#include "instance/Instance.h"
 #include "AABB.h"
 
 struct Ray {
@@ -27,7 +28,8 @@ public:
     static float rayIntersectAABB(Ray &ray, AABB &aabb);
 
     float t = -1;
-    Triangle *triangle = nullptr;
+    Instance *instancePtr = nullptr;
+    Triangle *trianglePtr = nullptr;
 };
 
 

@@ -5,14 +5,15 @@
 #ifndef PATH_TRACING_RENDERER_H
 #define PATH_TRACING_RENDERER_H
 
-#include "../instance/Scene.h"
-#include "../texture/Texture.h"
+#include "../instance/Triangle.h"
 #include "RenderPass.h"
+#include <vector>
 #include <map>
 
+class Scene;
 
 class Renderer: public VertexFragmentRenderPass {
-    struct MeshInfo {
+    struct InstanceInfo {
         mat4 world2local;
         vec4 emission;
         int materialPtr;
@@ -22,20 +23,20 @@ class Renderer: public VertexFragmentRenderPass {
         vec4 aa, bb;
         int lsIndex = -1;
         int rsIndex = -1;
-        int meshIndex = -1;
+        int instanceIndex = -1;
         int triangleIndex = -1;
     };
 
     std::vector<GLuint64> textureHandlesBuffer;
     std::vector<float> materialBuffer;
     std::vector<Triangle> triangleBuffer;
-    std::vector<MeshInfo> meshInfoBuffer;
+    std::vector<InstanceInfo> instanceInfoBuffer;
     std::vector<BVHNodeInfo> meshBVHBuffer;
     std::vector<BVHNodeInfo> sceneBVHBuffer;
     GLuint textureHandleSSBO;
     GLuint materialSSBO;
     GLuint triangleSSBO;
-    GLuint meshInfoSSBO;
+    GLuint instanceInfoSSBO;
     GLuint meshBVHSSBO;
     GLuint sceneBVHSSBO;
 

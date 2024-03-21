@@ -5,6 +5,7 @@
 #include "BVH.h"
 #include <algorithm>
 #include <functional>
+#include "instance/Instance.h"
 #include "instance/Mesh.h"
 
 BVHNode* BVHNode::build(std::vector<BVHPrimitive> &primitives) {
@@ -14,10 +15,14 @@ BVHNode* BVHNode::build(std::vector<BVHPrimitive> &primitives) {
     assert(n > 0);
     if(n == 1) {
         BVHPrimitive p = primitives[0];
-        if(p.meshPtr) {
-            assert(p.meshPtr->meshBVHRoot);
-            delete cur;
-            return p.meshPtr->meshBVHRoot;
+        cur->aabb = p.aabb;
+        if(p.instancePtr) {
+            assert(p.instancePtr->mesh->meshBVHRoot);
+            cur->instancePtr = p.instancePtr;
+            cur->ls = p.instancePtr->mesh->meshBVHRoot;
+            cur->siz = cur->ls->siz;
+            cur->depth = cur->ls->depth + 1;
+            return cur;
         } else {
             assert(p.trianglePtr);
             cur->trianglePtr = p.trianglePtr;
@@ -77,29 +82,33 @@ BVHNode* BVHNode::build(std::vector<BVHPrimitive> &primitives) {
 }
 
 BVHNode::~BVHNode() {
-    if(ls && !ls->meshPtr) delete ls;
-    if(rs && !rs->meshPtr) delete rs;
+    if(ls && !ls->instancePtr) delete ls;
+    if(rs && !rs->instancePtr) delete rs;
 }
 
-void BVHNode::rayIntersect(Ray ray, Intersection &isect) {
-    if(meshPtr != nullptr) {
-        ray.ori = world2local * vec4(ray.ori, 1);
-        ray.dir = world2local * vec4(ray.dir, 0); // keep scale.
+void BVHNode::rayIntersect(Ray ray, Intersection &isect, Instance* insp) {
+    if(instancePtr != nullptr) {
+        mat4 w2l = glm::inverse(instancePtr->matrix_to_global());
+        ray.ori = w2l * vec4(ray.ori, 1);
+        ray.dir = w2l * vec4(ray.dir, 0); // keep scale.
+        ls->rayIntersect(ray, isect, instancePtr);
+        return;
     }
 
     if(trianglePtr != nullptr) {
         float t2 = Intersection::rayIntersectTriangle(ray, *trianglePtr);
         if(t2 > 0 && (t2 < isect.t || isect.t < 0)) {
             isect.t = t2;
-            isect.triangle = trianglePtr;
+            isect.instancePtr = insp;
+            isect.trianglePtr = trianglePtr;
         }
         return;
     }
 
     float t1 = Intersection::rayIntersectAABB(ray, aabb);
     if(t1 > 0 && (t1 < isect.t || isect.t < 0)) {
-        if(ls) ls->rayIntersect(ray, isect);
-        if(rs) rs->rayIntersect(ray, isect);
+        if(ls) ls->rayIntersect(ray, isect, insp);
+        if(rs) rs->rayIntersect(ray, isect, insp);
     }
 }
 

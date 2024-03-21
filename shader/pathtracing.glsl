@@ -47,21 +47,21 @@ Triangle get_triangle(int idx) {
     return y;
 }
 
-struct MeshInfo {
+struct InstanceInfo {
     mat4 world2local;
     vec4 emission; // emission.z = is_emission (-1 or 1)
     int materialPtr;
     int emptyblock[11];
 };
 layout(binding = 3, std430) readonly buffer ssbo3 {
-    MeshInfo meshInfoBuffer[];
+    InstanceInfo instanceInfoBuffer[];
 };
 
 struct BVHNode {
     vec4 aa, bb; // actually vec3
     int lsIndex;
     int rsIndex;
-    int meshIndex; // unused
+    int instanceIndex;
     int triangleIndex;
 };
 layout(binding = 4, std430) readonly buffer ssbo4 {
@@ -69,7 +69,6 @@ layout(binding = 4, std430) readonly buffer ssbo4 {
 };
 layout(binding = 5, std430) readonly buffer ssbo5 {
     BVHNode sceneBVHBuffer[];
-// 在scene BVH中，用 -meshIndex 表示叶子节点（0~M-1），应转移到 meshBVH 中求交
 };
 
 layout(binding = 6) buffer ssbo6 {
@@ -175,8 +174,8 @@ struct Intersection {
     vec3 normal; // in world space.
     float t;
     vec2 uv;
+    int instanceIndex;
     int materialPtr;
-    int meshIndex;
     int triangleIndex;
 };
 const Intersection nointersect = Intersection(false, vec3(0), vec3(0, 0, 1), INF, vec2(0), -1, -1, -1);
@@ -193,7 +192,8 @@ bool intersect_aabb(Ray ray, vec3 aa, vec3 bb, out float nearT) {
     tmx = min(tmx, max(t1.y, t2.y));
     tmx = min(tmx, max(t1.z, t2.z));
     nearT = tmi;
-    return tmi < tmx + RAY_EPS;
+    // TODO check why need eps?
+    return tmi < tmx + 0.001;
 }
 
 /// 返回与triangle的具体碰撞信息
@@ -210,7 +210,7 @@ Intersection intersect_triangle(Ray ray, int triangleIndex) {
     float u = dot(S1, S) * k;
     float v = dot(S2, ray.dir) * k;
 
-    bool exist = (RAY_EPS < t && 0 < u && 0 < v && u + v < 1);
+    bool exist = (0.001 < t && 0 < u && 0 < v && u + v < 1);
 
     vec3 pos = ray.ori + t * ray.dir;
     vec3 nor = normalize(tri.normal[0].xyz * (1 - u - v) + tri.normal[1].xyz * u + tri.normal[2].xyz * v);
@@ -227,14 +227,14 @@ Intersection intersect_triangle(Ray ray, int triangleIndex) {
 
 int stack_h = 0;
 int stack[256];
-void intersect_meshBVH(int meshIndex, Ray _ray, inout Intersection result) {
+void intersect_meshBVH(int root, int instanceIndex, Ray _ray, inout Intersection result) {
     int starth = stack_h;
-    stack[++stack_h] = meshIndex;
+    stack[++stack_h] = root;
 
-    mat4 w2l = meshInfoBuffer[meshIndex].world2local;
+    mat4 w2l = instanceInfoBuffer[instanceIndex].world2local;
     mat3 rot = mat3(normalize(w2l[0].xyz),
-    normalize(w2l[1].xyz),
-    normalize(w2l[2].xyz));
+                    normalize(w2l[1].xyz),
+                    normalize(w2l[2].xyz));
 
     Ray ray;
     ray.ori = (w2l * vec4(_ray.ori, 1)).xyz;
@@ -252,7 +252,8 @@ void intersect_meshBVH(int meshIndex, Ray _ray, inout Intersection result) {
                 isect.normal = isect.normal * rot;
                 isect.position = _ray.ori + isect.t * _ray.dir;
                 result = isect;
-                result.meshIndex = meshIndex;
+                result.instanceIndex = instanceIndex;
+                result.materialPtr = instanceInfoBuffer[instanceIndex].materialPtr;
             }
         } else {
             float tnear;
@@ -269,6 +270,7 @@ void intersect_meshBVH(int meshIndex, Ray _ray, inout Intersection result) {
 Intersection intersect_sceneBVH(Ray ray) {
     Intersection result = nointersect;
 
+
     stack_h = 0;
     stack[++stack_h] = 0;
 
@@ -280,15 +282,14 @@ Intersection intersect_sceneBVH(Ray ray) {
         if(!intersect_aabb(ray, vec3(cur.aa), vec3(cur.bb), tnear)) continue;
         if(tnear > result.t) continue;
 
-        if(cur.lsIndex <= 0) intersect_meshBVH(-cur.lsIndex, ray, result);
-        else stack[++stack_h] = cur.lsIndex;
+        if(cur.instanceIndex >= 0) {
+            intersect_meshBVH(cur.lsIndex, cur.instanceIndex, ray, result);
+            continue;
+        }
 
-        if(cur.rsIndex <= 0) intersect_meshBVH(-cur.rsIndex, ray, result);
-        else stack[++stack_h] = cur.rsIndex;
+        stack[++stack_h] = cur.lsIndex;
+        stack[++stack_h] = cur.rsIndex;
     }
-
-    MeshInfo meshInfo = meshInfoBuffer[result.meshIndex];
-    result.materialPtr = meshInfo.materialPtr;
 
     return result;
 }
@@ -390,12 +391,11 @@ vec3 shade(Ray ray, in Intersection first_isect) {
 
     float total_eta = 1.0;
     for(int dep = 0; dep < MAX_DEPTH; dep++) {
-        MeshInfo hitMesh = meshInfoBuffer[isect.meshIndex];
-
-        if(hitMesh.emission.w > 0) {
-            result += history * hitMesh.emission.xyz;
-            break;
-        }
+//        InstanceInfo hitMesh = instanceInfoBuffer[isect.meshIndex];
+//        if(hitMesh.emission.w > 0) {
+//            result += history * hitMesh.emission.xyz;
+//            break;
+//        }
 
         Frame coord = create_coord(isect.normal);
         vec3 wi = to_local(coord, -ray.dir);
@@ -497,7 +497,7 @@ void main() {
         normalout = normalize(-ray.dir);
         depthout = 1000;
         isect.position = ray.ori + ray.dir * 1000;
-        isect.meshIndex = 1000;
+        isect.instanceIndex = 1000;
     } else {
         BSDFQueryRecord bRec = BSDFQueryRecord(-ray.dir, -ray.dir, isect.materialPtr, isect.uv, 1.0);
         albedoout = albedo_material(bRec);
@@ -528,7 +528,7 @@ void main() {
     albedoGBuffer[pixelPtr * 3 + 2] = albedoout.z;
     momentGBuffer[pixelPtr * 2 + 0] = lum;
     momentGBuffer[pixelPtr * 2 + 1] = lum * lum;
-    meshIndexGBuffer[pixelPtr] = isect.meshIndex;
+    meshIndexGBuffer[pixelPtr] = isect.instanceIndex;
     numSamplesGBuffer[pixelPtr] = SPP;
 
     return;

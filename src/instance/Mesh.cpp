@@ -3,14 +3,13 @@
 //
 
 #include "Mesh.h"
+#include "../BVH.h"
 
 void Mesh::build_meshBVH() {
 
     std::vector<BVHPrimitive> primitives;
     for(Triangle &t: triangles) {
         BVHPrimitive tmp;
-        assert(!tmp.trianglePtr);
-        assert(!tmp.meshPtr);
 
         tmp.trianglePtr = &t;
         for(auto &v: t.vertex) tmp.aabb.addPoint(v);
@@ -18,7 +17,6 @@ void Mesh::build_meshBVH() {
     }
 
     meshBVHRoot = BVHNode::build(primitives);
-    meshBVHRoot->meshPtr = this;
 }
 
 Mesh::Mesh(string _name, std::vector<Triangle> &&_triangles):

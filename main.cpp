@@ -13,6 +13,7 @@
 #include "src/tool/loader.h"
 #include "src/texture/Skybox.h"
 #include "src/instance/Camera.h"
+#include "src/BVH.h"
 #include <opencv2/opencv.hpp>
 #include "src/TinyUI.h"
 using namespace std;
@@ -112,9 +113,23 @@ void mouse_callback(GLFWwindow* window, double xpos, double ypos) {
 
 void mouse_clickcalback(GLFWwindow* window, int button, int state, int mod) {
     if(button == GLFW_MOUSE_BUTTON_LEFT && state == GLFW_PRESS) {
-        Intersection isect;
-        for()
+        double x, y;
+        glfwGetCursorPos(window, &x, &y); // →x ↓y
 
+        if(x >= SCREEN_W || y >= SCREEN_H) return;
+
+        float disz = SCREEN_W * 0.5 / tan(camera->fov / 2);
+        mat4 v2w = camera->v2w_matrix();
+        vec3 ori = vec3(v2w * vec4(0, 0, 0, 1));
+        vec3 dir = normalize(vec3(v2w * vec4(x - SCREEN_W / 2, SCREEN_H / 2 - y, -disz, 0)));
+        Ray ray = Ray(ori, dir);
+
+        Intersection isect;
+        scene->sceneBVHRoot->rayIntersect(ray, isect);
+        if(isect.t >= 0) {
+            TinyUI::selectInstance(isect.instancePtr);
+        }
+        std::cout << isect.t << std::endl;
     }
 }
 
@@ -322,6 +337,7 @@ int main(int argc, const char* argv[]) {
     glfwSwapInterval(1); // Enable vsync
     glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
     glfwSetCursorPosCallback(window, mouse_callback);
+    glfwSetMouseButtonCallback(window, mouse_clickcalback);
 
     //初始化glad
     gladLoadGLLoader((GLADloadproc)glfwGetProcAddress);

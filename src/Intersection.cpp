@@ -16,7 +16,7 @@ float Intersection::rayIntersectTriangle(Ray &ray, Triangle &tri) {
     float u = dot(S1, S) * k;
     float v = dot(S2, ray.dir) * k;
 
-    bool exist = (0 < t && 0 < u && 0 < v && u + v < 1);
+    bool exist = (0.001 < t && 0 < u && 0 < v && u + v < 1);
 
     if(!exist) return -1;
     else return t;
@@ -33,6 +33,6 @@ float Intersection::rayIntersectAABB(Ray &ray, AABB &aabb) {
     tmx = min(tmx, max(t1.y, t2.y));
     tmx = min(tmx, max(t1.z, t2.z));
 
-    if(tmi < tmx + 0.00001) return tmi;
+    if(tmi < tmx + 0.001) return tmi;
     else return -1;
 }

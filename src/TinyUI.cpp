@@ -5,6 +5,7 @@
 #include "TinyUI.h"
 #include "imgui/imgui.h"
 #include "tool/tool.h"
+#include "instance/Mesh.h"
 #include "material/RoughConductor.h"
 #include "material/RoughDielectric.h"
 

@@ -2,7 +2,6 @@
 #define PI 3.1415926
 #define INV_PI 0.3183098
 #define EPS 0.0001
-#define RAY_EPS 0.01
 
 int roundint(float x) {
     float b = step(x, 0);
