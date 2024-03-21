@@ -24,10 +24,11 @@ public:
      * Basic intersect event
      * \return time, if not exist, return -1;
      */
-    static float rayIntersectTriangle(Ray &ray, Triangle &triangle);
-    static float rayIntersectAABB(Ray &ray, AABB &aabb);
+    static bool rayIntersectTriangle(Ray &ray, Triangle &triangle, float &tnear);
+    static bool rayIntersectAABB(Ray &ray, AABB &aabb, float &tnear);
 
-    float t = -1;
+    bool exist = false;
+    float t = INF;
     Instance *instancePtr = nullptr;
     Triangle *trianglePtr = nullptr;
 };

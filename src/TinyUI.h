@@ -16,8 +16,6 @@ class TinyUI {
 private:
     static bool showUI;
 
-    static Instance *selectedInstance;
-
     static std::set<Instance*> toopenList;
 
     static void insert_instance_Hierarchy(Instance *u);
@@ -27,6 +25,9 @@ private:
     static void insert_configuration();
 
 public:
+
+    static Instance *selectedInstance;
+
     /**
      * initialization using glfw.
      */

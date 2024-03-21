@@ -90,7 +90,7 @@ layout(binding = 11) buffer ssbo11 {
     float momentGBuffer[];
 };
 layout(binding = 12) buffer ssbo12 {
-    float meshIndexGBuffer[];
+    float instanceIndexGBuffer[];
 };
 layout(binding = 13) buffer ssbo13 {
     float numSamplesGBuffer[];
@@ -192,8 +192,8 @@ bool intersect_aabb(Ray ray, vec3 aa, vec3 bb, out float nearT) {
     tmx = min(tmx, max(t1.y, t2.y));
     tmx = min(tmx, max(t1.z, t2.z));
     nearT = tmi;
-    // TODO check why need eps?
-    return tmi < tmx + 0.001;
+
+    return tmx >= tmi && tmx >= 0;
 }
 
 /// 返回与triangle的具体碰撞信息
@@ -210,7 +210,7 @@ Intersection intersect_triangle(Ray ray, int triangleIndex) {
     float u = dot(S1, S) * k;
     float v = dot(S2, ray.dir) * k;
 
-    bool exist = (0.001 < t && 0 < u && 0 < v && u + v < 1);
+    bool exist = (0.0001 <= t && 0 <= u && 0 <= v && u + v <= 1);
 
     vec3 pos = ray.ori + t * ray.dir;
     vec3 nor = normalize(tri.normal[0].xyz * (1 - u - v) + tri.normal[1].xyz * u + tri.normal[2].xyz * v);
@@ -528,7 +528,7 @@ void main() {
     albedoGBuffer[pixelPtr * 3 + 2] = albedoout.z;
     momentGBuffer[pixelPtr * 2 + 0] = lum;
     momentGBuffer[pixelPtr * 2 + 1] = lum * lum;
-    meshIndexGBuffer[pixelPtr] = isect.instanceIndex;
+    instanceIndexGBuffer[pixelPtr] = isect.instanceIndex;
     numSamplesGBuffer[pixelPtr] = SPP;
 
     return;

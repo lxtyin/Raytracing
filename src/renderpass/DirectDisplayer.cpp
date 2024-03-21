@@ -10,8 +10,9 @@
 DirectDisplayer::DirectDisplayer(const string &fragShaderPath) : VertexFragmentRenderPass(fragShaderPath) {}
 
 
-void DirectDisplayer::draw(GLuint targetSSBO) {
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, targetSSBO);
+void DirectDisplayer::draw(GBuffer &curFrame) {
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, curFrame.colorGBufferSSBO);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, curFrame.instanceIndexGBufferSSBO);
 
     glBindVertexArray(VAO);
     glDrawArrays(GL_TRIANGLES, 0, 6);

@@ -11,6 +11,7 @@
 #include <map>
 
 class Scene;
+class Instance;
 
 class Renderer: public VertexFragmentRenderPass {
     struct InstanceInfo {
@@ -39,6 +40,8 @@ class Renderer: public VertexFragmentRenderPass {
     GLuint instanceInfoSSBO;
     GLuint meshBVHSSBO;
     GLuint sceneBVHSSBO;
+
+    std::map<Instance*, int> instanceIndexMap;
 
     /**
      * reload meshInfos in O(numMeshes). Including transforms, materials/textures
@@ -69,6 +72,11 @@ public:
      * called when updating materials / textures / transforms.
      */
     void reload_sceneinfos(Scene *scene);
+
+    /**
+     * get the index of instance that binded in render pass.
+     */
+    int query_instanceIndex(Instance *instance);
 
     void draw(GBuffer &gbuffer);
 };

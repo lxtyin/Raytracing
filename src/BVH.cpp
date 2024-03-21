@@ -96,8 +96,9 @@ void BVHNode::rayIntersect(Ray ray, Intersection &isect, Instance* insp) {
     }
 
     if(trianglePtr != nullptr) {
-        float t2 = Intersection::rayIntersectTriangle(ray, *trianglePtr);
-        if(t2 > 0 && (t2 < isect.t || isect.t < 0)) {
+        float t2;
+        if(Intersection::rayIntersectTriangle(ray, *trianglePtr, t2) && t2 < isect.t) {
+            isect.exist = true;
             isect.t = t2;
             isect.instancePtr = insp;
             isect.trianglePtr = trianglePtr;
@@ -105,8 +106,8 @@ void BVHNode::rayIntersect(Ray ray, Intersection &isect, Instance* insp) {
         return;
     }
 
-    float t1 = Intersection::rayIntersectAABB(ray, aabb);
-    if(t1 > 0 && (t1 < isect.t || isect.t < 0)) {
+    float t1;
+    if(Intersection::rayIntersectAABB(ray, aabb, t1) && t1 < isect.t) {
         if(ls) ls->rayIntersect(ray, isect, insp);
         if(rs) rs->rayIntersect(ray, isect, insp);
     }

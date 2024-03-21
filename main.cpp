@@ -126,10 +126,11 @@ void mouse_clickcalback(GLFWwindow* window, int button, int state, int mod) {
 
         Intersection isect;
         scene->sceneBVHRoot->rayIntersect(ray, isect);
-        if(isect.t >= 0) {
+        if(isect.exist) {
             TinyUI::selectInstance(isect.instancePtr);
+        } else {
+            TinyUI::selectInstance(nullptr);
         }
-        std::cout << isect.t << std::endl;
     }
 }
 
@@ -207,8 +208,10 @@ void update(float dt) {
         {
             glUniform1i(glGetUniformLocation(directPass->shaderProgram, "SCREEN_W"), SCREEN_W);
             glUniform1i(glGetUniformLocation(directPass->shaderProgram, "SCREEN_H"), SCREEN_H);
+            glUniform1i(glGetUniformLocation(directPass->shaderProgram, "selectedInstanceIndex"),
+                        renderPass->query_instanceIndex(TinyUI::selectedInstance));
         }
-        directPass->draw(curFrame.colorGBufferSSBO);
+        directPass->draw(curFrame);
 
         back_projection = camera->projection() * camera->w2v_matrix();
 

@@ -5,7 +5,7 @@
 #include "Intersection.h"
 
 
-float Intersection::rayIntersectTriangle(Ray &ray, Triangle &tri) {
+bool Intersection::rayIntersectTriangle(Ray &ray, Triangle &tri, float &tnear) {
     vec3 E1 = tri.vertex[1] - tri.vertex[0];
     vec3 E2 = tri.vertex[2] - tri.vertex[0];
     vec3 S = ray.ori - tri.vertex[0];
@@ -16,14 +16,12 @@ float Intersection::rayIntersectTriangle(Ray &ray, Triangle &tri) {
     float u = dot(S1, S) * k;
     float v = dot(S2, ray.dir) * k;
 
-    bool exist = (0.001 < t && 0 < u && 0 < v && u + v < 1);
-
-    if(!exist) return -1;
-    else return t;
+    tnear = t;
+    return (0.001 < t && 0 < u && 0 < v && u + v < 1);
 }
 
-float Intersection::rayIntersectAABB(Ray &ray, AABB &aabb) {
-    float tmi = 0, tmx = INF;
+bool Intersection::rayIntersectAABB(Ray &ray, AABB &aabb, float &tnear) {
+    float tmi = -INF, tmx = INF;
     vec3 t1 = (aabb.mi - ray.ori) / ray.dir;
     vec3 t2 = (aabb.mx - ray.ori) / ray.dir;
     tmi = max(tmi, min(t1.x, t2.x));
@@ -33,6 +31,7 @@ float Intersection::rayIntersectAABB(Ray &ray, AABB &aabb) {
     tmx = min(tmx, max(t1.y, t2.y));
     tmx = min(tmx, max(t1.z, t2.z));
 
-    if(tmi < tmx + 0.001) return tmi;
-    else return -1;
+    tnear = tmi;
+    return tmx >= tmi && tmx >= 0;
 }
+

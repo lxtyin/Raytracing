@@ -129,6 +129,7 @@ void TinyUI::insert_configuration() {
 
 void TinyUI::selectInstance(Instance *instance) {
     selectedInstance = instance;
+    if(instance == nullptr) return;
     Instance *ptr = instance;
     while(ptr) {
         toopenList.insert(ptr);

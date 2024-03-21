@@ -18,7 +18,7 @@ layout(binding = 2, std430) readonly buffer ssbo2 {
     float normalGBuffer[];
 };
 layout(binding = 3, std430) readonly buffer ssbo3 {
-    float meshIndexGBuffer[];
+    float instanceIndexGBuffer[];
 };
 layout(binding = 4, std430) readonly buffer ssbo4 {
     float motionGBuffer[];
@@ -50,7 +50,7 @@ bool geometry_test(uint ptr1, uint ptr2) {
         normalGBuffer[ptr1 * 3 + 1],
         normalGBuffer[ptr1 * 3 + 2]
     );
-    float id1 = meshIndexGBuffer[ptr1];
+    float id1 = instanceIndexGBuffer[ptr1];
     vec3 normal2 = vec3(
         historyNormalGBuffer[ptr2 * 3 + 0],
         historyNormalGBuffer[ptr2 * 3 + 1],
@@ -136,7 +136,7 @@ void main() {
     }
     mu /= nv;
     var = var / nv - mu * mu;
-    vec3 sigma = sqrt(var) * 2;
+    vec3 sigma = sqrt(var);
 
     // Temporal accumulation
     vec2 last_uv = screen_uv - motion;

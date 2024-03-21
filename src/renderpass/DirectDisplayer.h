@@ -12,7 +12,7 @@ class DirectDisplayer: public VertexFragmentRenderPass {
 public:
     DirectDisplayer(const string &fragShaderPath);
 
-    void draw(GLuint targetSSBO);
+    void draw(GBuffer &curFrame);
 };
 
 

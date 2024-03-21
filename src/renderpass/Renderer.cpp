@@ -126,9 +126,9 @@ void Renderer::reload_triangles(Scene *scene) {
 }
 
 void Renderer::reload_sceneBVH(Scene *scene) {
-    std::map<Instance*, uint> instanceIndexMap;
     std::set<Mesh*> meshes;
     std::map<Mesh*, uint> meshIndexMap;
+    instanceIndexMap.clear();
 
     for(int i = 0;i < scene->allMeshes.size();i++) {
         Instance* ist = scene->allMeshes[i].first;
@@ -206,7 +206,7 @@ void Renderer::draw(GBuffer &gbuffer) {
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 9, gbuffer.motionGBufferSSBO);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 10, gbuffer.albedoGBufferSSBO);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 11, gbuffer.momentGBufferSSBO);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 12, gbuffer.meshIndexGBufferSSBO);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 12, gbuffer.instanceIndexGBufferSSBO);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 13, gbuffer.numSamplesGBufferSSBO);
 
 
@@ -230,3 +230,9 @@ void Renderer::draw(GBuffer &gbuffer) {
 }
 
 Renderer::Renderer(const string &shaderPath): VertexFragmentRenderPass(shaderPath) {}
+
+
+int Renderer::query_instanceIndex(Instance *instance) {
+    if(!instanceIndexMap.count(instance)) return -1;
+    return instanceIndexMap[instance];
+}

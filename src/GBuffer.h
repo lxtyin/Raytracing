@@ -19,7 +19,7 @@ public:
     GLuint motionGBufferSSBO;          // 2, motion in screen space ([0, 1]^2).
     GLuint albedoGBufferSSBO;
     GLuint momentGBufferSSBO;
-    GLuint meshIndexGBufferSSBO;
+    GLuint instanceIndexGBufferSSBO;
     GLuint numSamplesGBufferSSBO;
 
     void copyFrom(GBuffer *buffer); // copy data from another GBuffer
