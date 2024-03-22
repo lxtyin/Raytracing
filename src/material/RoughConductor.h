@@ -14,8 +14,9 @@ class RoughConductor: public Material {
 public:
     int materialType = 1;
 
-    vec3 albedo = vec3(0.5);
+    vec3 albedo = vec3(0.5); // as albedo of diffuse and F0 of metal part.
     float roughness = 0.5;
+    float metallic = 0.5;
     Texture *albedo_map = nullptr;
 
     int material_type() override;

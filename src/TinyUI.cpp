@@ -87,7 +87,7 @@ void TinyUI::insert_instance_Editor(Instance *u) {
             static ImGuiComboFlags flags = ImGuiComboFlags_HeightSmall | ImGuiComboFlags_PopupAlignLeft;
 
             const char* items[] = { "RoughConductor", "RoughDielectric"};
-            static int item_current_idx = u->mesh->material->material_type() - 1;
+            int item_current_idx = u->mesh->material->material_type() - 1;
             const char* combo_preview_value = items[item_current_idx];
 
             if (ImGui::BeginCombo("Type", combo_preview_value, flags)) {

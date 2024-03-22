@@ -13,6 +13,7 @@ class RoughDielectric: public Material {
 public:
     vec3 albedo = vec3(0.5);
     float roughness = 0.5;
+    float metallic = 0.5;
     Texture *albedo_map = nullptr;
     float interiorIOR = 1.3; // consider exterior_ior = 1.0, eta = interior_ior / exterior_ior
 

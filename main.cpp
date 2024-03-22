@@ -307,12 +307,10 @@ void init_scene() {
 //        o2->transform.scale = vec3(10);
 //        scene->add_child(o2);
 
-//        Instance *light= AssimpLoader::load_model("model/light.obj");
-//        light->transform.scale = vec3(30, 30, 30);
-//        light->transform.position = vec3(0, 100, 0);
-//        light->get_child(0)->meshes[0]->material->emission = vec3(5);
-//        light->get_child(0)->meshes[0]->material->is_emit = true;
-//        scene->add_child(light);
+        Instance *light= AssimpLoader::load_model("model/light.obj");
+        light->transform.scale = vec3(30, 30, 30);
+        light->transform.position = vec3(0, 10, 0);
+        scene->add_child(light);
     }
 
 	skybox = new Skybox("hdrs/kloofendal_48d_partly_cloudy_puresky_2k.hdr");

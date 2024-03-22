@@ -22,9 +22,9 @@ void TAA::draw(GBuffer &curFrame, bool saveFrame) {
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, history.colorGBufferSSBO);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, curFrame.motionGBufferSSBO);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, curFrame.normalGBufferSSBO);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 4, curFrame.meshIndexGBufferSSBO);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 4, curFrame.instanceIndexGBufferSSBO);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 5, history.normalGBufferSSBO);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 6, history.meshIndexGBufferSSBO);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 6, history.instanceIndexGBufferSSBO);
 
     glBindVertexArray(VAO);
     glDrawArrays(GL_TRIANGLES, 0, 6);

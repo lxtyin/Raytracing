@@ -51,6 +51,9 @@ namespace AssimpLoader{
         if(AI_SUCCESS == mat->Get(AI_MATKEY_ROUGHNESS_FACTOR, res)){
             result->roughness = std::max(0.001f, res);
         }
+        if(AI_SUCCESS == mat->Get(AI_MATKEY_METALLIC_FACTOR, res)){
+            result->metallic = res;
+        }
         if(AI_SUCCESS == mat->Get(AI_MATKEY_TEXTURE(aiTextureType_BASE_COLOR, 0), str)){
             result->albedo_map = processImage(str.C_Str(), scene);
         }

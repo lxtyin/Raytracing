@@ -5,6 +5,7 @@
 #include "RoughConductor.h"
 #include "imgui/imgui.h"
 #include "../tool/tool.h"
+#include <iostream>
 #include <map>
 
 void RoughConductor::insert_gui() {
@@ -12,7 +13,8 @@ void RoughConductor::insert_gui() {
     ImGui::ColorEdit3("albedo", col1);
     albedo = {col1[0], col1[1], col1[2]};
 
-    ImGui::DragFloat("roughness", &roughness, 0.005, 0.001, 1, "%.3f");
+    ImGui::SliderFloat("roughness", &roughness, 0.001, 1, "%.3f");
+    ImGui::SliderFloat("metallic", &metallic, 0, 1, "%.3f");
 
     if(albedo_map) {
         ImGui::Text("Albedo map");
@@ -28,6 +30,7 @@ int RoughConductor::insert_buffer(std::vector<float> &materialBuffer, const std:
     materialBuffer.emplace_back(albedo.y);
     materialBuffer.emplace_back(albedo.z);
     materialBuffer.emplace_back(roughness);
+    materialBuffer.emplace_back(metallic);
     if(albedo_map) {
         materialBuffer.emplace_back((float)textureIndexMap.at(albedo_map));
     } else materialBuffer.emplace_back(-1.0f);
