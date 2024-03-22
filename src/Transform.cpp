@@ -84,14 +84,16 @@ bool Transform::operator ==(const Transform& t) const {
 
 void Transform::insert_gui() {
     float p[3] = { position.x, position.y, position.z };
-    ImGui::SliderFloat3("position", p, -10, 10, "%.2f");
+    ImGui::DragFloat3("position", p, 1.0, -1000, 1000, "%.2f");
     position = vec3(p[0], p[1], p[2]);
 
     float r[3] = { rotation.x, rotation.y, rotation.z };
-    ImGui::SliderFloat3("rotation", r, -180, 180, "%.2f");
+    ImGui::DragFloat3("rotation", r, 1.0, -1000, 1000, "%.2f");
     rotation = vec3(r[0], r[1], r[2]);
 
     float s[3] = { scale.x, scale.y, scale.z };
-    ImGui::SliderFloat3("scale", s, -10, 10, "%.2f");
+    ImGui::DragFloat3("scale", s, 0.1, -1000, 1000, "%.2f");
     scale = vec3(s[0], s[1], s[2]);
+
+    // TODO: R + S -> nan ?
 }

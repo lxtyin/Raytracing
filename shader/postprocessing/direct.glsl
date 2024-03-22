@@ -28,11 +28,11 @@ void main() {
         int instanceIndex = int(instanceIndexGBuffer[pixelPtr] + 0.01);
 
         if(instanceIndex == selectedInstanceIndex) {
-            if((pixelIndex.x + pixelIndex.y) % 10 == 0)
-                outputcolor = vec3(255, 175, 69) / 255;
+//            if((pixelIndex.x + pixelIndex.y) % 10 == 0)
+//                outputcolor = vec3(255, 175, 69) / 255;
         } else {
-            for(int i = 0;i < 9;i++) {
-                ivec2 index = pixelIndex + ivec2(i / 3 - 1, i % 3 - 1);
+            for(int i = 0;i < 25;i++) {
+                ivec2 index = pixelIndex + ivec2(i / 5 - 2, i % 5 - 2);
                 if(index.x < 0 || index.x >= SCREEN_W || index.y < 0 || index.y >= SCREEN_H) continue;
                 int ptr = index.y * SCREEN_W + index.x;
 

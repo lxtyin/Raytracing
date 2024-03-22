@@ -10,8 +10,10 @@ void RoughDielectric::insert_gui() {
     ImGui::ColorEdit3("albedo", col1);
     albedo = {col1[0], col1[1], col1[2]};
 
-    ImGui::SliderFloat("roughness", &roughness, 0.001, 1);
-    ImGui::SliderFloat("interiorIOR", &interiorIOR, 1.0, 3.0);
+
+    ImGui::DragFloat("roughness", &roughness, 0.005, 0.001, 1, "%.3f");
+    ImGui::DragFloat("interiorIOR", &interiorIOR, 0.1, 1.0, 3.0, "%.2f");
+
 
     if(albedo_map) {
         ImGui::Text("Albedo map");

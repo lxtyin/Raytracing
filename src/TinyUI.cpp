@@ -29,7 +29,7 @@ void TinyUI::update(Scene *scene, float fps) {
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
 
-//    ImGui::ShowDemoWindow(&showUI);
+    ImGui::ShowDemoWindow(&showUI);
     if (showUI) {
         ImGui::Begin("Hierarchy", &showUI);
         insert_instance_Hierarchy(scene);

@@ -232,9 +232,7 @@ void intersect_meshBVH(int root, int instanceIndex, Ray _ray, inout Intersection
     stack[++stack_h] = root;
 
     mat4 w2l = instanceInfoBuffer[instanceIndex].world2local;
-    mat3 rot = mat3(normalize(w2l[0].xyz),
-                    normalize(w2l[1].xyz),
-                    normalize(w2l[2].xyz));
+    mat3 rs = mat3(w2l);
 
     Ray ray;
     ray.ori = (w2l * vec4(_ray.ori, 1)).xyz;
@@ -248,8 +246,8 @@ void intersect_meshBVH(int root, int instanceIndex, Ray _ray, inout Intersection
             // leaf
             Intersection isect = intersect_triangle(ray, cur.triangleIndex);
             if(isect.exist && isect.t < result.t){
-                //                // M^-1 * v = M^T * v -> v * M
-                isect.normal = isect.normal * rot;
+                // (l2w^-1)^T * V = w2l^T * V -> V * l2w
+                isect.normal = normalize(isect.normal * rs);
                 isect.position = _ray.ori + isect.t * _ray.dir;
                 result = isect;
                 result.instanceIndex = instanceIndex;

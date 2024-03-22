@@ -12,7 +12,7 @@ void RoughConductor::insert_gui() {
     ImGui::ColorEdit3("albedo", col1);
     albedo = {col1[0], col1[1], col1[2]};
 
-    ImGui::SliderFloat("roughness", &roughness, 0.001, 1);
+    ImGui::DragFloat("roughness", &roughness, 0.005, 0.001, 1, "%.3f");
 
     if(albedo_map) {
         ImGui::Text("Albedo map");
