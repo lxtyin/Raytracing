@@ -21,12 +21,14 @@ class Config {
 	static int SPP;
 	static bool useTAA;
     static bool useTemporalFilter;
+    static bool useStaticBlender;
 	static int filterLevel;
 };
 
 inline int Config::SPP = 1;
 inline bool Config::useTAA = false;
 inline bool Config::useTemporalFilter = false;
+inline bool Config::useStaticBlender = false;
 inline int Config::filterLevel = 0;
 
 

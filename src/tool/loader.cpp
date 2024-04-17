@@ -52,7 +52,7 @@ namespace AssimpLoader{
             result->roughness = std::max(0.001f, res);
         }
         if(AI_SUCCESS == mat->Get(AI_MATKEY_METALLIC_FACTOR, res)){
-            result->metallic = res;
+            result->metallic = 1.0;
         }
         if(AI_SUCCESS == mat->Get(AI_MATKEY_TEXTURE(aiTextureType_BASE_COLOR, 0), str)){
             result->albedo_map = processImage(str.C_Str(), scene);
@@ -67,7 +67,6 @@ namespace AssimpLoader{
         std::vector<vec2> uvs;
         std::vector<vec3> normals;
         std::vector<Triangle> triangles;
-
 
         for(int i = 0; i < mesh->mNumVertices; i++){
             float tex[2] = {0, 0};

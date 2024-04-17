@@ -8,6 +8,7 @@
 #include "src/renderpass/TAA.h"
 #include "src/renderpass/SVGFTemporalFilter.h"
 #include "src/renderpass/FilterPass.h"
+#include "src/renderpass/StaticBlender.h"
 #include "src/tool/tool.h"
 #include "src/Config.h"
 #include "src/tool/loader.h"
@@ -17,7 +18,6 @@
 #include <opencv2/opencv.hpp>
 #include "src/TinyUI.h"
 using namespace std;
-
 
 /**
  * TODO
@@ -42,6 +42,7 @@ FilterPass *filterPass;
 ToneMappingGamma *mappingPass;
 SVGFTemporalFilter *svgfTemporalFilterPass;
 TAA *taaPass;
+StaticBlender *staticBlenderPass;
 DirectDisplayer *directPass;
 
 // ----
@@ -151,13 +152,13 @@ void update(float dt) {
         {
             renderPass->bind_texture("skybox", skybox->textureObject, 0);
             renderPass->bind_texture("skybox_samplecache", skybox->skyboxsamplerObject, 1);
+            glUniform1f(glGetUniformLocation(renderPass->shaderProgram, "skybox_Light_SUM"), skybox->lightSum);
             glUniformMatrix4fv(glGetUniformLocation(renderPass->shaderProgram, "v2wMat"), 1, GL_FALSE, glm::value_ptr(camera->v2w_matrix()));
             glUniform1i(glGetUniformLocation(renderPass->shaderProgram, "SPP"), Config::SPP);
             glUniform1i(glGetUniformLocation(renderPass->shaderProgram, "SCREEN_W"), SCREEN_W);
             glUniform1i(glGetUniformLocation(renderPass->shaderProgram, "SCREEN_H"), SCREEN_H);
             glUniform1i(glGetUniformLocation(renderPass->shaderProgram, "MAX_DEPTH"), 2);
             glUniform1ui(glGetUniformLocation(renderPass->shaderProgram, "frameCounter"), frameCounter);
-            glUniform1f(glGetUniformLocation(renderPass->shaderProgram, "skybox_Light_SUM"), skybox->lightSum);
             glUniform1f(glGetUniformLocation(renderPass->shaderProgram, "fov"), SCREEN_FOV);
             glUniform1i(glGetUniformLocation(renderPass->shaderProgram, "SKY_W"), skybox->width);
             glUniform1i(glGetUniformLocation(renderPass->shaderProgram, "SKY_H"), skybox->height);
@@ -165,6 +166,15 @@ void update(float dt) {
 //            glUniform1i(glGetUniformLocation(renderPass->shaderProgram, "suppleTrace"), false);
         }
         renderPass->draw(curFrame);
+
+        if(Config::useStaticBlender) {
+            staticBlenderPass->use();
+            {
+                glUniform1i(glGetUniformLocation(staticBlenderPass->shaderProgram, "SCREEN_W"), SCREEN_W);
+                glUniform1i(glGetUniformLocation(staticBlenderPass->shaderProgram, "SCREEN_H"), SCREEN_H);
+            }
+            staticBlenderPass->draw(curFrame);
+        }
 
         if(Config::useTemporalFilter) {
             svgfTemporalFilterPass->use();
@@ -218,12 +228,6 @@ void update(float dt) {
     }
     //--------------------------------------
 
-	// Menu
-	if(glfwGetKeyDown(window, GLFW_KEY_E)) {
-        //TODO just debug
-        TinyUI::selectInstance(scene->get_child(1)->get_child(0));
-	}
-
 	// Output camera pose
 	if(glfwGetKeyDown(window, GLFW_KEY_P)) {
 		Transform t = camera->transform;
@@ -232,7 +236,7 @@ void update(float dt) {
 		cout << "Rotation: " << t.rotation[0] << ", " << t.rotation[1] << ", " << t.rotation[2] << '\n';
 	}
 
-	Transform before = camera->transform;
+	Transform previousCameraTransform = camera->transform;
 
 	// screen shot.
 	if(glfwGetKeyDown(window, GLFW_KEY_T)) {
@@ -263,8 +267,13 @@ void update(float dt) {
 
     if(glfwGetKey(window, GLFW_KEY_SPACE)) camera->transform.position += vec3(0, speed * dt, 0);
     if(glfwGetKey(window, GLFW_KEY_LEFT_SHIFT))  camera->transform.position += vec3(0, -speed * dt, 0);
-	if(glfwGetKey(window, GLFW_KEY_Q)) glfwSetWindowShouldClose(window, GL_TRUE);
+	if(glfwGetKey(window, GLFW_KEY_ESCAPE)) glfwSetWindowShouldClose(window, GL_TRUE);
 
+    // TODO: if updated.
+    if(!(camera->transform == previousCameraTransform)) {
+        staticBlenderPass->frameCounter = 0;
+//        taaPass->firstFrame = true;
+    }
 }
 
 void init_scene() {
@@ -276,6 +285,7 @@ void init_scene() {
     mappingPass    = new ToneMappingGamma("shader/postprocessing/ToneMappingGamma.glsl");
     taaPass    = new TAA("shader/postprocessing/TAA.glsl");
     directPass    = new DirectDisplayer("shader/postprocessing/direct.glsl");
+    staticBlenderPass = new StaticBlender("shader/postprocessing/StaticBlender.glsl");
 //    pass_mix = new RenderPass("shader/postprocessing/mixAndMap.frag", 0, true);
 
 //    renderPass    = new Renderer("shader/pathtracing2024.frag", 4);

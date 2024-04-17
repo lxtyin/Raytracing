@@ -22,7 +22,6 @@ vec3 eval_RoughConductor(in BSDFQueryRecord bRec) {
     float k = pow2(alpha + 1) / 8;
     float Gi4io = 0.25 / ((bRec.wi.z * (1 - k) + k) * (bRec.wo.z * (1 - k) + k));
 
-
     float FL = pow5(1 - bRec.wi.z), FV = pow5(1 - bRec.wo.z);
     float Fd90 = 0.5 + 2 * pow2(LdotH) * alpha;
     float Fd = mix(1.0f, Fd90, FL) * mix(1.0f, Fd90, FV);

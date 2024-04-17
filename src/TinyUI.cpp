@@ -123,11 +123,16 @@ void TinyUI::insert_configuration() {
 
     ImGui::Checkbox("Use TAA", &Config::useTAA);
     ImGui::Checkbox("Use TemporalFilter", &Config::useTemporalFilter);
+    ImGui::Checkbox("Use StaticBlender", &Config::useStaticBlender);
     ImGui::SliderInt("Filter Level", &Config::filterLevel, 0, 5);
     ImGui::SliderInt("Samples per pixel", &Config::SPP, 1, 16);
 }
 
 void TinyUI::selectInstance(Instance *instance) {
+    if(selectedInstance == instance) {
+        selectedInstance = nullptr;
+        return;
+    }
     selectedInstance = instance;
     if(instance == nullptr) return;
     Instance *ptr = instance;
