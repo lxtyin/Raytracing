@@ -23,21 +23,25 @@ void ResourceManager::add_mesh(Mesh *y) {
     assert(!meshIndexMap.count(y));
     meshIndexMap[y] = (int)meshes.size();
     meshes.push_back(y);
+    reload_meshes();
 }
 void ResourceManager::del_mesh(Mesh *y) {
     assert(meshIndexMap.count(y));
     meshes[meshIndexMap[y]] = nullptr;
     meshIndexMap[y] = 0;
+    reload_meshes();
 }
 void ResourceManager::add_texture(Texture *y) {
     assert(!textureIndexMap.count(y));
     textureIndexMap[y] = (int)textures.size();
     textures.push_back(y);
+    reload_textures();
 }
 void ResourceManager::del_texture(Texture *y) {
     assert(textureIndexMap.count(y));
     textures[textureIndexMap[y]] = nullptr;
     textureIndexMap[y] = 0;
+    reload_textures();
 }
 
 void ResourceManager::update_globalinstance(Scene *scene) {
@@ -61,6 +65,7 @@ void ResourceManager::update_globalinstance_recursive(Instance *cur, mat4 transf
 void ResourceManager::reload_textures() {
     auto tmp = textures;
     textures.clear();
+    textureIndexMap.clear();
     for(Texture *t: tmp) if(t) {
         textureIndexMap[t] = textures.size();
         textures.push_back(t);
@@ -143,6 +148,8 @@ void ResourceManager::reload_meshes() {
 }
 
 void ResourceManager::reload_instances() {
+    materialBuffer.clear();
+    instanceInfoBuffer.clear();
     for(auto &[u, mat]: globalInstances) {
         assert(u->mesh);
         assert(u->material);
@@ -185,7 +192,6 @@ void ResourceManager::reload_sceneBVH(BVHNode *root) {
             y.aa = vec4(p->aabb.mi, 0);
             y.bb = vec4(p->aabb.mx, 0);
             y.instanceIndex = instanceIndexMap[p->instancePtr];
-            y.lsIndex = meshIndexMap[p->instancePtr->mesh];
             sceneBVHBuffer.push_back(y);
             continue;
         }

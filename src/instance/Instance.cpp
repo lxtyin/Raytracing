@@ -27,7 +27,7 @@ void Instance::set_parent(Instance *p) {
         }
     }
     parent = p;
-    p->children.push_back(this);
+    if(p) p->children.push_back(this);
 }
 
 int Instance::add_child(Instance *cd) {
@@ -38,4 +38,12 @@ int Instance::add_child(Instance *cd) {
 mat4 Instance::matrix_to_global() {
 	if(parent == nullptr) return transform.matrix();
 	return parent->matrix_to_global() * transform.matrix();
+}
+
+Instance::~Instance() {
+    for(auto it: children) {
+        it->parent = nullptr;
+        delete it;
+    }
+    if(parent) set_parent(nullptr);
 }

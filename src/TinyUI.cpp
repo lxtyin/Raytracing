@@ -14,6 +14,7 @@
 bool TinyUI::showUI = true;
 Instance* TinyUI::selectedInstance = nullptr;
 std::set<Instance*> TinyUI::toopenList;
+std::set<Instance*> TinyUI::toeraseList;
 
 void TinyUI::init(GLFWwindow *window) {
     IMGUI_CHECKVERSION();
@@ -67,24 +68,33 @@ void TinyUI::insert_instance_Hierarchy(Instance *u) {
 
     bool node_open = ImGui::TreeNodeEx((void*)u, node_flags, u->name.c_str());
     if(ImGui::IsItemClicked(0) || ImGui::IsItemClicked(1)) selectedInstance = u;
-    if (ImGui::BeginPopupContextWindow()) {
+
+    if (ImGui::BeginPopupContextItem()) {
         if(ImGui::Button("Import")) {
             string dir = show_file_open_dialog();
             Instance *nw = AssimpLoader::load_model(dir);
             if(nw) {
-//                renderPass
                 u->add_child(nw);
-                ResourceManager::manager->reload_textures();
-                ResourceManager::manager->reload_meshes();
+                ResourceManager::manager->reload_scene(Scene::main_scene);
             }
+            ImGui::CloseCurrentPopup();
         }
-        ImGui::Button("Delete");
+        if(ImGui::Button("Delete")) {
+            selectInstance(nullptr);
+            toeraseList.insert(u);
+            ImGui::CloseCurrentPopup();
+        }
         ImGui::EndPopup();
     }
 
     if(node_open) {
         for(auto *cd: u->children) {
-            insert_instance_Hierarchy(cd);
+            if(toeraseList.count(cd)) {
+                toeraseList.erase(cd);
+                delete cd;
+            } else {
+                insert_instance_Hierarchy(cd);
+            }
         }
         ImGui::TreePop();
     }

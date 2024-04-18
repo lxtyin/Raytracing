@@ -17,6 +17,7 @@ private:
     static bool showUI;
 
     static std::set<Instance*> toopenList;
+    static std::set<Instance*> toeraseList;
 
     static void insert_instance_Hierarchy(Instance *u);
 

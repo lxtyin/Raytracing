@@ -329,8 +329,6 @@ void init_scene() {
 	camera->transform.position = vec3(-12.1396, 9.27221, 13.2912);
 	camera->transform.rotation = vec3(-26.19, -45.8484, 0);
 
-    ResourceManager::manager->reload_meshes();
-    ResourceManager::manager->reload_textures();
     ResourceManager::manager->reload_scene(scene);
 
     std::cout << "BVH size:" << scene->sceneBVHRoot->siz << std::endl;

@@ -25,6 +25,8 @@ public:
     Transform transform;                 /**< transform to parent. */
 
     Instance() = default;
+    ~Instance();
+
     explicit Instance(const string &nm, Instance *p = nullptr);
 
 	mat4 matrix_to_global(); // O(Hierarchy depth), not large
