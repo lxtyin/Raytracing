@@ -11,30 +11,12 @@ class BVHNode;
 
 class Scene: public Instance{
 
-    /**
-     * recursive load all meshes and get their transform2world.
-     */
-    void fetch_meshes(Instance* cur, mat4 transform2world, std::vector<std::pair<Instance*, mat4>> &allMeshes);
-
-    void build_sceneBVH();
-
 public:
-
     static Scene *main_scene;
-
-    /**
-     * All the meshes(instances) and it's matrix to global. This array is used for final rendering.
-     */
-    std::vector<std::pair<Instance*, mat4>> allMeshes;
 
     BVHNode* sceneBVHRoot = nullptr;
 
     explicit Scene(const string &nm);
-
-    /**
-     * update allMeshes and BVH.
-     */
-    void update();
 
     ~Scene();
 };

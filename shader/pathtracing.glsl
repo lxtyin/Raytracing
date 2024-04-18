@@ -50,7 +50,8 @@ Triangle get_triangle(int idx) {
 struct InstanceInfo {
     mat4 world2local;
     int materialPtr;
-    int emptyblock[11];
+    int meshIndex;
+    int emptyblock[10];
 };
 layout(binding = 3, std430) readonly buffer ssbo3 {
     InstanceInfo instanceInfoBuffer[];
@@ -223,7 +224,8 @@ Intersection intersect_triangle(Ray ray, int triangleIndex) {
 
 int stack_h = 0;
 int stack[256];
-void intersect_meshBVH(int root, int instanceIndex, Ray _ray, inout Intersection result) {
+void intersect_meshBVH(int instanceIndex, Ray _ray, inout Intersection result) {
+    int root = instanceInfoBuffer[instanceIndex].meshIndex;
     int starth = stack_h;
     stack[++stack_h] = root;
 
@@ -277,7 +279,7 @@ Intersection intersect_sceneBVH(Ray ray) {
         if(tnear > result.t) continue;
 
         if(cur.instanceIndex >= 0) {
-            intersect_meshBVH(cur.lsIndex, cur.instanceIndex, ray, result);
+            intersect_meshBVH(cur.instanceIndex, ray, result);
             continue;
         }
 
@@ -471,6 +473,10 @@ void main() {
         if(!isect.exist) {
             colorout += get_background_color(ray.dir);
         } else {
+//            vec3 albedo = vec3(materialBuffer[isect.materialPtr + 1],
+//                            materialBuffer[isect.materialPtr + 2],
+//                            materialBuffer[isect.materialPtr + 3]);
+//            colorout += albedo;
             colorout += shade(ray, isect);
         }
     }

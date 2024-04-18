@@ -28,11 +28,15 @@ namespace AssimpLoader{
             std::vector<uchar> data(width * height * channel);
             memcpy(data.data(), buff, data.size());
             stbi_image_free(buff);
-            return new Texture(width, height, channel, move(data));
+            Texture* texture = new Texture(width, height, channel, move(data));
+            ResourceManager::manager->add_texture(texture);
+            return texture;
         } else {
             // local image file.
             string path = directory + name;
-            return new Texture(path);
+            Texture* texture = new Texture(path);
+            ResourceManager::manager->add_texture(texture);
+            return texture;
         }
     }
 
@@ -92,6 +96,7 @@ namespace AssimpLoader{
         }
 
         Mesh *result = new Mesh(mesh->mName.C_Str(), std::move(triangles));
+        ResourceManager::manager->add_mesh(result);
         return result;
     }
 

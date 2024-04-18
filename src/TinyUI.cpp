@@ -9,6 +9,7 @@
 #include "instance/Mesh.h"
 #include "material/RoughConductor.h"
 #include "material/RoughDielectric.h"
+#include "ResourceManager.h"
 
 bool TinyUI::showUI = true;
 Instance* TinyUI::selectedInstance = nullptr;
@@ -59,6 +60,13 @@ void TinyUI::insert_instance_Hierarchy(Instance *u) {
     if(selectedInstance == u) node_flags |= ImGuiTreeNodeFlags_Selected;
     if(u->children.size() == 0) node_flags |= ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_Bullet;
 
+    if(toopenList.count(u)) {
+        toopenList.erase(u);
+        ImGui::SetNextItemOpen(true);
+    }
+
+    bool node_open = ImGui::TreeNodeEx((void*)u, node_flags, u->name.c_str());
+    if(ImGui::IsItemClicked(0) || ImGui::IsItemClicked(1)) selectedInstance = u;
     if (ImGui::BeginPopupContextWindow()) {
         if(ImGui::Button("Import")) {
             string dir = show_file_open_dialog();
@@ -66,21 +74,14 @@ void TinyUI::insert_instance_Hierarchy(Instance *u) {
             if(nw) {
 //                renderPass
                 u->add_child(nw);
+                ResourceManager::manager->reload_textures();
+                ResourceManager::manager->reload_meshes();
             }
         }
         ImGui::Button("Delete");
         ImGui::EndPopup();
-        selectedInstance = u;
-        node_flags |= ImGuiTreeNodeFlags_Selected;
     }
 
-    if(toopenList.count(u)) {
-        toopenList.erase(u);
-        ImGui::SetNextItemOpen(true);
-    }
-    bool node_open = ImGui::TreeNodeEx((void*)u, node_flags, u->name.c_str());
-
-    if(ImGui::IsItemClicked()) selectedInstance = u;
     if(node_open) {
         for(auto *cd: u->children) {
             insert_instance_Hierarchy(cd);

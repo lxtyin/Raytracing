@@ -137,8 +137,7 @@ void mouse_clickcalback(GLFWwindow* window, int button, int state, int mod) {
 
 void update(float dt) {
 
-    scene->update();
-    renderPass->reload_sceneinfos(scene);
+    ResourceManager::manager->reload_scene(scene);
 
 	static glm::mat4 back_projection = camera->projection() * camera->w2v_matrix();
     static GBuffer curFrame;
@@ -163,7 +162,6 @@ void update(float dt) {
             glUniform1i(glGetUniformLocation(renderPass->shaderProgram, "SKY_W"), skybox->width);
             glUniform1i(glGetUniformLocation(renderPass->shaderProgram, "SKY_H"), skybox->height);
             glUniformMatrix4fv(glGetUniformLocation(renderPass->shaderProgram, "backprojMat"), 1, GL_FALSE, glm::value_ptr(back_projection));
-//            glUniform1i(glGetUniformLocation(renderPass->shaderProgram, "suppleTrace"), false);
         }
         renderPass->draw(curFrame);
 
@@ -219,7 +217,7 @@ void update(float dt) {
             glUniform1i(glGetUniformLocation(directPass->shaderProgram, "SCREEN_W"), SCREEN_W);
             glUniform1i(glGetUniformLocation(directPass->shaderProgram, "SCREEN_H"), SCREEN_H);
             glUniform1i(glGetUniformLocation(directPass->shaderProgram, "selectedInstanceIndex"),
-                        renderPass->query_instanceIndex(TinyUI::selectedInstance));
+                        ResourceManager::manager->queryInstanceIndex(TinyUI::selectedInstance));
         }
         directPass->draw(curFrame);
 
@@ -293,6 +291,8 @@ void init_scene() {
 //    pass_fw  = new RenderPass("shader/postprocessing/filter_w.frag", 1);
 //	pass_fh  = new RenderPass("shader/postprocessing/filter_h.frag", 0, true);
 
+    ResourceManager::manager = new ResourceManager();
+
     Scene::main_scene = scene = new Scene("Scene");
     camera = new Camera(SCREEN_FOV, 1000);
     scene->add_child(camera);
@@ -328,8 +328,11 @@ void init_scene() {
     camera->transform.rotation.y = 180;
 	camera->transform.position = vec3(-12.1396, 9.27221, 13.2912);
 	camera->transform.rotation = vec3(-26.19, -45.8484, 0);
-    scene->update();
-    renderPass->reload_scene(scene);
+
+    ResourceManager::manager->reload_meshes();
+    ResourceManager::manager->reload_textures();
+    ResourceManager::manager->reload_scene(scene);
+
     std::cout << "BVH size:" << scene->sceneBVHRoot->siz << std::endl;
     std::cout << "BVH depth:" << scene->sceneBVHRoot->depth << std::endl;
 }
