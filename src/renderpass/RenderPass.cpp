@@ -1,7 +1,6 @@
 //
 // Created by lx_tyin on 2023/2/23.
 //
-
 #include "../Config.h"
 #include "../tool/tool.h"
 #include "RenderPass.h"
@@ -73,6 +72,7 @@ void VertexFragmentRenderPass::init_shader(const string &fragShaderPath) {
     glGetProgramiv(shaderProgram, GL_LINK_STATUS, &success);
     if(!success){
         glGetProgramInfoLog(shaderProgram, 1024, nullptr, infoLog);
+        save_file(fragShaderPath + ".unfold", fragmentShaderCode);
         std::cerr << "RenderPass: " << fragShaderPath << " link failed: " << infoLog << std::endl;
     }
     glDeleteShader(vertexShader);

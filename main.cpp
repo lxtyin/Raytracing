@@ -293,7 +293,7 @@ void init_scene() {
 //    pass_fw  = new RenderPass("shader/postprocessing/filter_w.frag", 1);
 //	pass_fh  = new RenderPass("shader/postprocessing/filter_h.frag", 0, true);
 
-    scene = new Scene("Scene");
+    Scene::main_scene = scene = new Scene("Scene");
     camera = new Camera(SCREEN_FOV, 1000);
     scene->add_child(camera);
     {

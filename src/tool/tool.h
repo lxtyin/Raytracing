@@ -18,6 +18,18 @@ string read_file(const string &path);
 
 string read_shader(const string &path);
 
+void save_file(const string &path, const string &info);
+
 string localtimestring();
 
 void copySSBO(GLuint frm, GLuint tar, uint siz);
+
+
+string show_file_open_dialog() ;
+
+string show_save_dir_dialog() ;
+
+
+string show_file_open_dialog() ;
+
+string show_save_dir_dialog() ;

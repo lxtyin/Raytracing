@@ -11,7 +11,6 @@
 #include <string>
 using std::string;
 
-class Material;
 class BVHNode;
 
 class Mesh {
@@ -19,11 +18,7 @@ public:
     string name = "A Mesh";
     std::vector<Triangle> triangles;    /**< triangles in local space >**/
 
-    bool isEmitter = false;
-    vec3 emission = vec3(0.0);
-
     BVHNode *meshBVHRoot;
-    Material *material;        /**< material resource. */
 
     void build_meshBVH();
 

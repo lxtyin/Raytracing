@@ -7,7 +7,7 @@ float sobol(uint d, uint i) {
     uint r = 0;
     uint offset = d * 32;
     for(uint j = 0; i != 0; i >>= 1, j++) {
-        if((i & 1) != 0) r ^= V[offset+j];
+        if((i & 1u) != 0) r ^= V[offset+j];
     }
     return float(r) * inv32;
 //    return r * 1.0 / (1u << 32);

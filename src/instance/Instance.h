@@ -9,6 +9,7 @@
 #include <vector>
 
 class Mesh;
+class Material;
 
 class Instance {
 protected:
@@ -18,8 +19,9 @@ protected:
     std::vector<Instance*> children;
 
 public:
-    Mesh* mesh = nullptr;
     string name = "A Instance";
+    Mesh* mesh = nullptr;
+    Material *material = nullptr;
     Transform transform;                 /**< transform to parent. */
 
     Instance() = default;

@@ -58,6 +58,10 @@ namespace AssimpLoader{
             result->albedo_map = processImage(str.C_Str(), scene);
         }
 
+        if(AI_SUCCESS == mat->Get(AI_MATKEY_EMISSIVE_INTENSITY, color)) {
+            // TODO: emitter
+
+        }
         return result;
     }
 
@@ -88,16 +92,6 @@ namespace AssimpLoader{
         }
 
         Mesh *result = new Mesh(mesh->mName.C_Str(), std::move(triangles));
-        if(mesh->mMaterialIndex >= 0){
-            aiMaterial *mat = scene->mMaterials[mesh->mMaterialIndex];
-            result->material = processMaterial(mat, scene);
-
-            aiColor3D color;
-            if(AI_SUCCESS == mat->Get(AI_MATKEY_EMISSIVE_INTENSITY, color)) {
-                result->isEmitter = true;
-                result->emission = vec3(color.r, color.g, color.b);
-            }
-        }
         return result;
     }
 
@@ -115,6 +109,11 @@ namespace AssimpLoader{
         if(node->mNumMeshes == 1) {
             aiMesh *mesh = scene->mMeshes[node->mMeshes[0]];
             cur->mesh = processMesh(mesh, scene);
+
+            if(mesh->mMaterialIndex >= 0){
+                aiMaterial *mat = scene->mMaterials[mesh->mMaterialIndex];
+                cur->material = processMaterial(mat, scene);
+            }
         }
 //        for(int i = 0; i < node->mNumMeshes; i++) {
 //            aiMesh *mesh = scene->mMeshes[node->mMeshes[i]];

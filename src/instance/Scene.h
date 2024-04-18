@@ -20,6 +20,8 @@ class Scene: public Instance{
 
 public:
 
+    static Scene *main_scene;
+
     /**
      * All the meshes(instances) and it's matrix to global. This array is used for final rendering.
      */

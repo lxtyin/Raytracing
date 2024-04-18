@@ -8,7 +8,7 @@
 #include "Texture.h"
 
 
-class HDRTexture: public GPUResource {
+class HDRTexture {
 public:
     int width;
     int height;

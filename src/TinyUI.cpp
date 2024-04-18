@@ -5,6 +5,7 @@
 #include "TinyUI.h"
 #include "imgui/imgui.h"
 #include "tool/tool.h"
+#include "tool/loader.h"
 #include "instance/Mesh.h"
 #include "material/RoughConductor.h"
 #include "material/RoughDielectric.h"
@@ -22,7 +23,6 @@ void TinyUI::init(GLFWwindow *window) {
     ImGui_ImplGlfw_InitForOpenGL(window, true);
     ImGui_ImplOpenGL3_Init("#version 130");
 }
-
 
 void TinyUI::update(Scene *scene, float fps) {
     ImGui_ImplOpenGL3_NewFrame();
@@ -59,6 +59,21 @@ void TinyUI::insert_instance_Hierarchy(Instance *u) {
     if(selectedInstance == u) node_flags |= ImGuiTreeNodeFlags_Selected;
     if(u->children.size() == 0) node_flags |= ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_Bullet;
 
+    if (ImGui::BeginPopupContextWindow()) {
+        if(ImGui::Button("Import")) {
+            string dir = show_file_open_dialog();
+            Instance *nw = AssimpLoader::load_model(dir);
+            if(nw) {
+//                renderPass
+                u->add_child(nw);
+            }
+        }
+        ImGui::Button("Delete");
+        ImGui::EndPopup();
+        selectedInstance = u;
+        node_flags |= ImGuiTreeNodeFlags_Selected;
+    }
+
     if(toopenList.count(u)) {
         toopenList.erase(u);
         ImGui::SetNextItemOpen(true);
@@ -81,13 +96,13 @@ void TinyUI::insert_instance_Editor(Instance *u) {
         ImGui::SeparatorText("Mesh");
         ImGui::BulletText(str_format("%u triangles", u->mesh->triangles.size()).c_str());
 
-        if(u->mesh->material) {
+        if(u->material) {
             ImGui::SeparatorText("Material");
 
             static ImGuiComboFlags flags = ImGuiComboFlags_HeightSmall | ImGuiComboFlags_PopupAlignLeft;
 
             const char* items[] = { "RoughConductor", "RoughDielectric"};
-            int item_current_idx = u->mesh->material->material_type() - 1;
+            int item_current_idx = u->material->material_type() - 1;
             const char* combo_preview_value = items[item_current_idx];
 
             if (ImGui::BeginCombo("Type", combo_preview_value, flags)) {
@@ -98,10 +113,10 @@ void TinyUI::insert_instance_Editor(Instance *u) {
                         if(n == item_current_idx) continue;
                         else {
                             // update material;
-                            delete u->mesh->material;
+                            delete u->material;
 
-                            if(n == 0) u->mesh->material = new RoughConductor();
-                            else if(n == 1) u->mesh->material = new RoughDielectric();
+                            if(n == 0) u->material = new RoughConductor();
+                            else if(n == 1) u->material = new RoughDielectric();
                             else assert(false);
 
                             item_current_idx = n;
@@ -113,7 +128,7 @@ void TinyUI::insert_instance_Editor(Instance *u) {
                 ImGui::EndCombo();
             }
 
-            u->mesh->material->insert_gui();
+            u->material->insert_gui();
         }
     }
 }

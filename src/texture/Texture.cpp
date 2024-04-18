@@ -29,7 +29,6 @@ void Texture::load_to_gpu() {
 
     textureHandle = glGetTextureHandleARB(textureObject);
     glMakeTextureHandleResidentARB(textureHandle);
-    isonGPU = true;
 }
 
 
@@ -37,7 +36,6 @@ void Texture::unload_from_gpu() {
     glMakeTextureHandleNonResidentARB(textureHandle);
     glDeleteTextures(1, &textureObject);
     textureObject = textureHandle = 0;
-    isonGPU = false;
 }
 
 

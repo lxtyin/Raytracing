@@ -3,7 +3,7 @@
 
 #include "glad/glad.h"
 #include "stb_image.h"
-#include "../GPUResource.h"
+#include "../ResourceManager.h"
 #include <string>
 #include <vector>
 using std::string;
@@ -11,7 +11,7 @@ using uint = unsigned int;
 using uchar = unsigned char;
 
 // Store in texture space. (Quadrant 1)
-class Texture: public GPUResource {
+class Texture {
 public:
     GLuint textureObject = 0;
     GLuint64 textureHandle = 0;
@@ -21,8 +21,8 @@ public:
     int channel;
     std::vector<uchar> data;
 
-    virtual void load_to_gpu();
-    virtual void unload_from_gpu();
+    void load_to_gpu();
+    void unload_from_gpu();
 
     explicit Texture(const string &imagePath);
 

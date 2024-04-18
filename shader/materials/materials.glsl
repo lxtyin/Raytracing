@@ -93,7 +93,7 @@ float pdf_material(in BSDFQueryRecord bRec) {
     else return 0.0;
 }
 
-vec3 sample_material(in out BSDFQueryRecord bRec, out float pdf) {
+vec3 sample_material(inout BSDFQueryRecord bRec, out float pdf) {
     int type = roundint(materialBuffer[bRec.mptr]);
     if(type == 1) return sample_RoughConductor(bRec, pdf);
     else if(type == 2) return sample_RoughDielectric(bRec, pdf);
@@ -109,3 +109,5 @@ vec3 albedo_material(in BSDFQueryRecord bRec) {
     else if(type == 2) return albedo_RoughDielectric(bRec);
     else return vec3(0);
 }
+
+// TODO spj for emitter.

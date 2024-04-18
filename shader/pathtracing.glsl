@@ -49,7 +49,6 @@ Triangle get_triangle(int idx) {
 
 struct InstanceInfo {
     mat4 world2local;
-    vec4 emission; // emission.z = is_emission (-1 or 1)
     int materialPtr;
     int emptyblock[11];
 };
@@ -98,9 +97,6 @@ layout(binding = 13) buffer ssbo13 {
 
 
 // Input infos ===
-
-// In supple trace, adding samples until numSamples = SPP, only color and moment is updated.
-uniform bool suppleTrace;
 uniform mat4 v2wMat;
 uniform mat4 backprojMat; // Last frame matrix to project worldposition -> [-1, 1]
 uniform int MAX_DEPTH = 2;

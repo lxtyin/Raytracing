@@ -76,7 +76,7 @@ float pdf_RoughDielectric(in BSDFQueryRecord bRec) {
     return pdf * dwh_dwo;
 }
 
-vec3 sample_RoughDielectric(in out BSDFQueryRecord bRec, out float pdf) {
+vec3 sample_RoughDielectric(inout BSDFQueryRecord bRec, out float pdf) {
 
 //    bRec.wo = sample_uniformsphere(pdf);
 //    pdf = 0.25 * INV_PI;

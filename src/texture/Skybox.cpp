@@ -92,5 +92,4 @@ void Skybox::unload_from_gpu() {
     glDeleteTextures(1, &textureObject);
     glDeleteTextures(1, &skyboxsamplerObject);
     textureObject = skyboxsamplerObject = textureHandle = 0;
-    isonGPU = false;
 }

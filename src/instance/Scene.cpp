@@ -7,6 +7,7 @@
 #include "../BVH.h"
 #include <iostream>
 
+Scene* Scene::main_scene = nullptr;
 
 void Scene::fetch_meshes(Instance* cur, mat4 transform2world, std::vector<std::pair<Instance*, mat4>> &allMeshes) {
     if(cur->mesh) {

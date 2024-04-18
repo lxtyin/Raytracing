@@ -23,18 +23,17 @@ void Renderer::reload_meshInfos(Scene* scene) {
 
     for(auto &[u, mat]: scene->allMeshes) {
         assert(u->mesh);
-        assert(u->mesh->material);
-        auto umtexs = u->mesh->material->textures();
+        assert(u->material);
+        auto umtexs = u->material->textures();
         for(Texture *t: umtexs) {
             if(!textureIndexMap.count(t)) {
                 textureIndexMap[t] = textureHandlesBuffer.size();
                 textureHandlesBuffer.push_back(t->textureHandle);
             }
         }
-        int materialPtr = u->mesh->material->insert_buffer(materialBuffer, textureIndexMap);
+        int materialPtr = u->material->insert_buffer(materialBuffer, textureIndexMap);
         InstanceInfo y;
         y.world2local = glm::inverse(mat);
-        y.emission = vec4(u->mesh->emission, u->mesh->isEmitter ? 1 : -1);
         y.materialPtr = materialPtr;
         instanceInfoBuffer.push_back(y);
     }

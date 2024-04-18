@@ -39,7 +39,7 @@ float pdf_RoughConductor(in BSDFQueryRecord bRec) {
     return pdf / (4 * LdotH);
 }
 
-vec3 sample_RoughConductor(in out BSDFQueryRecord bRec, out float pdf) {
+vec3 sample_RoughConductor(inout BSDFQueryRecord bRec, out float pdf) {
     if(bRec.wi.z <= 0) {
         pdf = 0.0;
         return vec3(0.0);
