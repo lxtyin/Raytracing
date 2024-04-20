@@ -6,8 +6,9 @@
 #define PATH_TRACING_RESOURCEMANAGER_H
 
 
-#include "instance/Triangle.h"
 #include "glad/glad.h"
+#include "instance/Triangle.h"
+#include "Buffer.h"
 #include <vector>
 #include <string>
 #include <map>
@@ -64,14 +65,15 @@ class ResourceManager {
 
 public:
     static ResourceManager *manager;
-    ResourceManager();
 
-    GLuint textureHandleSSBO;
-    GLuint materialSSBO;
-    GLuint triangleSSBO;
-    GLuint instanceInfoSSBO;
-    GLuint meshBVHSSBO;
-    GLuint sceneBVHSSBO;
+    ~ResourceManager();
+
+    SSBOBuffer<GLuint64> textureHandleSSBO;
+    SSBOBuffer<float> materialSSBO;
+    SSBOBuffer<Triangle> triangleSSBO;
+    SSBOBuffer<InstanceInfo> instanceInfoSSBO;
+    SSBOBuffer<BVHNodeInfo> meshBVHSSBO;
+    SSBOBuffer<BVHNodeInfo> sceneBVHSSBO;
 
     void reload_textures();
     void reload_meshes();

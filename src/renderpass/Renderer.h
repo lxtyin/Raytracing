@@ -14,12 +14,20 @@ class Scene;
 class Instance;
 
 class Renderer: public VertexFragmentRenderPass {
-
 public:
+    SSBOBuffer<float> colorGBufferSSBO;
+    SSBOBuffer<float> normalGBufferSSBO;
+    SSBOBuffer<float> depthGBufferSSBO;
+    SSBOBuffer<float> motionGBufferSSBO;
+    SSBOBuffer<float> albedoGBufferSSBO;
+    SSBOBuffer<float> momentGBufferSSBO;
+    SSBOBuffer<float> instanceIndexGBufferSSBO;
+    SSBOBuffer<float> numSamplesGBufferSSBO;
 
     Renderer(const string &shaderPath);
+    ~Renderer();
 
-    void draw(GBuffer &gbuffer);
+    void draw();
 };
 
 

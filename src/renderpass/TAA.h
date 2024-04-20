@@ -9,17 +9,24 @@
 
 class TAA: public VertexFragmentRenderPass {
 public:
-    GBuffer history;
+
+    SSBOBuffer<float> historycolorGBufferSSBO;
+    SSBOBuffer<float> historynormalGBufferSSBO;
+    SSBOBuffer<float> historyinstanceIndexGBufferSSBO;
 
     bool firstFrame;
 
     TAA(const string &fragShaderPath);
+    ~TAA();
 
     /**
      * Note curFrame will be stolen if saveFrame = false;
      * \saveFrame set false only if it is the final pass.
      */
-    void draw(GBuffer &curFrame, bool saveFrame = true);
+    void draw(SSBOBuffer<float> &colorGBufferSSBO,
+              SSBOBuffer<float> &motionGBufferSSBO,
+              SSBOBuffer<float> &normalGBufferSSBO,
+              SSBOBuffer<float> &instanceIndexGBufferSSBO, bool saveFrame = true);
 };
 
 

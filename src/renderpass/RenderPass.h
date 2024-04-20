@@ -7,6 +7,7 @@
 
 #include "glad/glad.h"
 #include "../GBuffer.h"
+#include "../Buffer.h"
 #include <string>
 using std::string;
 
@@ -16,12 +17,13 @@ public:
 
     void use();
 
-    /** 将texture绑定到对应的uniform sampler变量上
+    /** 将texture绑定到对应的uniform sampler变量上 (old, tmp used)
      * \param name uniform variable
      * \param textureObject
      * \param targetId GL_TEXTURE0 + id
      */
     void bind_texture(const char *name, GLuint textureObject, int targetId, int type = GL_TEXTURE_2D);
+
 };
 
 class ComputeRenderPass: public RenderPass {
@@ -29,6 +31,8 @@ protected:
 
     ComputeRenderPass(const string &computeShaderPath);
     void init_shader(const string &computeShaderPath);
+
+    void drawcall();
 };
 
 class VertexFragmentRenderPass: public RenderPass {
@@ -37,6 +41,8 @@ public:
 
     VertexFragmentRenderPass(const string &fragShaderPath);
     void init_shader(const string &fragShaderPath);
+
+    void drawcall();
 };
 
 

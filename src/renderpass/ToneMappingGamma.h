@@ -12,7 +12,7 @@ public:
 
     ToneMappingGamma(const string &fragShaderPath);
 
-    void draw(GBuffer &curFrame);
+    void draw(SSBOBuffer<float> &colorGBufferSSBO);
 };
 
 

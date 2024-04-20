@@ -61,7 +61,6 @@ void ResourceManager::update_globalinstance_recursive(Instance *cur, mat4 transf
     }
 }
 
-
 void ResourceManager::reload_textures() {
     auto tmp = textures;
     textures.clear();
@@ -74,14 +73,7 @@ void ResourceManager::reload_textures() {
     textureHandlesBuffer.clear();
     for(Texture *t: textures) if(t) textureHandlesBuffer.push_back(t->textureHandle);
 
-    if(textureHandleSSBO) glDeleteBuffers(1, &textureHandleSSBO);
-    glCreateBuffers(1, &textureHandleSSBO);
-    glNamedBufferStorage(
-            textureHandleSSBO,
-            sizeof(GLuint64) * textureHandlesBuffer.size(),
-            (const void *)textureHandlesBuffer.data(),
-            GL_DYNAMIC_STORAGE_BIT
-    );
+    textureHandleSSBO = SSBOBuffer<GLuint64>(textureHandlesBuffer.size(), textureHandlesBuffer.data());
 }
 
 void ResourceManager::reload_meshes() {
@@ -101,15 +93,7 @@ void ResourceManager::reload_meshes() {
             triangleBuffer.push_back(t);
         }
     }
-
-    if(triangleSSBO) glDeleteBuffers(1, &triangleSSBO);
-    glCreateBuffers(1, &triangleSSBO);
-    glNamedBufferStorage(
-            triangleSSBO,
-            sizeof(Triangle) * triangleBuffer.size(),
-            (const void *)triangleBuffer.data(),
-            GL_DYNAMIC_STORAGE_BIT
-    );
+    triangleSSBO = SSBOBuffer<Triangle>(triangleBuffer.size(), triangleBuffer.data());
 
     // update meshBVH
     meshBVHBuffer.clear();
@@ -136,15 +120,7 @@ void ResourceManager::reload_meshes() {
         if(p->trianglePtr) y.triangleIndex = triangleIndexMap[p->trianglePtr];
         meshBVHBuffer.push_back(y);
     }
-
-    if(meshBVHSSBO) glDeleteBuffers(1, &meshBVHSSBO);
-    glCreateBuffers(1, &meshBVHSSBO);
-    glNamedBufferStorage(
-            meshBVHSSBO,
-            sizeof(BVHNodeInfo) * meshBVHBuffer.size(),
-            (const void *)meshBVHBuffer.data(),
-            GL_DYNAMIC_STORAGE_BIT
-    );
+    meshBVHSSBO = SSBOBuffer<BVHNodeInfo>(meshBVHBuffer.size(), meshBVHBuffer.data());
 }
 
 void ResourceManager::reload_instances() {
@@ -160,22 +136,8 @@ void ResourceManager::reload_instances() {
         y.meshIndex = meshIndexMap[u->mesh];
         instanceInfoBuffer.push_back(y);
     }
-    if(materialSSBO) glDeleteBuffers(1, &materialSSBO);
-    glCreateBuffers(1, &materialSSBO);
-    glNamedBufferStorage(
-            materialSSBO,
-            sizeof(float) * materialBuffer.size(),
-            (const void *)materialBuffer.data(),
-            GL_DYNAMIC_STORAGE_BIT
-    );
-    if(instanceInfoSSBO) glDeleteBuffers(1, &instanceInfoSSBO);
-    glCreateBuffers(1, &instanceInfoSSBO);
-    glNamedBufferStorage(
-            instanceInfoSSBO,
-            sizeof(InstanceInfo) * instanceInfoBuffer.size(),
-            (const void *)instanceInfoBuffer.data(),
-            GL_DYNAMIC_STORAGE_BIT
-    );
+    materialSSBO = SSBOBuffer<float>(materialBuffer.size(), materialBuffer.data());
+    instanceInfoSSBO = SSBOBuffer<InstanceInfo>(instanceInfoBuffer.size(), instanceInfoBuffer.data());
 }
 
 void ResourceManager::reload_sceneBVH(BVHNode *root) {
@@ -207,14 +169,7 @@ void ResourceManager::reload_sceneBVH(BVHNode *root) {
         y.rsIndex = ir;
         sceneBVHBuffer.push_back(y);
     }
-    if(sceneBVHSSBO) glDeleteBuffers(1, &sceneBVHSSBO);
-    glCreateBuffers(1, &sceneBVHSSBO);
-    glNamedBufferStorage(
-            sceneBVHSSBO,
-            sizeof(BVHNodeInfo) * sceneBVHBuffer.size(),
-            (const void *)sceneBVHBuffer.data(),
-            GL_DYNAMIC_STORAGE_BIT
-    );
+    sceneBVHSSBO = SSBOBuffer<BVHNodeInfo>(sceneBVHBuffer.size(), sceneBVHBuffer.data());
 }
 
 void ResourceManager::reload_scene(Scene *scene) {
@@ -248,8 +203,14 @@ int ResourceManager::queryInstanceIndex(Instance *ins) {
     return instanceIndexMap[ins];
 }
 
-ResourceManager::ResourceManager() {
-    textureHandleSSBO = materialSSBO = triangleSSBO = instanceInfoSSBO = meshBVHSSBO = sceneBVHSSBO = 0;
+ResourceManager::~ResourceManager() {
+    textureHandleSSBO.release();
+    materialSSBO.release();
+    triangleSSBO.release();
+    instanceInfoSSBO.release();
+    meshBVHSSBO.release();
+    sceneBVHSSBO.release();
 }
+
 
 

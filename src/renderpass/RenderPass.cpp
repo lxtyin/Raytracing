@@ -39,6 +39,13 @@ ComputeRenderPass::ComputeRenderPass(const string &computeShaderPath) {
     init_shader(computeShaderPath);
 }
 
+void ComputeRenderPass::drawcall() {
+    glDispatchCompute((SCREEN_H + 31) / 32,
+                      (SCREEN_W + 31) / 32,
+                      1);
+    glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
+}
+
 void VertexFragmentRenderPass::init_shader(const string &fragShaderPath) {
     string vertexShaderCode = read_shader("shader/basic/fullscreen.vert");
     string fragmentShaderCode = read_shader(fragShaderPath);
@@ -95,6 +102,13 @@ VertexFragmentRenderPass::VertexFragmentRenderPass(const string &fragShaderPath)
     glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (void*)nullptr);
     glEnableVertexAttribArray(0);
     glBindVertexArray(0);//unbind VAO
+}
+
+void VertexFragmentRenderPass::drawcall() {
+    glBindVertexArray(VAO);
+    glDrawArrays(GL_TRIANGLES, 0, 6);
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    glBindVertexArray(0);
 }
 
 void RenderPass::use() {

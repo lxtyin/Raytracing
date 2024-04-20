@@ -15,42 +15,47 @@
 #include <queue>
 #include <set>
 
-void Renderer::draw(GBuffer &gbuffer) {
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, ResourceManager::manager->textureHandleSSBO);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, ResourceManager::manager->materialSSBO);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, ResourceManager::manager->triangleSSBO);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, ResourceManager::manager->instanceInfoSSBO);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 4, ResourceManager::manager->meshBVHSSBO);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 5, ResourceManager::manager->sceneBVHSSBO);
 
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 6, gbuffer.colorGBufferSSBO);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 7, gbuffer.normalGBufferSSBO);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 8, gbuffer.depthGBufferSSBO);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 9, gbuffer.motionGBufferSSBO);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 10, gbuffer.albedoGBufferSSBO);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 11, gbuffer.momentGBufferSSBO);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 12, gbuffer.instanceIndexGBufferSSBO);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 13, gbuffer.numSamplesGBufferSSBO);
+Renderer::Renderer(const string &shaderPath): VertexFragmentRenderPass(shaderPath),
+                                              colorGBufferSSBO(SCREEN_W * SCREEN_H * 3),
+                                              normalGBufferSSBO(SCREEN_W * SCREEN_H * 3),
+                                              depthGBufferSSBO(SCREEN_W * SCREEN_H * 1),
+                                              motionGBufferSSBO(SCREEN_W * SCREEN_H * 2),
+                                              albedoGBufferSSBO(SCREEN_W * SCREEN_H * 3),
+                                              momentGBufferSSBO(SCREEN_W * SCREEN_H * 2),
+                                              instanceIndexGBufferSSBO(SCREEN_W * SCREEN_H * 1),
+                                              numSamplesGBufferSSBO(SCREEN_W * SCREEN_H * 1)
+{}
 
 
-    glBindVertexArray(VAO);
-    glDrawArrays(GL_TRIANGLES, 0, 6);
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
-    glBindVertexArray(0);
+void Renderer::draw() {
+    ResourceManager::manager->textureHandleSSBO.bind_current_shader(0);
+    ResourceManager::manager->materialSSBO.bind_current_shader(1);
+    ResourceManager::manager->triangleSSBO.bind_current_shader(2);
+    ResourceManager::manager->instanceInfoSSBO.bind_current_shader(3);
+    ResourceManager::manager->meshBVHSSBO.bind_current_shader(4);
+    ResourceManager::manager->sceneBVHSSBO.bind_current_shader(5);
 
-    // Run compute shader
-//    glDispatchCompute((SCREEN_H + 31) / 32,
-//                      (SCREEN_W + 31) / 32,
-//                      1);
-//    glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
+    colorGBufferSSBO.bind_current_shader(6);
+    normalGBufferSSBO.bind_current_shader(7);
+    depthGBufferSSBO.bind_current_shader(8);
+    motionGBufferSSBO.bind_current_shader(9);
+    albedoGBufferSSBO.bind_current_shader(10);
+    momentGBufferSSBO.bind_current_shader(11);
+    instanceIndexGBufferSSBO.bind_current_shader(12);
+    numSamplesGBufferSSBO.bind_current_shader(13);
 
-//    cout << colorGBufferSSBO << "R: ";
-//    glBindBuffer(GL_SHADER_STORAGE_BUFFER, colorGBufferSSBO);
-//    float* tmpdata = (float*)glMapBufferRange(GL_SHADER_STORAGE_BUFFER, 0, framesize * sizeof(float), GL_MAP_READ_BIT);
-//    for(int i = 0;i < 10;i++) std::cout << tmpdata[i] << ' ';
-//    std::cout << std::endl;
-//    glUnmapBuffer(GL_SHADER_STORAGE_BUFFER);
+    drawcall();
 }
 
-Renderer::Renderer(const string &shaderPath): VertexFragmentRenderPass(shaderPath) {}
+Renderer::~Renderer() {
+    colorGBufferSSBO.release();
+    normalGBufferSSBO.release();
+    depthGBufferSSBO.release();
+    motionGBufferSSBO.release();
+    albedoGBufferSSBO.release();
+    momentGBufferSSBO.release();
+    instanceIndexGBufferSSBO.release();
+    numSamplesGBufferSSBO.release();
+}
 

@@ -9,11 +9,22 @@
 
 class SVGFTemporalFilter: public VertexFragmentRenderPass {
 public:
-    GBuffer history;
+
+    SSBOBuffer<float> historycolorGBufferSSBO;
+    SSBOBuffer<float> historymomentGBufferSSBO;
+    SSBOBuffer<float> historynormalGBufferSSBO;
+    SSBOBuffer<float> historyinstanceIndexGBufferSSBO;
+    SSBOBuffer<float> historynumSamplesGBufferSSBO;
 
     SVGFTemporalFilter(const string &fragShaderPath);
+    ~SVGFTemporalFilter();
 
-    void draw(GBuffer &curFrame);
+    void draw(SSBOBuffer<float> &colorGBufferSSBO,
+              SSBOBuffer<float> &momentGBufferSSBO,
+              SSBOBuffer<float> &normalGBufferSSBO,
+              SSBOBuffer<float> &instanceIndexGBufferSSBO,
+              SSBOBuffer<float> &motionGBufferSSBO,
+              SSBOBuffer<float> &numSamplesGBufferSSBO);
 };
 
 

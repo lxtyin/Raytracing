@@ -5,32 +5,50 @@
 #include "TAA.h"
 #include "../Config.h"
 
-TAA::TAA(const string &fragShaderPath) : VertexFragmentRenderPass(fragShaderPath) {
-    firstFrame = true;
-}
+TAA::TAA(const string &fragShaderPath) :
+    VertexFragmentRenderPass(fragShaderPath),
+    historycolorGBufferSSBO(SCREEN_H * SCREEN_W * 3),
+    historynormalGBufferSSBO(SCREEN_H * SCREEN_W * 3),
+    historyinstanceIndexGBufferSSBO(SCREEN_H * SCREEN_W * 1)
+    { firstFrame = true;}
 
-
-void TAA::draw(GBuffer &curFrame, bool saveFrame) {
+void TAA::draw(SSBOBuffer<float> &colorGBufferSSBO,
+               SSBOBuffer<float> &motionGBufferSSBO,
+               SSBOBuffer<float> &normalGBufferSSBO,
+               SSBOBuffer<float> &instanceIndexGBufferSSBO,
+               bool saveFrame) {
 
     if(firstFrame) {
         firstFrame = false;
-        history.copyFrom(&curFrame);
+        historycolorGBufferSSBO.copy(&colorGBufferSSBO);
+        historynormalGBufferSSBO.copy(&normalGBufferSSBO);
+        historyinstanceIndexGBufferSSBO.copy(&instanceIndexGBufferSSBO);
         return;
     }
 
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, curFrame.colorGBufferSSBO); // inout
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, history.colorGBufferSSBO);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, curFrame.motionGBufferSSBO);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, curFrame.normalGBufferSSBO);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 4, curFrame.instanceIndexGBufferSSBO);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 5, history.normalGBufferSSBO);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 6, history.instanceIndexGBufferSSBO);
+    colorGBufferSSBO.bind_current_shader(0);
+    historycolorGBufferSSBO.bind_current_shader(1);
+    motionGBufferSSBO.bind_current_shader(2);
+    normalGBufferSSBO.bind_current_shader(3);
+    instanceIndexGBufferSSBO.bind_current_shader(4);
+    historynormalGBufferSSBO.bind_current_shader(5);
+    historyinstanceIndexGBufferSSBO.bind_current_shader(6);
 
-    glBindVertexArray(VAO);
-    glDrawArrays(GL_TRIANGLES, 0, 6);
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
-    glBindVertexArray(0);
+    drawcall();
 
-    if(saveFrame) history.copyFrom(&curFrame);
-    else history.swap(&curFrame);
+    if(saveFrame) {
+        historycolorGBufferSSBO.copy(&colorGBufferSSBO);
+        historynormalGBufferSSBO.copy(&normalGBufferSSBO);
+        historyinstanceIndexGBufferSSBO.copy(&instanceIndexGBufferSSBO);
+    } else {
+        std::swap(historycolorGBufferSSBO, colorGBufferSSBO);
+        std::swap(historynormalGBufferSSBO, normalGBufferSSBO);
+        std::swap(historyinstanceIndexGBufferSSBO, instanceIndexGBufferSSBO);
+    }
+}
+
+TAA::~TAA() {
+    historycolorGBufferSSBO.release();
+    historynormalGBufferSSBO.release();
+    historyinstanceIndexGBufferSSBO.release();
 }

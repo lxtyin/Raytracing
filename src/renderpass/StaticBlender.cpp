@@ -6,32 +6,25 @@
 #include "../tool/tool.h"
 #include "../Config.h"
 
-StaticBlender::StaticBlender(const string &fragShaderPath) : VertexFragmentRenderPass(fragShaderPath) {
+StaticBlender::StaticBlender(const string &fragShaderPath) :
+    VertexFragmentRenderPass(fragShaderPath),
+    historyColorGBufferSSBO(SCREEN_W * SCREEN_H * 3)
+{
     frameCounter = 0;
-
-    int framesize = SCREEN_H * SCREEN_W * 3;
-    float *placeholder = new float[framesize];
-
-    glGenBuffers(1, &historyColorGBufferSSBO);
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, historyColorGBufferSSBO);
-    glBufferData(GL_SHADER_STORAGE_BUFFER, framesize * sizeof(float), placeholder, GL_DYNAMIC_COPY);
-
 }
 
-void StaticBlender::draw(GBuffer &curFrame) {
+void StaticBlender::draw(SSBOBuffer<float> &colorGBufferSSBO) {
     ++frameCounter;
 
     glUniform1ui(glGetUniformLocation(shaderProgram, "frameCounter"), frameCounter);
 
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, curFrame.colorGBufferSSBO);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, historyColorGBufferSSBO);
+    colorGBufferSSBO.bind_current_shader(0);
+    historyColorGBufferSSBO.bind_current_shader(1);
 
-    glBindVertexArray(VAO);
-    glDrawArrays(GL_TRIANGLES, 0, 6);
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
-    glBindVertexArray(0);
+    drawcall();
 }
 
 StaticBlender::~StaticBlender() {
-    glDeleteBuffers(1, &historyColorGBufferSSBO);
+    historyColorGBufferSSBO.release();
 }
+

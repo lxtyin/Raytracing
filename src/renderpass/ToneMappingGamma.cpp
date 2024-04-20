@@ -4,15 +4,12 @@
 
 #include "ToneMappingGamma.h"
 
-ToneMappingGamma::ToneMappingGamma(const string &fragShaderPath) : VertexFragmentRenderPass(fragShaderPath) {}
+ToneMappingGamma::ToneMappingGamma(const string &fragShaderPath) :
+    VertexFragmentRenderPass(fragShaderPath){}
 
-void ToneMappingGamma::draw(GBuffer &curFrame) {
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, curFrame.colorGBufferSSBO); // inout
-
-    glBindVertexArray(VAO);
-    glDrawArrays(GL_TRIANGLES, 0, 6);
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
-    glBindVertexArray(0);
+void ToneMappingGamma::draw(SSBOBuffer<float> &colorGBufferSSBO) {
+    colorGBufferSSBO.bind_current_shader(0);
+    drawcall();
 }
 
 
