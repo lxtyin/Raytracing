@@ -161,82 +161,85 @@ void update(float dt) {
         {
             renderPass->bind_texture("skybox", skybox->textureObject, 0);
             renderPass->bind_texture("skybox_samplecache", skybox->skyboxsamplerObject, 1);
+            renderPass->bind_texture("depthGBufferTexture", rasterPass->depthGBufferTexture, 2);
+            renderPass->bind_texture("normalGBufferTexture", rasterPass->normalGBufferTexture, 3);
+            renderPass->bind_texture("uvGBufferTexture", rasterPass->uvGBufferTexture, 4);
+            renderPass->bind_texture("instanceIndexGBufferTexture", rasterPass->instanceIndexGBufferTexture, 5);
             glUniform1f(glGetUniformLocation(renderPass->shaderProgram, "skybox_Light_SUM"), skybox->lightSum);
             glUniformMatrix4fv(glGetUniformLocation(renderPass->shaderProgram, "v2wMat"), 1, GL_FALSE, glm::value_ptr(camera->v2w_matrix()));
             glUniform1i(glGetUniformLocation(renderPass->shaderProgram, "SPP"), Config::SPP);
             glUniform1i(glGetUniformLocation(renderPass->shaderProgram, "SCREEN_W"), SCREEN_W);
             glUniform1i(glGetUniformLocation(renderPass->shaderProgram, "SCREEN_H"), SCREEN_H);
-            glUniform1i(glGetUniformLocation(renderPass->shaderProgram, "MAX_DEPTH"), 1);
+            glUniform1i(glGetUniformLocation(renderPass->shaderProgram, "WINDOW_W"), Config::WINDOW_W);
+            glUniform1i(glGetUniformLocation(renderPass->shaderProgram, "WINDOW_H"), Config::WINDOW_H);
+            glUniform1i(glGetUniformLocation(renderPass->shaderProgram, "MAX_DEPTH"), 2);
             glUniform1ui(glGetUniformLocation(renderPass->shaderProgram, "frameCounter"), frameCounter);
             glUniform1f(glGetUniformLocation(renderPass->shaderProgram, "fov"), camera->fovX);
             glUniform1i(glGetUniformLocation(renderPass->shaderProgram, "SKY_W"), skybox->width);
             glUniform1i(glGetUniformLocation(renderPass->shaderProgram, "SKY_H"), skybox->height);
             glUniformMatrix4fv(glGetUniformLocation(renderPass->shaderProgram, "backprojMat"), 1, GL_FALSE, glm::value_ptr(back_projection));
         }
-        renderPass->draw(rasterPass->depthGBufferSSBO,
-                         rasterPass->normalGBufferSSBO,
-                         rasterPass->uvGBufferSSBO,
-                         rasterPass->instanceIndexGBufferSSBO);
+        renderPass->draw();
 
-//        if(Config::useStaticBlender) {
-//            staticBlenderPass->use();
-//            {
-//                glUniform1i(glGetUniformLocation(staticBlenderPass->shaderProgram, "SCREEN_W"), SCREEN_W);
-//                glUniform1i(glGetUniformLocation(staticBlenderPass->shaderProgram, "SCREEN_H"), SCREEN_H);
-//            }
-//            staticBlenderPass->draw(renderPass->colorGBufferSSBO);
-//        }
-//
-//        if(Config::useTemporalFilter) {
-//            svgfTemporalFilterPass->use();
-//            {
-//                glUniform1i(glGetUniformLocation(svgfTemporalFilterPass->shaderProgram, "SCREEN_W"), SCREEN_W);
-//                glUniform1i(glGetUniformLocation(svgfTemporalFilterPass->shaderProgram, "SCREEN_H"), SCREEN_H);
-//            }
-//            svgfTemporalFilterPass->draw(renderPass->colorGBufferSSBO,
-//                                         renderPass->momentGBufferSSBO,
-//                                         renderPass->normalGBufferSSBO,
-//                                         renderPass->instanceIndexGBufferSSBO,
-//                                         renderPass->motionGBufferSSBO,
-//                                         renderPass->numSamplesGBufferSSBO);
-//        }
-//
-//        // a'trous wavelet filter
-//        for(int i = 0;i < Config::filterLevel;i++) {
-//            svgfSpatialFilterPass->use();
-//            {
-//                glUniform1i(glGetUniformLocation(svgfSpatialFilterPass->shaderProgram, "SCREEN_W"), SCREEN_W);
-//                glUniform1i(glGetUniformLocation(svgfSpatialFilterPass->shaderProgram, "SCREEN_H"), SCREEN_H);
-//                glUniformMatrix4fv(glGetUniformLocation(svgfSpatialFilterPass->shaderProgram, "w2vMat"), 1, GL_FALSE, glm::value_ptr(camera->w2v_matrix()));
-//                glUniform1i(glGetUniformLocation(svgfSpatialFilterPass->shaderProgram, "step"), 1 << i);
-//            }
-//            svgfSpatialFilterPass->draw(
-//                    renderPass->colorGBufferSSBO,
-//                    renderPass->normalGBufferSSBO,
-//                    renderPass->depthGBufferSSBO,
-//                    renderPass->momentGBufferSSBO,
-//                    renderPass->numSamplesGBufferSSBO);
-//        }
-//
-//        mappingPass->use();
-//        {
-//            glUniform1i(glGetUniformLocation(mappingPass->shaderProgram, "SCREEN_W"), SCREEN_W);
-//            glUniform1i(glGetUniformLocation(mappingPass->shaderProgram, "SCREEN_H"), SCREEN_H);
-//        }
-//        mappingPass->draw(renderPass->colorGBufferSSBO);
-//
-//        if(Config::useTAA) {
-//            taaPass->use();
-//            {
-//                glUniform1i(glGetUniformLocation(taaPass->shaderProgram, "SCREEN_W"), SCREEN_W);
-//                glUniform1i(glGetUniformLocation(taaPass->shaderProgram, "SCREEN_H"), SCREEN_H);
-//            }
-//            taaPass->draw(
-//                    renderPass->colorGBufferSSBO,
-//                    renderPass->motionGBufferSSBO,
-//                    renderPass->normalGBufferSSBO,
-//                    renderPass->instanceIndexGBufferSSBO);
-//        }
+        if(Config::useStaticBlender) {
+            staticBlenderPass->use();
+            {
+                glUniform1i(glGetUniformLocation(staticBlenderPass->shaderProgram, "SCREEN_W"), SCREEN_W);
+                glUniform1i(glGetUniformLocation(staticBlenderPass->shaderProgram, "SCREEN_H"), SCREEN_H);
+            }
+            staticBlenderPass->draw(renderPass->colorGBufferSSBO);
+        }
+
+        if(Config::useTemporalFilter) {
+            svgfTemporalFilterPass->use();
+            {
+                glUniform1i(glGetUniformLocation(svgfTemporalFilterPass->shaderProgram, "SCREEN_W"), SCREEN_W);
+                glUniform1i(glGetUniformLocation(svgfTemporalFilterPass->shaderProgram, "SCREEN_H"), SCREEN_H);
+            }
+            svgfTemporalFilterPass->draw(renderPass->colorGBufferSSBO,
+                                         renderPass->momentGBufferSSBO,
+                                         renderPass->normalGBufferSSBO,
+                                         renderPass->instanceIndexGBufferSSBO,
+                                         renderPass->motionGBufferSSBO,
+                                         renderPass->numSamplesGBufferSSBO);
+        }
+
+        // a'trous wavelet filter
+        for(int i = 0;i < Config::filterLevel;i++) {
+            svgfSpatialFilterPass->use();
+            {
+                glUniform1i(glGetUniformLocation(svgfSpatialFilterPass->shaderProgram, "SCREEN_W"), SCREEN_W);
+                glUniform1i(glGetUniformLocation(svgfSpatialFilterPass->shaderProgram, "SCREEN_H"), SCREEN_H);
+                glUniformMatrix4fv(glGetUniformLocation(svgfSpatialFilterPass->shaderProgram, "w2vMat"), 1, GL_FALSE, glm::value_ptr(camera->w2v_matrix()));
+                glUniform1i(glGetUniformLocation(svgfSpatialFilterPass->shaderProgram, "step"), 1 << i);
+            }
+            svgfSpatialFilterPass->draw(
+                    renderPass->colorGBufferSSBO,
+                    renderPass->normalGBufferSSBO,
+                    renderPass->depthGBufferSSBO,
+                    renderPass->momentGBufferSSBO,
+                    renderPass->numSamplesGBufferSSBO);
+        }
+
+        mappingPass->use();
+        {
+            glUniform1i(glGetUniformLocation(mappingPass->shaderProgram, "SCREEN_W"), SCREEN_W);
+            glUniform1i(glGetUniformLocation(mappingPass->shaderProgram, "SCREEN_H"), SCREEN_H);
+        }
+        mappingPass->draw(renderPass->colorGBufferSSBO);
+
+        if(Config::useTAA) {
+            taaPass->use();
+            {
+                glUniform1i(glGetUniformLocation(taaPass->shaderProgram, "SCREEN_W"), SCREEN_W);
+                glUniform1i(glGetUniformLocation(taaPass->shaderProgram, "SCREEN_H"), SCREEN_H);
+            }
+            taaPass->draw(
+                    renderPass->colorGBufferSSBO,
+                    renderPass->motionGBufferSSBO,
+                    renderPass->normalGBufferSSBO,
+                    renderPass->instanceIndexGBufferSSBO);
+        }
 
         directPass->use();
         {
@@ -246,7 +249,7 @@ void update(float dt) {
                         ResourceManager::manager->queryInstanceIndex(TinyUI::selectedInstance));
         }
         directPass->draw(renderPass->colorGBufferSSBO,
-                         rasterPass->instanceIndexGBufferSSBO);
+                         renderPass->instanceIndexGBufferSSBO);
 
         back_projection = camera->projection() * camera->w2v_matrix();
 
@@ -323,10 +326,10 @@ void init_scene() {
         o1->transform.rotation = vec3(-90, 0, 0);
 		scene->add_child(o1);
 
-        Instance *light= AssimpLoader::load_model("model/light.obj");
-        light->transform.scale = vec3(30, 30, 30);
-        light->transform.position = vec3(0, 10, 0);
-        scene->add_child(light);
+//        Instance *light= AssimpLoader::load_model("model/light.obj");
+//        light->transform.scale = vec3(30, 30, 30);
+//        light->transform.position = vec3(0, 10, 0);
+//        scene->add_child(light);
     }
 
 	skybox = new Skybox("model/kloofendal_48d_partly_cloudy_puresky_2k.hdr");

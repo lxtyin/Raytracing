@@ -7,6 +7,7 @@
 #include shader/basic/math.glsl
 #include shader/basic/sobol.glsl
 
+const uniform float RAY_MINDIS = 0.001;
 
 #ifdef COMPUTE_SHADER
 layout (local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
@@ -71,34 +72,37 @@ layout(binding = 5, std430) readonly buffer ssbo5 {
     BVHNode sceneBVHBuffer[];
 };
 
-layout(binding = 6) buffer ssbo6 {
+layout(binding = 6) writeonly buffer ssbo6 {
     float colorGBuffer[];
 };
-layout(binding = 7) buffer ssbo7 {
+layout(binding = 7) writeonly buffer ssbo7 {
     float motionGBuffer[];
 };
-layout(binding = 8) buffer ssbo8 {
+layout(binding = 8) writeonly buffer ssbo8 {
     float albedoGBuffer[];
 };
-layout(binding = 9) buffer ssbo9 {
+layout(binding = 9) writeonly buffer ssbo9 {
     float momentGBuffer[];
 };
-layout(binding = 10) buffer ssbo10 {
+layout(binding = 10) writeonly buffer ssbo10 {
     float numSamplesGBuffer[];
 };
 
-layout(binding = 11) readonly buffer ssbo11 {
+layout(binding = 11) writeonly buffer ssbo11 {
     float depthGBuffer[];
 };
-layout(binding = 12) readonly buffer ssbo12 {
+layout(binding = 12) writeonly buffer ssbo12 {
     float normalGBuffer[];
 };
-layout(binding = 13) readonly buffer ssbo13 {
-    float uvGBuffer[];
-};
-layout(binding = 14) readonly buffer ssbo14 {
+layout(binding = 13) writeonly buffer ssbo13 {
     float instanceIndexGBuffer[];
 };
+
+uniform sampler2D depthGBufferTexture;
+uniform sampler2D normalGBufferTexture;
+uniform sampler2D uvGBufferTexture;
+uniform sampler2D instanceIndexGBufferTexture;
+
 
 // Input infos ===
 uniform mat4 v2wMat;
@@ -107,6 +111,8 @@ uniform int MAX_DEPTH = 2;
 uniform float fov = PI / 3;
 uniform int SCREEN_W;
 uniform int SCREEN_H;
+uniform int WINDOW_W;
+uniform int WINDOW_H;
 uniform sampler2D skybox;
 uniform sampler2D skybox_samplecache;
 uniform float skybox_Light_SUM;
@@ -193,7 +199,7 @@ bool intersect_aabb(Ray ray, vec3 aa, vec3 bb, out float nearT) {
     tmx = min(tmx, max(t1.z, t2.z));
     nearT = tmi;
 
-    return tmx >= tmi && tmx >= 0;
+    return tmx >= tmi && tmx >= RAY_MINDIS;
 }
 
 /// 返回与triangle的具体碰撞信息
@@ -210,7 +216,7 @@ Intersection intersect_triangle(Ray ray, int triangleIndex) {
     float u = dot(S1, S) * k;
     float v = dot(S2, ray.dir) * k;
 
-    bool exist = (0.0001 <= t && 0 <= u && 0 <= v && u + v <= 1);
+    bool exist = (RAY_MINDIS <= t && 0 <= u && 0 <= v && u + v <= 1);
 
     vec3 pos = ray.ori + t * ray.dir;
     vec3 nor = normalize(tri.normal[0].xyz * (1 - u - v) + tri.normal[1].xyz * u + tri.normal[2].xyz * v);
@@ -465,27 +471,20 @@ void main() {
     vec3 dir = normalize(vec3(v2wMat * vec4(p.x - SCREEN_W / 2, p.y - SCREEN_H / 2, -disz, 0)));
     Ray ray = Ray(ori, dir);
 
-    //        bool exist;
-    //        vec3 position; // in world space.
-    //        vec3 normal; // in world space.
-    //        float t;
-    //        vec2 uv;
-    //        int instanceIndex;
-    //        int materialPtr;
-    //        int triangleIndex;
 
     Intersection first_isect;
 
-    float depth = max(0.0f, depthGBuffer[pixelPtr] - 0.001f);
-    int instanceIndex = int(instanceIndexGBuffer[pixelPtr] + 0.01);
+    // viewport at left upper corner.
+    vec2 window_uv = vec2(screen_uv.x * SCREEN_W / WINDOW_W,
+            (screen_uv.y - 1) * SCREEN_H / WINDOW_H + 1);
+
+    float depth = texture(depthGBufferTexture, window_uv).r;
+    int instanceIndex = int(texture(instanceIndexGBufferTexture, window_uv).r + 0.01);
 
     first_isect.t = depth;
     first_isect.exist = depth < 90000;
-    first_isect.normal = vec3(normalGBuffer[pixelPtr * 3 + 0],
-                                normalGBuffer[pixelPtr * 3 + 1],
-                                normalGBuffer[pixelPtr * 3 + 2]);
-    first_isect.uv = vec2(uvGBuffer[pixelPtr * 2 + 0],
-                        uvGBuffer[pixelPtr * 2 + 1]);
+    first_isect.normal = texture(normalGBufferTexture, window_uv).xyz;
+    first_isect.uv = texture(uvGBufferTexture, window_uv).xy;
     first_isect.position = ray.ori + ray.dir * first_isect.t;
     first_isect.instanceIndex = instanceIndex;
     first_isect.materialPtr = instanceInfoBuffer[instanceIndex].materialPtr;
@@ -515,7 +514,7 @@ void main() {
     // calculate motion vector
     vec4 lastNDC = backprojMat * vec4(first_isect.position, 1);
     lastNDC /= lastNDC.w;
-    vec2 last_suv = (vec2(lastNDC.x, lastNDC.y * SCREEN_W / SCREEN_H) + 1.0) / 2;
+    vec2 last_suv = (lastNDC.xy + 1.0) / 2;
     motionout = screen_uv - last_suv;
 
     float lum = luminance(colorout);
@@ -523,7 +522,6 @@ void main() {
     colorGBuffer[pixelPtr * 3 + 0] = colorout.x;
     colorGBuffer[pixelPtr * 3 + 1] = colorout.y;
     colorGBuffer[pixelPtr * 3 + 2] = colorout.z;
-
     motionGBuffer[pixelPtr * 2 + 0] = motionout.x;
     motionGBuffer[pixelPtr * 2 + 1] = motionout.y;
     albedoGBuffer[pixelPtr * 3 + 0] = albedoout.x;
@@ -532,6 +530,12 @@ void main() {
     momentGBuffer[pixelPtr * 2 + 0] = lum;
     momentGBuffer[pixelPtr * 2 + 1] = lum * lum;
     numSamplesGBuffer[pixelPtr] = 1;
+
+    depthGBuffer[pixelPtr] = first_isect.t;
+    normalGBuffer[pixelPtr * 3 + 0] = first_isect.normal.x;
+    normalGBuffer[pixelPtr * 3 + 1] = first_isect.normal.y;
+    normalGBuffer[pixelPtr * 3 + 2] = first_isect.normal.z;
+    instanceIndexGBuffer[pixelPtr] = first_isect.instanceIndex;
 
     return;
 }

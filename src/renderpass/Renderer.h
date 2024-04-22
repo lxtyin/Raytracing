@@ -20,14 +20,14 @@ public:
     SSBOBuffer<float> albedoGBufferSSBO;
     SSBOBuffer<float> momentGBufferSSBO;
     SSBOBuffer<float> numSamplesGBufferSSBO;
+    SSBOBuffer<float> depthGBufferSSBO;
+    SSBOBuffer<float> normalGBufferSSBO;
+    SSBOBuffer<float> instanceIndexGBufferSSBO;
 
     Renderer(const string &shaderPath);
     ~Renderer();
 
-    void draw(SSBOBuffer<float> &depthGBufferSSBO,
-              SSBOBuffer<float> &normalGBufferSSBO,
-              SSBOBuffer<float> &uvGBufferSSBO,
-              SSBOBuffer<float> &instanceIndexGBufferSSBO);
+    void draw();
 };
 
 

@@ -12,20 +12,15 @@ class Instance;
 
 class RasterPass: public RenderPass {
     GLuint frameBufferObject;
-    GLuint depthRenderBuffer;    // GBuffer, store distance (float).
-    GLuint normalRenderBuffer;
-    GLuint uvRenderBuffer;
-    GLuint instanceRenderBuffer;
     GLuint depthTestRenderBuffer; // use for depth test (store gl_FragCoord.z).
 
     void init_fbo();
-    void copy_fbodata_to_ssbo();
 
 public:
-    SSBOBuffer<float> depthGBufferSSBO;
-    SSBOBuffer<float> normalGBufferSSBO;
-    SSBOBuffer<float> uvGBufferSSBO;
-    SSBOBuffer<float> instanceIndexGBufferSSBO;
+    GLuint depthGBufferTexture;    // GBuffer, store distance (float).
+    GLuint normalGBufferTexture;
+    GLuint uvGBufferTexture;
+    GLuint instanceIndexGBufferTexture;
 
     void init_shader(const string &vertexShaderPath, const string &fragShaderPath);
 

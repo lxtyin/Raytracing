@@ -52,16 +52,6 @@ void RasterPass::init_shader(const string &vertexShaderPath, const string &fragS
 }
 
 void RasterPass::draw(Camera *camera) {
-//    depthGBufferSSBO.fill(100000.0f);
-//    normalGBufferSSBO.fill(0.0f);
-//    uvGBufferSSBO.fill(0.0f);
-//    instanceIndexGBufferSSBO.fill(-10.0);
-
-//    depthGBufferSSBO.bind_current_shader(0);
-//    normalGBufferSSBO.bind_current_shader(1);
-//    uvGBufferSSBO.bind_current_shader(2);
-//    instanceIndexGBufferSSBO.bind_current_shader(3);
-
     glBindFramebuffer(GL_FRAMEBUFFER, frameBufferObject);
     GLuint attaches[4] = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2, GL_COLOR_ATTACHMENT3};
     glDrawBuffers(4, attaches);
@@ -88,54 +78,56 @@ void RasterPass::draw(Camera *camera) {
     glDisable(GL_DEPTH_TEST);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
-    copy_fbodata_to_ssbo();
+//    copy_fbodata_to_ssbo();
 }
 
-RasterPass::RasterPass(const string &vertexShaderPath, const string &fragShaderPath):
-        depthGBufferSSBO(SCREEN_W * SCREEN_H * 1),
-        normalGBufferSSBO(SCREEN_W * SCREEN_H * 3),
-        uvGBufferSSBO(SCREEN_W * SCREEN_H * 2),
-        instanceIndexGBufferSSBO(SCREEN_W * SCREEN_H * 1)
-{
+RasterPass::RasterPass(const string &vertexShaderPath, const string &fragShaderPath) {
     init_shader(vertexShaderPath, fragShaderPath);
     init_fbo();
 }
 
 RasterPass::~RasterPass() {
-    depthGBufferSSBO.release();
-    normalGBufferSSBO.release();
-    uvGBufferSSBO.release();
-    instanceIndexGBufferSSBO.release();
     glDeleteFramebuffers(1, &frameBufferObject);
-    glDeleteRenderbuffers(1, &depthRenderBuffer);
-    glDeleteRenderbuffers(1, &normalRenderBuffer);
-    glDeleteRenderbuffers(1, &uvRenderBuffer);
-    glDeleteRenderbuffers(1, &instanceRenderBuffer);
+    glDeleteTextures(1, &depthGBufferTexture);
+    glDeleteTextures(1, &normalGBufferTexture);
+    glDeleteTextures(1, &uvGBufferTexture);
+    glDeleteTextures(1, &instanceIndexGBufferTexture);
 }
 
 void RasterPass::init_fbo() {
     glGenFramebuffers(1, &frameBufferObject);
     glBindFramebuffer(GL_FRAMEBUFFER, frameBufferObject);
 
-    glGenRenderbuffers(1, &depthRenderBuffer);
-    glBindRenderbuffer(GL_RENDERBUFFER, depthRenderBuffer);
-    glRenderbufferStorage(GL_RENDERBUFFER, GL_R32F, Config::WINDOW_W, Config::WINDOW_H);
-    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER, depthRenderBuffer);
+    // Generate texture
+    glGenTextures(1, &depthGBufferTexture);
+    glBindTexture(GL_TEXTURE_2D, depthGBufferTexture);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_R32F, Config::WINDOW_W, Config::WINDOW_H, 0, GL_RED, GL_FLOAT, NULL);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, depthGBufferTexture, 0);
 
-    glGenRenderbuffers(1, &normalRenderBuffer);
-    glBindRenderbuffer(GL_RENDERBUFFER, normalRenderBuffer);
-    glRenderbufferStorage(GL_RENDERBUFFER, GL_RGB32F, Config::WINDOW_W, Config::WINDOW_H);
-    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_RENDERBUFFER, normalRenderBuffer);
+    glGenTextures(1, &normalGBufferTexture);
+    glBindTexture(GL_TEXTURE_2D, normalGBufferTexture);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB32F, Config::WINDOW_W, Config::WINDOW_H, 0, GL_RGB, GL_FLOAT, NULL);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, normalGBufferTexture, 0);
 
-    glGenRenderbuffers(1, &uvRenderBuffer);
-    glBindRenderbuffer(GL_RENDERBUFFER, uvRenderBuffer);
-    glRenderbufferStorage(GL_RENDERBUFFER, GL_RG32F, Config::WINDOW_W, Config::WINDOW_H);
-    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT2, GL_RENDERBUFFER, uvRenderBuffer);
+    glGenTextures(1, &uvGBufferTexture);
+    glBindTexture(GL_TEXTURE_2D, uvGBufferTexture);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RG32F, Config::WINDOW_W, Config::WINDOW_H, 0, GL_RG, GL_FLOAT, NULL);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT2, GL_TEXTURE_2D, uvGBufferTexture, 0);
 
-    glGenRenderbuffers(1, &instanceRenderBuffer);
-    glBindRenderbuffer(GL_RENDERBUFFER, instanceRenderBuffer);
-    glRenderbufferStorage(GL_RENDERBUFFER, GL_R32F, Config::WINDOW_W, Config::WINDOW_H);
-    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT3, GL_RENDERBUFFER, instanceRenderBuffer);
+    glGenTextures(1, &instanceIndexGBufferTexture);
+    glBindTexture(GL_TEXTURE_2D, instanceIndexGBufferTexture);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_R32F, Config::WINDOW_W, Config::WINDOW_H, 0, GL_RED, GL_FLOAT, NULL);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT3, GL_TEXTURE_2D, instanceIndexGBufferTexture, 0);
+
+    glBindTexture(GL_TEXTURE_2D, 0);
 
     glGenRenderbuffers(1, &depthTestRenderBuffer);
     glBindRenderbuffer(GL_RENDERBUFFER, depthTestRenderBuffer);
@@ -148,26 +140,26 @@ void RasterPass::init_fbo() {
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
-void RasterPass::copy_fbodata_to_ssbo() {
-    glBindFramebuffer(GL_FRAMEBUFFER, frameBufferObject);
-    float *data = new float[SCREEN_W * SCREEN_H * 3];
-
-    glReadBuffer(GL_COLOR_ATTACHMENT0);     // depth
-    glReadPixels(0, Config::WINDOW_H - SCREEN_H, SCREEN_W, SCREEN_H, GL_RED, GL_FLOAT, data);
-    depthGBufferSSBO.copy(data);
-
-    glReadBuffer(GL_COLOR_ATTACHMENT1);     // normal
-    glReadPixels(0, Config::WINDOW_H - SCREEN_H, SCREEN_W, SCREEN_H, GL_RGB, GL_FLOAT, data);
-    normalGBufferSSBO.copy(data);
-
-    glReadBuffer(GL_COLOR_ATTACHMENT2);     // uv
-    glReadPixels(0, Config::WINDOW_H - SCREEN_H, SCREEN_W, SCREEN_H, GL_RG, GL_FLOAT, data);
-    uvGBufferSSBO.copy(data);
-
-    glReadBuffer(GL_COLOR_ATTACHMENT3);     // instanceIndex
-    glReadPixels(0, Config::WINDOW_H - SCREEN_H, SCREEN_W, SCREEN_H, GL_RED, GL_FLOAT, data);
-    instanceIndexGBufferSSBO.copy(data);
-
-    delete[] data;
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
-}
+//[[maybe_unused]] void RasterPass::copy_fbodata_to_ssbo() {
+//    glBindFramebuffer(GL_FRAMEBUFFER, frameBufferObject);
+//    float *data = new float[SCREEN_W * SCREEN_H * 3];
+//
+//    glReadBuffer(GL_COLOR_ATTACHMENT0);     // depth
+//    glReadPixels(0, Config::WINDOW_H - SCREEN_H, SCREEN_W, SCREEN_H, GL_RED, GL_FLOAT, data);
+//    depthGBufferSSBO.copy(data);
+//
+//    glReadBuffer(GL_COLOR_ATTACHMENT1);     // normal
+//    glReadPixels(0, Config::WINDOW_H - SCREEN_H, SCREEN_W, SCREEN_H, GL_RGB, GL_FLOAT, data);
+//    normalGBufferSSBO.copy(data);
+//
+//    glReadBuffer(GL_COLOR_ATTACHMENT2);     // uv
+//    glReadPixels(0, Config::WINDOW_H - SCREEN_H, SCREEN_W, SCREEN_H, GL_RG, GL_FLOAT, data);
+//    uvGBufferSSBO.copy(data);
+//
+//    glReadBuffer(GL_COLOR_ATTACHMENT3);     // instanceIndex
+//    glReadPixels(0, Config::WINDOW_H - SCREEN_H, SCREEN_W, SCREEN_H, GL_RED, GL_FLOAT, data);
+//    instanceIndexGBufferSSBO.copy(data);
+//
+//    delete[] data;
+//    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+//}
