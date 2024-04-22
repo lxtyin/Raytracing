@@ -111,6 +111,11 @@ void VertexFragmentRenderPass::drawcall() {
     glBindVertexArray(0);
 }
 
+VertexFragmentRenderPass::~VertexFragmentRenderPass() {
+    glDeleteBuffers(1, &VAO);
+    glDeleteBuffers(1, &VBO);
+}
+
 void RenderPass::use() {
     glUseProgram(shaderProgram);
 }

@@ -31,7 +31,7 @@ int RoughConductor::insert_buffer(std::vector<float> &materialBuffer, const std:
     materialBuffer.emplace_back(albedo.z);
     materialBuffer.emplace_back(roughness);
     materialBuffer.emplace_back(metallic);
-    if(albedo_map) {
+    if(albedo_map && albedo_map->textureHandle) {
         materialBuffer.emplace_back((float)textureIndexMap.at(albedo_map));
     } else materialBuffer.emplace_back(-1.0f);
     return ptr;

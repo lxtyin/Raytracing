@@ -4,6 +4,7 @@
 #include "exglm.hpp"
 #include "../material/RoughConductor.h"
 #include "../material/RoughDielectric.h"
+#include "../ResourceManager.h"
 #include "common.h"
 using namespace std;
 
@@ -58,6 +59,7 @@ namespace AssimpLoader{
         if(AI_SUCCESS == mat->Get(AI_MATKEY_METALLIC_FACTOR, res)){
             result->metallic = 1.0;
         }
+
         if(AI_SUCCESS == mat->Get(AI_MATKEY_TEXTURE(aiTextureType_BASE_COLOR, 0), str)){
             result->albedo_map = processImage(str.C_Str(), scene);
         }
@@ -66,6 +68,7 @@ namespace AssimpLoader{
             // TODO: emitter
 
         }
+
         return result;
     }
 
@@ -119,6 +122,7 @@ namespace AssimpLoader{
                 aiMaterial *mat = scene->mMaterials[mesh->mMaterialIndex];
                 cur->material = processMaterial(mat, scene);
             }
+
         }
 //        for(int i = 0; i < node->mNumMeshes; i++) {
 //            aiMesh *mesh = scene->mMeshes[node->mMeshes[i]];

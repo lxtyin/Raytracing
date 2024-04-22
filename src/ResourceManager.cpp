@@ -212,5 +212,9 @@ ResourceManager::~ResourceManager() {
     sceneBVHSSBO.release();
 }
 
+std::vector<std::pair<Instance *, mat4>> ResourceManager::getGlobalInstances() {
+    return globalInstances;
+}
+
 
 

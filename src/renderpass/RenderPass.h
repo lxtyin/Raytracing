@@ -6,8 +6,7 @@
 #define PATH_TRACING_RENDERPASS_H
 
 #include "glad/glad.h"
-#include "../GBuffer.h"
-#include "../Buffer.h"
+#include "../SSBOBuffer.h"
 #include <string>
 using std::string;
 
@@ -23,12 +22,10 @@ public:
      * \param targetId GL_TEXTURE0 + id
      */
     void bind_texture(const char *name, GLuint textureObject, int targetId, int type = GL_TEXTURE_2D);
-
 };
 
 class ComputeRenderPass: public RenderPass {
 protected:
-
     ComputeRenderPass(const string &computeShaderPath);
     void init_shader(const string &computeShaderPath);
 
@@ -36,10 +33,12 @@ protected:
 };
 
 class VertexFragmentRenderPass: public RenderPass {
-public:
+protected:
     GLuint VAO = 0, VBO = 0;
-
+public:
     VertexFragmentRenderPass(const string &fragShaderPath);
+    ~VertexFragmentRenderPass();
+
     void init_shader(const string &fragShaderPath);
 
     void drawcall();

@@ -8,22 +8,29 @@
 #include "imgui/imgui.h"
 #include "common.h"
 
+// RenderDoc does not support them, so we need to disable texture.
+//#define USE_BINDLESS_TEXTURE
+
 const int SCREEN_W = 640;
 const int SCREEN_H = 480;
-const int WINDOW_W = 1000;
-const int WINDOW_H = 700;
 
 // FOV for X axis.
-const float SCREEN_FOV = M_PI / 3;
+const float FOV_X = M_PI / 3;
 
 class Config {
  public:
+    static int WINDOW_W;
+    static int WINDOW_H;
+
 	static int SPP;
 	static bool useTAA;
     static bool useTemporalFilter;
     static bool useStaticBlender;
 	static int filterLevel;
 };
+
+inline int Config::WINDOW_W = 1000;
+inline int Config::WINDOW_H = 700;
 
 inline int Config::SPP = 1;
 inline bool Config::useTAA = false;

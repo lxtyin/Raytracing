@@ -11,7 +11,7 @@
 class Camera: public Instance {
  public:
 
-    float fov;
+    float fovX;
     float near, far;
 
 	Camera(float _near, float _far);

@@ -27,13 +27,19 @@ void Texture::load_to_gpu() {
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR); //GL_NEAREST 为邻近
     glGenerateMipmap(GL_TEXTURE_2D);//生成mipmap
 
+#ifdef USE_BINDLESS_TEXTURE
     textureHandle = glGetTextureHandleARB(textureObject);
     glMakeTextureHandleResidentARB(textureHandle);
+#else
+    textureHandle = 0;
+#endif
 }
 
 
 void Texture::unload_from_gpu() {
+#ifdef USE_BINDLESS_TEXTURE
     glMakeTextureHandleNonResidentARB(textureHandle);
+#endif
     glDeleteTextures(1, &textureObject);
     textureObject = textureHandle = 0;
 }

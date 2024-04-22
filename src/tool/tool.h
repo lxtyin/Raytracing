@@ -22,8 +22,6 @@ void save_file(const string &path, const string &info);
 
 string localtimestring();
 
-void copySSBO(GLuint frm, GLuint tar, uint siz);
-
 
 string show_file_open_dialog() ;
 

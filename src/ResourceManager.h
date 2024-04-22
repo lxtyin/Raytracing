@@ -8,14 +8,13 @@
 
 #include "glad/glad.h"
 #include "instance/Triangle.h"
-#include "Buffer.h"
+#include "SSBOBuffer.h"
 #include <vector>
 #include <string>
 #include <map>
 using std::string;
 using uint = unsigned int;
 
-class Texture;
 class Instance;
 class Mesh;
 class Scene;
@@ -39,7 +38,7 @@ class ResourceManager {
     
     std::vector<Texture*> textures;
     std::vector<Mesh*> meshes;
-    std::vector<std::pair<Instance*, mat4>> globalInstances; // Instances and transform to global.
+    std::vector<std::pair<Instance*, mat4>> globalInstances; // Instances and transform to global. (updated each frame)
 
     std::map<Texture*, uint> textureIndexMap;
     std::map<Mesh*, uint> meshIndexMap;
@@ -85,6 +84,8 @@ public:
     void del_mesh(Mesh *y);
     void update_globalinstance(Scene* scene);
     void update_globalinstance_recursive(Instance* ins, mat4 transform2world);
+
+    std::vector<std::pair<Instance*, mat4>> getGlobalInstances();
 
     int queryInstanceIndex(Instance *ins);
 };

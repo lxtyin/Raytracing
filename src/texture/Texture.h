@@ -3,12 +3,13 @@
 
 #include "glad/glad.h"
 #include "stb_image.h"
-#include "../ResourceManager.h"
+#include "../Config.h"
 #include <string>
 #include <vector>
 using std::string;
 using uint = unsigned int;
 using uchar = unsigned char;
+
 
 // Store in texture space. (Quadrant 1)
 class Texture {
