@@ -10,10 +10,11 @@
 class SVGFSpatialFilterPass: public VertexFragmentRenderPass {
 public:
 
-    SSBOBuffer<float> colorOutputSSBO;
+    SSBOBuffer<float> colorOutputGBufferSSBO;
 
     SVGFSpatialFilterPass(const string &fragShaderPath);
     ~SVGFSpatialFilterPass();
+
 
     void draw(SSBOBuffer<float> &colorGBufferSSBO,
               SSBOBuffer<float> &normalGBufferSSBO,

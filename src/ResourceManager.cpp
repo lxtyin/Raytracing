@@ -47,7 +47,11 @@ void ResourceManager::del_texture(Texture *y) {
 void ResourceManager::update_globalinstance(Scene *scene) {
     globalInstances.clear();
     instanceIndexMap.clear();
+    lightBuffer.clear();
     update_globalinstance_recursive(scene, mat4(1.0));
+
+    lightSSBO.release();
+    lightSSBO = SSBOBuffer<LightInfo>(lightBuffer.size(), lightBuffer.data());
 }
 
 void ResourceManager::update_globalinstance_recursive(Instance *cur, mat4 transform2world) {
@@ -55,6 +59,17 @@ void ResourceManager::update_globalinstance_recursive(Instance *cur, mat4 transf
         instanceIndexMap[cur] = (int)globalInstances.size();
         globalInstances.emplace_back(cur, transform2world);
     }
+    if(cur->emitterType == Emitter_POINT) {
+        vec3 pos = vec3(transform2world * vec4(cur->transform.position, 1.0));
+        LightInfo lightInfo(0, pos, cur->emission);
+        lightBuffer.push_back(lightInfo);
+    }
+    if(cur->emitterType == Emitter_DIRECTIONAL) {
+        vec3 dir = vec3(transform2world * vec4(cur->transform.direction_z(), 0.0));
+        LightInfo lightInfo(1, dir, cur->emission);
+        lightBuffer.push_back(lightInfo);
+    }
+
     Instance *child;
     for(int i = 0; (child = cur->get_child(i)) != nullptr; i++){
         update_globalinstance_recursive(child, transform2world * child->transform.matrix());
@@ -73,6 +88,7 @@ void ResourceManager::reload_textures() {
     textureHandlesBuffer.clear();
     for(Texture *t: textures) if(t) textureHandlesBuffer.push_back(t->textureHandle);
 
+    textureHandleSSBO.release();
     textureHandleSSBO = SSBOBuffer<GLuint64>(textureHandlesBuffer.size(), textureHandlesBuffer.data());
 }
 
@@ -93,6 +109,8 @@ void ResourceManager::reload_meshes() {
             triangleBuffer.push_back(t);
         }
     }
+
+    triangleSSBO.release();
     triangleSSBO = SSBOBuffer<Triangle>(triangleBuffer.size(), triangleBuffer.data());
 
     // update meshBVH
@@ -120,6 +138,8 @@ void ResourceManager::reload_meshes() {
         if(p->trianglePtr) y.triangleIndex = triangleIndexMap[p->trianglePtr];
         meshBVHBuffer.push_back(y);
     }
+
+    meshBVHSSBO.release();
     meshBVHSSBO = SSBOBuffer<BVHNodeInfo>(meshBVHBuffer.size(), meshBVHBuffer.data());
 }
 
@@ -136,7 +156,11 @@ void ResourceManager::reload_instances() {
         y.meshIndex = meshIndexMap[u->mesh];
         instanceInfoBuffer.push_back(y);
     }
+
+    materialSSBO.release();
     materialSSBO = SSBOBuffer<float>(materialBuffer.size(), materialBuffer.data());
+
+    instanceInfoSSBO.release();
     instanceInfoSSBO = SSBOBuffer<InstanceInfo>(instanceInfoBuffer.size(), instanceInfoBuffer.data());
 }
 
@@ -169,6 +193,7 @@ void ResourceManager::reload_sceneBVH(BVHNode *root) {
         y.rsIndex = ir;
         sceneBVHBuffer.push_back(y);
     }
+    sceneBVHSSBO.release();
     sceneBVHSSBO = SSBOBuffer<BVHNodeInfo>(sceneBVHBuffer.size(), sceneBVHBuffer.data());
 }
 
@@ -210,10 +235,15 @@ ResourceManager::~ResourceManager() {
     instanceInfoSSBO.release();
     meshBVHSSBO.release();
     sceneBVHSSBO.release();
+    lightSSBO.release();
 }
 
 std::vector<std::pair<Instance *, mat4>> ResourceManager::getGlobalInstances() {
     return globalInstances;
+}
+
+int ResourceManager::getLightCount() {
+    return (int)lightBuffer.size();
 }
 
 

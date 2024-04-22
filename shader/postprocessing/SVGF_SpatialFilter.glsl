@@ -7,7 +7,6 @@
 in vec2 screen_uv;
 uniform int SCREEN_W;
 uniform int SCREEN_H;
-uniform mat4 w2vMat;
 uniform int step;           // for differen level of a'trous wavelet filter.
 
 layout(binding = 0, std430) readonly buffer ssbo0 {
@@ -26,7 +25,7 @@ layout(binding = 4, std430) readonly buffer ssbo4 {
     float numSamplesGBuffer[];
 };
 layout(binding = 5, std430) buffer ssbo5 {
-    float colorOutput[];
+    float colorOutputGBuffer[];
 };
 
 const float kernel[3] = {1.0, 2.0 / 3.0, 1.0 / 6};
@@ -52,17 +51,10 @@ void main() {
     float numSamples = numSamplesGBuffer[pixelPtr];
     float depth = depthGBuffer[pixelPtr];
 
-    vec3 clipspaceN = normalize(mat3(w2vMat) * normal);
-    vec2 gradZ = vec2(clipspaceN.x, clipspaceN.y);
 
     // estimate variance
     float variance = max(0, moment.y - moment.x * moment.x);
     float sigma = sqrt(variance);
-
-//    colorOutput[pixelPtr * 3 + 0] = numSamples / 10;
-//    colorOutput[pixelPtr * 3 + 1] = numSamples / 10;
-//    colorOutput[pixelPtr * 3 + 2] = numSamples / 10;
-//    return;
 
     // filter
     float totalWeight = 0;
@@ -84,13 +76,12 @@ void main() {
                 normalGBuffer[ptr * 3 + 2]
             );
             float _depth = depthGBuffer[ptr];
-            float dz = abs(dot(gradZ, vec2(i, j) * step));
 
             // No depth now.
             float w = kernel[abs(i)] * kernel[abs(j)] *
                     pow(max(0, dot(normal, _normal)), 128) *
-                    exp(-abs(depth - _depth) / (dz + 0.00001)) *
-                    exp(-abs(luminance(color) - luminance(_color)) / (sigma * 4.0 + 0.00001));
+                    exp(-abs(depth - _depth) / 2) *
+                    exp(-abs(length(color - _color)) / (sigma * 4.0 + 0.00001));
 
             totalWeight += w;
             result += w * _color;
@@ -99,8 +90,8 @@ void main() {
     result /= totalWeight;
     if(any(isnan(result)) || any(isinf(result))) result = vec3(10000, 0, 0);
 
-    colorOutput[pixelPtr * 3 + 0] = result.x;
-    colorOutput[pixelPtr * 3 + 1] = result.y;
-    colorOutput[pixelPtr * 3 + 2] = result.z;
+    colorOutputGBuffer[pixelPtr * 3 + 0] = result.x;
+    colorOutputGBuffer[pixelPtr * 3 + 1] = result.y;
+    colorOutputGBuffer[pixelPtr * 3 + 2] = result.z;
 }
 

@@ -22,21 +22,24 @@ void SVGFTemporalFilter::draw(SSBOBuffer<float> &colorGBufferSSBO,
                               SSBOBuffer<float> &motionGBufferSSBO,
                               SSBOBuffer<float> &numSamplesGBufferSSBO) {
 
-    colorGBufferSSBO.bind_current_shader(0);
-    momentGBufferSSBO.bind_current_shader(1);
-    normalGBufferSSBO.bind_current_shader(2);
-    instanceIndexGBufferSSBO.bind_current_shader(3);
-    motionGBufferSSBO.bind_current_shader(4);
+    if(!firstFrame) {
+        colorGBufferSSBO.bind_current_shader(0);
+        momentGBufferSSBO.bind_current_shader(1);
+        normalGBufferSSBO.bind_current_shader(2);
+        instanceIndexGBufferSSBO.bind_current_shader(3);
+        motionGBufferSSBO.bind_current_shader(4);
 
-    historycolorGBufferSSBO.bind_current_shader(5);
-    historymomentGBufferSSBO.bind_current_shader(6);
-    historynormalGBufferSSBO.bind_current_shader(7);
-    historyinstanceIndexGBufferSSBO.bind_current_shader(8);
-    historynumSamplesGBufferSSBO.bind_current_shader(9);
+        historycolorGBufferSSBO.bind_current_shader(5);
+        historymomentGBufferSSBO.bind_current_shader(6);
+        historynormalGBufferSSBO.bind_current_shader(7);
+        historyinstanceIndexGBufferSSBO.bind_current_shader(8);
+        historynumSamplesGBufferSSBO.bind_current_shader(9);
 
-    numSamplesGBufferSSBO.bind_current_shader(10);
+        numSamplesGBufferSSBO.bind_current_shader(10);
 
-    drawcall();
+        drawcall();
+    }
+    firstFrame = false;
 
     historycolorGBufferSSBO.copy(&colorGBufferSSBO);
     historycolorGBufferSSBO.copy(&colorGBufferSSBO);

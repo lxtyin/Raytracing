@@ -11,6 +11,13 @@
 class Mesh;
 class Material;
 
+enum EmitterType {
+    Emitter_NONE,
+    Emitter_SURFACE,
+    Emitter_POINT,
+    Emitter_DIRECTIONAL
+};
+
 class Instance {
 protected:
     friend class TinyUI;
@@ -23,6 +30,8 @@ public:
     Mesh* mesh = nullptr;
     Material *material = nullptr;
     Transform transform;                 /**< transform to parent. */
+    EmitterType emitterType = Emitter_NONE;
+    vec3 emission = vec3(1.0);
 
     Instance() = default;
     ~Instance();
@@ -44,5 +53,7 @@ public:
      */
     int add_child(Instance *cd);
 };
+
+
 
 #endif //OPENGL_INSTANCE_H

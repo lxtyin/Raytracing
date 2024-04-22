@@ -142,6 +142,39 @@ void TinyUI::insert_instance_Editor(Instance *u) {
             u->material->insert_gui();
         }
     }
+
+    ImGui::SeparatorText("Emitter");
+    static ImGuiComboFlags flags = ImGuiComboFlags_HeightSmall | ImGuiComboFlags_PopupAlignLeft;
+    const char* items[] = { "None", "Surface", "Point", "Directional"};
+    int item_current_idx = u->emitterType;
+    const char* combo_preview_value = items[item_current_idx];
+
+    if (ImGui::BeginCombo("EmitterType", combo_preview_value, flags)) {
+        for (int n = 0; n < IM_ARRAYSIZE(items); n++) {
+            const bool is_selected = (item_current_idx == n);
+
+            if (ImGui::Selectable(items[n], is_selected)) {
+                if(n == item_current_idx) continue;
+                else {
+                    if(items[n] == "Surface" && !u->mesh) {
+                        std::cerr << "TinyUI: emitter type Surface must have a mesh." << std::endl;
+                    } else {
+                        u->emitterType = static_cast<EmitterType>(n);
+                        item_current_idx = n;
+                    }
+                }
+            }
+
+            if (is_selected) ImGui::SetItemDefaultFocus();
+        }
+        ImGui::EndCombo();
+    }
+
+    if(u->emitterType != Emitter_NONE) {
+        float r[3] = { u->emission.x, u->emission.y, u->emission.z };
+        ImGui::DragFloat3("emission", r, 0.1, -1000, 1000, "%.2f");
+        u->emission = vec3(r[0], r[1], r[2]);
+    }
 }
 
 void TinyUI::insert_configuration() {

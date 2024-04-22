@@ -8,7 +8,7 @@
 
 SVGFSpatialFilterPass::SVGFSpatialFilterPass(const string &fragShaderPath) :
     VertexFragmentRenderPass(fragShaderPath),
-    colorOutputSSBO(SCREEN_H * SCREEN_W * 3) {}
+    colorOutputGBufferSSBO(SCREEN_H * SCREEN_W * 3) {}
 
 void SVGFSpatialFilterPass::draw(SSBOBuffer<float> &colorGBufferSSBO,
                                  SSBOBuffer<float> &normalGBufferSSBO,
@@ -21,12 +21,12 @@ void SVGFSpatialFilterPass::draw(SSBOBuffer<float> &colorGBufferSSBO,
     depthGBufferSSBO.bind_current_shader(2);
     momentGBufferSSBO.bind_current_shader(3);
     numSamplesGBufferSSBO.bind_current_shader(4);
-    colorOutputSSBO.bind_current_shader(5);
+    colorOutputGBufferSSBO.bind_current_shader(5);
 
     drawcall();
-    colorOutputSSBO.copy(&colorGBufferSSBO);
+    colorGBufferSSBO.copy(&colorOutputGBufferSSBO);
 }
 
 SVGFSpatialFilterPass::~SVGFSpatialFilterPass() {
-    colorOutputSSBO.release();
+    colorOutputGBufferSSBO.release();
 }

@@ -138,6 +138,7 @@ void main() {
     var = var / nv - mu * mu;
     vec3 sigma = sqrt(var);
 
+
     // Temporal accumulation
     vec2 last_uv = screen_uv - motion;
     if(last_uv.x >= 1 || last_uv.y >= 1 || last_uv.x < 0 || last_uv.y < 0) {
@@ -163,10 +164,10 @@ void main() {
         // Additional variance test.
         vec3 dir = lastcolor - mu;
         if(!valid || abs(dir.x) > sigma.x || abs(dir.y) > sigma.y || abs(dir.z) > sigma.z) {
-            numSamplesGBuffer[pixelPtr] = 1;
+            ;
         } else {
             float historyLen = historyNumSamplesGBuffer[lastPixelPtr];
-            numSamplesGBuffer[pixelPtr] = historyLen + 1;
+            numSamplesGBuffer[pixelPtr] += historyLen;
             color = mix(lastcolor, color, 1.0 / (historyLen + 1));
             moment = mix(lastmoment, moment, 1.0 / (historyLen + 1));
         }

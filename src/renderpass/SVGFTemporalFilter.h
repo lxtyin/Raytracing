@@ -19,6 +19,8 @@ public:
     SVGFTemporalFilter(const string &fragShaderPath);
     ~SVGFTemporalFilter();
 
+    bool firstFrame = true;
+
     void draw(SSBOBuffer<float> &colorGBufferSSBO,
               SSBOBuffer<float> &momentGBufferSSBO,
               SSBOBuffer<float> &normalGBufferSSBO,

@@ -196,7 +196,7 @@ void update(float dt) {
                 glUniform1i(glGetUniformLocation(staticBlenderPass->shaderProgram, "SCREEN_W"), SCREEN_W);
                 glUniform1i(glGetUniformLocation(staticBlenderPass->shaderProgram, "SCREEN_H"), SCREEN_H);
             }
-            staticBlenderPass->draw(renderPass->colorGBufferSSBO);
+            staticBlenderPass->draw(renderPass->indirectLumGBufferSSBO);
         }
 
         if(Config::useTemporalFilter) {
@@ -205,13 +205,13 @@ void update(float dt) {
                 glUniform1i(glGetUniformLocation(svgfTemporalFilterPass->shaderProgram, "SCREEN_W"), SCREEN_W);
                 glUniform1i(glGetUniformLocation(svgfTemporalFilterPass->shaderProgram, "SCREEN_H"), SCREEN_H);
             }
-            svgfTemporalFilterPass->draw(renderPass->colorGBufferSSBO,
+            svgfTemporalFilterPass->draw(renderPass->indirectLumGBufferSSBO,
                                          renderPass->momentGBufferSSBO,
                                          renderPass->normalGBufferSSBO,
                                          renderPass->instanceIndexGBufferSSBO,
                                          renderPass->motionGBufferSSBO,
                                          renderPass->numSamplesGBufferSSBO);
-        }
+        } else svgfTemporalFilterPass->firstFrame = true;
 
         // a'trous wavelet filter
         for(int i = 0;i < Config::filterLevel;i++) {
@@ -223,7 +223,7 @@ void update(float dt) {
                 glUniform1i(glGetUniformLocation(svgfSpatialFilterPass->shaderProgram, "step"), 1 << i);
             }
             svgfSpatialFilterPass->draw(
-                    renderPass->colorGBufferSSBO,
+                    renderPass->indirectLumGBufferSSBO,
                     renderPass->normalGBufferSSBO,
                     renderPass->depthGBufferSSBO,
                     renderPass->momentGBufferSSBO,
@@ -235,7 +235,7 @@ void update(float dt) {
             glUniform1i(glGetUniformLocation(mappingPass->shaderProgram, "SCREEN_W"), SCREEN_W);
             glUniform1i(glGetUniformLocation(mappingPass->shaderProgram, "SCREEN_H"), SCREEN_H);
         }
-        mappingPass->draw(renderPass->colorGBufferSSBO);
+        mappingPass->draw(renderPass->indirectLumGBufferSSBO);
 
         if(Config::useTAA) {
             taaPass->use();
@@ -244,11 +244,11 @@ void update(float dt) {
                 glUniform1i(glGetUniformLocation(taaPass->shaderProgram, "SCREEN_H"), SCREEN_H);
             }
             taaPass->draw(
-                    renderPass->colorGBufferSSBO,
+                    renderPass->indirectLumGBufferSSBO,
                     renderPass->motionGBufferSSBO,
                     renderPass->normalGBufferSSBO,
                     renderPass->instanceIndexGBufferSSBO);
-        }
+        } else taaPass->firstFrame = true;
 
         directPass->use();
         {
@@ -257,7 +257,7 @@ void update(float dt) {
             glUniform1i(glGetUniformLocation(directPass->shaderProgram, "selectedInstanceIndex"),
                         ResourceManager::manager->queryInstanceIndex(TinyUI::selectedInstance));
         }
-        directPass->draw(renderPass->colorGBufferSSBO,
+        directPass->draw(renderPass->indirectLumGBufferSSBO,
                          renderPass->instanceIndexGBufferSSBO);
 
         back_projection = camera->projection() * camera->w2v_matrix();
@@ -309,7 +309,6 @@ void update(float dt) {
     // TODO: if updated.
     if(!(camera->transform == previousCameraTransform)) {
         staticBlenderPass->frameCounter = 0;
-//        taaPass->firstFrame = true;
     }
 }
 
@@ -335,10 +334,11 @@ void init_scene() {
         o1->transform.rotation = vec3(-90, 0, 0);
 		scene->add_child(o1);
 
-//        Instance *light= AssimpLoader::load_model("model/light.obj");
-//        light->transform.scale = vec3(30, 30, 30);
-//        light->transform.position = vec3(0, 10, 0);
-//        scene->add_child(light);
+        Instance *light = new Instance("light");
+        light->transform.rotation = vec3(63, 60, 0);
+        light->emitterType = Emitter_DIRECTIONAL;
+        light->emission = vec3(5, 5, 5);
+        scene->add_child(light);
     }
 
 	skybox = new Skybox("model/kloofendal_48d_partly_cloudy_puresky_2k.hdr");

@@ -33,6 +33,19 @@ struct BVHNodeInfo {
     int instanceIndex = -1;
     int triangleIndex = -1;
 };
+class LightInfo {
+public:
+    // temporal used. simple light
+    int type;
+    float x, y, z;
+    float r, g, b;
+    float emptyblock;
+    LightInfo(int t, vec3 p, vec3 v) {
+        type = t;
+        x = p.x, y = p.y, z = p.z;
+        r = v.x, g = v.y, b = v.z;
+    }
+};
 
 class ResourceManager {
     
@@ -51,6 +64,7 @@ class ResourceManager {
     std::vector<Triangle> triangleBuffer;
     std::vector<BVHNodeInfo> meshBVHBuffer;
     std::vector<BVHNodeInfo> sceneBVHBuffer;
+    std::vector<LightInfo> lightBuffer;
 
     /**
      * reload all instance info (material buffer, mesh ptr) in O(numInstances).
@@ -73,6 +87,7 @@ public:
     SSBOBuffer<InstanceInfo> instanceInfoSSBO;
     SSBOBuffer<BVHNodeInfo> meshBVHSSBO;
     SSBOBuffer<BVHNodeInfo> sceneBVHSSBO;
+    SSBOBuffer<LightInfo> lightSSBO;
 
     void reload_textures();
     void reload_meshes();
@@ -88,6 +103,7 @@ public:
     std::vector<std::pair<Instance*, mat4>> getGlobalInstances();
 
     int queryInstanceIndex(Instance *ins);
+    int getLightCount();
 };
 
 

@@ -74,19 +74,17 @@ layout(binding = 5, std430) readonly buffer ssbo5 {
 
 struct Light {
     // point light (0) or directional light (1).
-    float type;
-    float r, g, b;
+    int type;
     float x, y, z;
+    float r, g, b;
+    float emptyblock;
 };
-layout(binding = 14, std430) readonly buffer ssbo14 {
+layout(binding = 6, std430) readonly buffer ssbo6 {
     Light lightBuffer[];
 };
 uniform int lightCount;
 
 
-layout(binding = 6) buffer ssbo6 {
-    float colorGBuffer[];
-};
 layout(binding = 7) buffer ssbo7 {
     float albedoGBuffer[];
 };
@@ -109,6 +107,14 @@ layout(binding = 12) writeonly buffer ssbo12 {
 };
 layout(binding = 13) writeonly buffer ssbo13 {
     float instanceIndexGBuffer[];
+};
+
+
+layout(binding = 14) buffer ssbo14 {
+    float directLumGBuffer[];
+};
+layout(binding = 15) buffer ssbo15 {
+    float indirectLumGBuffer[];
 };
 
 uniform sampler2D depthGBufferTexture;
@@ -395,7 +401,6 @@ float skybox_sample_pdf(vec3 v) {
     return lw / w2a;
 }
 
-
 // path tracing
 // ---------------------------------------------- //
 
@@ -422,20 +427,46 @@ void shade(Ray ray, in Intersection first_isect, out vec3 resultDI, out vec3 res
         vec3 wi = to_local(coord, -ray.dir);
         vec3 wo, global_wo;
         float pdf;
-        global_wo = skybox_sample(pdf);
 
-        BSDFQueryRecord bRec = BSDFQueryRecord(wi, to_local(coord, global_wo), materialPtr, isect.uv, 1.0);
+        BSDFQueryRecord bRec = BSDFQueryRecord(wi, vec3(0), materialPtr, isect.uv, 1.0);
 
-        // direct light
-        if(pdf > 0) {
-            Intersection tsect = intersect_sceneBVH(Ray(isect.position, global_wo));
+        // skybox direct light
+//        global_wo = skybox_sample(pdf);
+//        if(pdf > 0) {
+//            Intersection tsect = intersect_sceneBVH(Ray(isect.position, global_wo));
+//            if(!tsect.exist) {
+//                bRec.wo = to_local(coord, global_wo);
+//                vec3 fr = eval_material(bRec);
+//                vec3 recv_col = get_background_color(global_wo) * fr * abs(bRec.wo.z) / (pdf + pdf_material(bRec));
+//                resultGI += history * recv_col;
+//                if(dep == 0) resultDI = recv_col;
+//            }
+//        }
+
+        // independent direct lighting
+        for(int li = 0;li < lightCount;li++) {
+
+            Light light = lightBuffer[li];
+            vec3 dir, radiance;
+            if(light.type == 0) {
+                dir = vec3(light.x, light.y, light.z) - isect.position;
+                radiance = vec3(light.r, light.g, light.b) / dot(dir, dir);
+                dir = normalize(dir);
+            } else {
+                dir = -normalize(vec3(light.x, light.y, light.z));
+                radiance = vec3(light.r, light.g, light.b);
+            }
+
+            Intersection tsect = intersect_sceneBVH(Ray(isect.position, dir));
             if(!tsect.exist) {
+                bRec.wo = to_local(coord, dir);
                 vec3 fr = eval_material(bRec);
-                vec3 recv_col = get_background_color(global_wo) * fr * abs(bRec.wo.z) / (pdf + pdf_material(bRec));
+                vec3 recv_col = radiance * fr * abs(bRec.wo.z);
                 resultGI += history * recv_col;
                 if(dep == 0) resultDI = recv_col;
             }
         }
+
 
         // indirect light
         vec3 fr = sample_material(bRec, pdf);
@@ -488,13 +519,14 @@ void main() {
     Intersection first_isect;
     first_isect.t = depth;
     first_isect.exist = depth <= 100000;
-    first_isect.normal = texture(normalGBufferTexture, window_uv).xyz;
+    first_isect.normal = normalize(texture(normalGBufferTexture, window_uv).xyz);
     first_isect.uv = texture(uvGBufferTexture, window_uv).xy;
     first_isect.position = ray.ori + ray.dir * first_isect.t;
     first_isect.instanceIndex = instanceIndex;
 
     vec3 resultDI, resultGI, albedo;
     shade(ray, first_isect, resultDI, resultGI);
+    vec3 resultIDI = resultGI - resultDI;
 
     // TODO avoid cameraNear clip ?
 
@@ -506,25 +538,8 @@ void main() {
         albedo = resultGI;
     }
 
-    // TODO: let the last sample be in the center.
-//    vec2 p = pixelIndex + vec2(0.5);
-//    float disz = SCREEN_W * 0.5 / tan(fov / 2);
-//    vec3 ori = vec3(v2wMat * vec4(0, 0, 0, 1));
-//    vec3 dir = normalize(vec3(v2wMat * vec4(p.x - SCREEN_W / 2, p.y - SCREEN_H / 2, -disz, 0)));
-//    ray = Ray(ori, dir);
-//    isect = intersect_sceneBVH(ray);
-
-    // get GBuffers use last sample.
-//    if(!isect.exist) {
-//        albedoout = colorout;
-//        isect.position = ray.ori + ray.dir * 1000;
-//        isect.instanceIndex = 1000;
-//    } else {
-//        BSDFQueryRecord bRec = BSDFQueryRecord(-ray.dir, -ray.dir, isect.materialPtr, isect.uv, 1.0);
-//        albedoout = albedo_material(bRec);
-//        normalout = isect.normal;
-//        depthout = isect.t;
-//    }
+    resultDI /= albedo;
+    resultIDI /= albedo;
 
     // calculate motion vector
     vec4 lastNDC = backprojMat * vec4(first_isect.position, 1);
@@ -536,22 +551,29 @@ void main() {
     vec2 moment = vec2(lum, lum * lum);
 
     if(currentspp != 1) {
-        vec3 lastcolor = vec3(colorGBuffer[pixelPtr * 3 + 0],
-                              colorGBuffer[pixelPtr * 3 + 1],
-                              colorGBuffer[pixelPtr * 3 + 2]);
+        vec3 lastdi = vec3(directLumGBuffer[pixelPtr * 3 + 0],
+                                directLumGBuffer[pixelPtr * 3 + 1],
+                                directLumGBuffer[pixelPtr * 3 + 2]);
+        vec3 lastidi = vec3(indirectLumGBuffer[pixelPtr * 3 + 0],
+                                 indirectLumGBuffer[pixelPtr * 3 + 1],
+                                 indirectLumGBuffer[pixelPtr * 3 + 2]);
         vec3 lastalbedo = vec3(albedoGBuffer[pixelPtr * 3 + 0],
                                albedoGBuffer[pixelPtr * 3 + 1],
                                albedoGBuffer[pixelPtr * 3 + 2]);
         vec2 lastmoment = vec2(momentGBuffer[pixelPtr * 2 + 0],
                                momentGBuffer[pixelPtr * 2 + 1]);
-        resultGI = mix(lastcolor, resultGI, 1.0 / currentspp);
+        resultDI = mix(lastdi, lastdi, 1.0 / currentspp);
+        resultIDI = mix(lastidi, lastidi, 1.0 / currentspp);
         albedo = mix(lastalbedo, albedo, 1.0 / currentspp);
         moment = mix(lastmoment, moment, 1.0 / currentspp);
     }
 
-    colorGBuffer[pixelPtr * 3 + 0] = resultGI.x;
-    colorGBuffer[pixelPtr * 3 + 1] = resultGI.y;
-    colorGBuffer[pixelPtr * 3 + 2] = resultGI.z;
+    directLumGBuffer[pixelPtr * 3 + 0] = resultDI.x;
+    directLumGBuffer[pixelPtr * 3 + 1] = resultDI.y;
+    directLumGBuffer[pixelPtr * 3 + 2] = resultDI.z;
+    indirectLumGBuffer[pixelPtr * 3 + 0] = resultIDI.x;
+    indirectLumGBuffer[pixelPtr * 3 + 1] = resultIDI.y;
+    indirectLumGBuffer[pixelPtr * 3 + 2] = resultIDI.z;
 
     albedoGBuffer[pixelPtr * 3 + 0] = albedo.x;
     albedoGBuffer[pixelPtr * 3 + 1] = albedo.y;

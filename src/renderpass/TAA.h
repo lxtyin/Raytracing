@@ -14,7 +14,7 @@ public:
     SSBOBuffer<float> historynormalGBufferSSBO;
     SSBOBuffer<float> historyinstanceIndexGBufferSSBO;
 
-    bool firstFrame;
+    bool firstFrame = true;
 
     TAA(const string &fragShaderPath);
     ~TAA();

@@ -15,7 +15,8 @@ class Instance;
 
 class Renderer: public VertexFragmentRenderPass {
 public:
-    SSBOBuffer<float> colorGBufferSSBO;
+    SSBOBuffer<float> directLumGBufferSSBO;
+    SSBOBuffer<float> indirectLumGBufferSSBO;
     SSBOBuffer<float> motionGBufferSSBO;
     SSBOBuffer<float> albedoGBufferSSBO;
     SSBOBuffer<float> momentGBufferSSBO;

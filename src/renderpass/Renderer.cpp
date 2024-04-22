@@ -17,7 +17,8 @@
 
 
 Renderer::Renderer(const string &shaderPath): VertexFragmentRenderPass(shaderPath),
-                                              colorGBufferSSBO(SCREEN_W * SCREEN_H * 3),
+                                              directLumGBufferSSBO(SCREEN_W * SCREEN_H * 3),
+                                              indirectLumGBufferSSBO(SCREEN_W * SCREEN_H * 3),
                                               motionGBufferSSBO(SCREEN_W * SCREEN_H * 2),
                                               albedoGBufferSSBO(SCREEN_W * SCREEN_H * 3),
                                               momentGBufferSSBO(SCREEN_W * SCREEN_H * 2),
@@ -36,8 +37,12 @@ void Renderer::draw() {
     ResourceManager::manager->instanceInfoSSBO.bind_current_shader(3);
     ResourceManager::manager->meshBVHSSBO.bind_current_shader(4);
     ResourceManager::manager->sceneBVHSSBO.bind_current_shader(5);
+    ResourceManager::manager->lightSSBO.bind_current_shader(6);
 
-    colorGBufferSSBO.bind_current_shader(6);
+    glUniform1i(glGetUniformLocation(shaderProgram, "lightCount"), ResourceManager::manager->getLightCount());
+
+    directLumGBufferSSBO.bind_current_shader(14);
+    indirectLumGBufferSSBO.bind_current_shader(15);
     albedoGBufferSSBO.bind_current_shader(7);
     momentGBufferSSBO.bind_current_shader(8);
 
@@ -52,7 +57,8 @@ void Renderer::draw() {
 }
 
 Renderer::~Renderer() {
-    colorGBufferSSBO.release();
+    directLumGBufferSSBO.release();
+    indirectLumGBufferSSBO.release();
     motionGBufferSSBO.release();
     albedoGBufferSSBO.release();
     momentGBufferSSBO.release();
