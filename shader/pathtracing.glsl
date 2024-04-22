@@ -142,6 +142,12 @@ uniform uint frameCounter;
 uniform int currentspp;
 uniform vec2 jitter;
 
+uniform bool BRDFSampling;
+uniform bool SkyboxSampling;
+uniform bool SkyboxLighting;
+
+uniform bool RasterizaionFor1st;
+
 #include shader/materials/materials.glsl
 
 
@@ -358,17 +364,17 @@ void sample_triangle(in Triangle t, out vec3 position, out vec3 normal) {
 //}
 
 // 球面均匀采样
-//vec3 spherical_sample(out float pdf) {
-//    float z = rand() * 2 - 1;
-//    float r = max(0.0, sqrt(1.0 - z * z));
-//    float phi = 2 * PI * rand();
-//    vec3 wo = vec3(r * cos(phi), r * sin(phi), z);
-//    pdf = 0.25 * INV_PI;
-//    return wo;
-//}
-//float spherical_sample_pdf() {
-//    return 0.25 * INV_PI;
-//}
+vec3 spherical_sample(out float pdf) {
+    float z = rand() * 2 - 1;
+    float r = max(0.0, sqrt(1.0 - z * z));
+    float phi = 2 * PI * rand();
+    vec3 wo = vec3(r * cos(phi), r * sin(phi), z);
+    pdf = 0.25 * INV_PI;
+    return wo;
+}
+float spherical_sample_pdf() {
+    return 0.25 * INV_PI;
+}
 
 vec3 get_background_color(vec3 v) {
     vec2 uv = vec2(atan(v.z, v.x), asin(v.y)); // atan returns [-pi, pi] if input (x, y)
@@ -431,17 +437,19 @@ void shade(Ray ray, in Intersection first_isect, out vec3 resultDI, out vec3 res
         BSDFQueryRecord bRec = BSDFQueryRecord(wi, vec3(0), materialPtr, isect.uv, 1.0);
 
         // skybox direct light
-//        global_wo = skybox_sample(pdf);
-//        if(pdf > 0) {
-//            Intersection tsect = intersect_sceneBVH(Ray(isect.position, global_wo));
-//            if(!tsect.exist) {
-//                bRec.wo = to_local(coord, global_wo);
-//                vec3 fr = eval_material(bRec);
-//                vec3 recv_col = get_background_color(global_wo) * fr * abs(bRec.wo.z) / (pdf + pdf_material(bRec));
-//                resultGI += history * recv_col;
-//                if(dep == 0) resultDI = recv_col;
-//            }
-//        }
+        if(SkyboxLighting && SkyboxSampling) {
+            global_wo = skybox_sample(pdf);
+            if(pdf > 0) {
+                Intersection tsect = intersect_sceneBVH(Ray(isect.position, global_wo));
+                if(!tsect.exist) {
+                    bRec.wo = to_local(coord, global_wo);
+                    vec3 fr = eval_material(bRec);
+                    vec3 recv_col = get_background_color(global_wo) * fr * abs(bRec.wo.z) / (pdf + pdf_material(bRec));
+                    resultGI += history * recv_col;
+                    if(dep == 0) resultDI = recv_col;
+                }
+            }
+        }
 
         // independent direct lighting
         for(int li = 0;li < lightCount;li++) {
@@ -470,14 +478,24 @@ void shade(Ray ray, in Intersection first_isect, out vec3 resultDI, out vec3 res
 
         // indirect light
         vec3 fr = sample_material(bRec, pdf);
+        if(!BRDFSampling) {
+            bRec.wo = spherical_sample(pdf);
+            fr = eval_material(bRec);
+        }
+
         global_wo = to_world(coord, bRec.wo);
         if(pdf <= 0) break;
 
         ray = Ray(isect.position, global_wo);
         isect = intersect_sceneBVH(ray);
         if(!isect.exist) {  // hit sky
-            vec3 recv_col = get_background_color(global_wo) * fr * abs(bRec.wo.z) / (pdf + skybox_sample_pdf(global_wo));
-            resultGI += history * recv_col;
+            if(SkyboxLighting && SkyboxSampling) {
+                vec3 recv_col = get_background_color(global_wo) * fr * abs(bRec.wo.z) / (pdf + skybox_sample_pdf(global_wo));
+                resultGI += history * recv_col;
+            } else if(SkyboxLighting) {
+                vec3 recv_col = get_background_color(global_wo) * fr * abs(bRec.wo.z) / pdf;
+                resultGI += history * recv_col;
+            }
             break;
         } else {
             history *= fr * abs(bRec.wo.z) / pdf;
@@ -524,8 +542,16 @@ void main() {
     first_isect.position = ray.ori + ray.dir * first_isect.t;
     first_isect.instanceIndex = instanceIndex;
 
+    if(!RasterizaionFor1st) {
+        first_isect = intersect_sceneBVH(ray);
+    }
+
     vec3 resultDI, resultGI, albedo;
     shade(ray, first_isect, resultDI, resultGI);
+
+    if(any(isnan(resultDI))) resultDI = vec3(0.0);
+    if(any(isnan(resultGI))) resultGI = vec3(0.0);
+
     vec3 resultIDI = resultGI - resultDI;
 
     // TODO avoid cameraNear clip ?
@@ -552,18 +578,18 @@ void main() {
 
     if(currentspp != 1) {
         vec3 lastdi = vec3(directLumGBuffer[pixelPtr * 3 + 0],
-                                directLumGBuffer[pixelPtr * 3 + 1],
-                                directLumGBuffer[pixelPtr * 3 + 2]);
+                           directLumGBuffer[pixelPtr * 3 + 1],
+                           directLumGBuffer[pixelPtr * 3 + 2]);
         vec3 lastidi = vec3(indirectLumGBuffer[pixelPtr * 3 + 0],
-                                 indirectLumGBuffer[pixelPtr * 3 + 1],
-                                 indirectLumGBuffer[pixelPtr * 3 + 2]);
+                            indirectLumGBuffer[pixelPtr * 3 + 1],
+                            indirectLumGBuffer[pixelPtr * 3 + 2]);
         vec3 lastalbedo = vec3(albedoGBuffer[pixelPtr * 3 + 0],
                                albedoGBuffer[pixelPtr * 3 + 1],
                                albedoGBuffer[pixelPtr * 3 + 2]);
         vec2 lastmoment = vec2(momentGBuffer[pixelPtr * 2 + 0],
                                momentGBuffer[pixelPtr * 2 + 1]);
-        resultDI = mix(lastdi, lastdi, 1.0 / currentspp);
-        resultIDI = mix(lastidi, lastidi, 1.0 / currentspp);
+        resultDI = mix(lastdi, resultDI, 1.0 / currentspp);
+        resultIDI = mix(lastidi, resultIDI, 1.0 / currentspp);
         albedo = mix(lastalbedo, albedo, 1.0 / currentspp);
         moment = mix(lastmoment, moment, 1.0 / currentspp);
     }

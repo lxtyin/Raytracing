@@ -51,6 +51,7 @@ ToneMappingGamma *mappingPass;
 TAA *taaPass;
 StaticBlender *staticBlenderPass;
 DirectDisplayer *directPass;
+std::mt19937 globalRand(0);
 
 // ----
 
@@ -149,7 +150,11 @@ void window_resize_callback(GLFWwindow* window, int w, int h) {
 
 void update(float dt) {
 
-    ResourceManager::manager->reload_scene(scene);
+    if(Config::DynamicBVH) {
+        ResourceManager::manager->reload_scene(scene);
+    } else {
+        ResourceManager::manager->reload_meshes();
+    }
 
 	static glm::mat4 back_projection = camera->projection() * camera->w2v_matrix();
 
@@ -161,8 +166,12 @@ void update(float dt) {
         // TODO: support direct light filter.
 
         std::mt19937 mrand(0);
+
+        vec2 jitter = vec2(0.5f);
+        if(Config::useStaticBlender) jitter = vec2(globalRand() * 1.0f / globalRand.max(), globalRand() * 1.0f / globalRand.max());
+
         for(int spp = 1;spp <= Config::SPP;spp++) {
-            vec2 jitter = vec2(mrand() * 1.0f / mrand.max(), mrand() * 1.0f / mrand.max());
+            if(Config::SPP > 1) jitter = vec2(mrand() * 1.0f / mrand.max(), mrand() * 1.0f / mrand.max());
             rasterPass->use();
             rasterPass->draw(camera, jitter);
 
@@ -182,7 +191,7 @@ void update(float dt) {
                 glUniform1i(glGetUniformLocation(renderPass->shaderProgram, "SCREEN_H"), SCREEN_H);
                 glUniform1i(glGetUniformLocation(renderPass->shaderProgram, "WINDOW_W"), Config::WINDOW_W);
                 glUniform1i(glGetUniformLocation(renderPass->shaderProgram, "WINDOW_H"), Config::WINDOW_H);
-                glUniform1i(glGetUniformLocation(renderPass->shaderProgram, "MAX_DEPTH"), 2);
+                glUniform1i(glGetUniformLocation(renderPass->shaderProgram, "MAX_DEPTH"), Config::MaxDepth);
                 glUniform1f(glGetUniformLocation(renderPass->shaderProgram, "cameraNear"), camera->near);
                 glUniform1f(glGetUniformLocation(renderPass->shaderProgram, "cameraFar"), camera->far);
                 glUniform1ui(glGetUniformLocation(renderPass->shaderProgram, "frameCounter"), frameCounter);
@@ -190,17 +199,23 @@ void update(float dt) {
                 glUniform1i(glGetUniformLocation(renderPass->shaderProgram, "SKY_W"), skybox->width);
                 glUniform1i(glGetUniformLocation(renderPass->shaderProgram, "SKY_H"), skybox->height);
                 glUniformMatrix4fv(glGetUniformLocation(renderPass->shaderProgram, "backprojMat"), 1, GL_FALSE, glm::value_ptr(back_projection));
+
+                glUniform1i(glGetUniformLocation(renderPass->shaderProgram, "BRDFSampling"), Config::BRDFSampling);
+                glUniform1i(glGetUniformLocation(renderPass->shaderProgram, "SkyboxSampling"), Config::SkyboxSampling);
+                glUniform1i(glGetUniformLocation(renderPass->shaderProgram, "SkyboxLighting"), Config::SkyboxLighting);
+                glUniform1i(glGetUniformLocation(renderPass->shaderProgram, "RasterizaionFor1st"), Config::RasterizaionFor1st);
             }
             renderPass->draw();
         }
 
-        if(Config::useTemporalFilter) {
+        if(Config::SVGFTemporalFilter) {
             svgfTemporalFilterPass->use();
             {
                 glUniform1i(glGetUniformLocation(svgfTemporalFilterPass->shaderProgram, "SCREEN_W"), SCREEN_W);
                 glUniform1i(glGetUniformLocation(svgfTemporalFilterPass->shaderProgram, "SCREEN_H"), SCREEN_H);
             }
-            svgfTemporalFilterPass->draw(renderPass->indirectLumGBufferSSBO,
+            svgfTemporalFilterPass->draw(renderPass->directLumGBufferSSBO,
+                                         renderPass->indirectLumGBufferSSBO,
                                          renderPass->momentGBufferSSBO,
                                          renderPass->normalGBufferSSBO,
                                          renderPass->instanceIndexGBufferSSBO,
@@ -209,7 +224,7 @@ void update(float dt) {
         } else svgfTemporalFilterPass->firstFrame = true;
 
         // a'trous wavelet filter
-        for(int i = 0;i < Config::filterLevel;i++) {
+        for(int i = 0;i < Config::SVGFSpatialFilterLevel;i++) {
             svgfSpatialFilterPass->use();
             {
                 glUniform1i(glGetUniformLocation(svgfSpatialFilterPass->shaderProgram, "SCREEN_W"), SCREEN_W);
@@ -217,12 +232,12 @@ void update(float dt) {
                 glUniformMatrix4fv(glGetUniformLocation(svgfSpatialFilterPass->shaderProgram, "w2vMat"), 1, GL_FALSE, glm::value_ptr(camera->w2v_matrix()));
                 glUniform1i(glGetUniformLocation(svgfSpatialFilterPass->shaderProgram, "step"), 1 << i);
             }
-            svgfSpatialFilterPass->draw(
-                    renderPass->indirectLumGBufferSSBO,
-                    renderPass->normalGBufferSSBO,
-                    renderPass->depthGBufferSSBO,
-                    renderPass->momentGBufferSSBO,
-                    renderPass->numSamplesGBufferSSBO);
+            svgfSpatialFilterPass->draw(renderPass->directLumGBufferSSBO,
+                                        renderPass->indirectLumGBufferSSBO,
+                                        renderPass->normalGBufferSSBO,
+                                        renderPass->depthGBufferSSBO,
+                                        renderPass->momentGBufferSSBO,
+                                        renderPass->numSamplesGBufferSSBO);
         }
 
         svgfMergePass->use();
@@ -239,7 +254,7 @@ void update(float dt) {
                 glUniform1i(glGetUniformLocation(staticBlenderPass->shaderProgram, "SCREEN_H"), SCREEN_H);
             }
             staticBlenderPass->draw(svgfMergePass->colorGBufferSSBO);
-        }
+        } else staticBlenderPass->frameCounter = 0;
 
         mappingPass->use();
         {
@@ -316,10 +331,6 @@ void update(float dt) {
     if(glfwGetKey(window, GLFW_KEY_LEFT_SHIFT))  camera->transform.position += vec3(0, -speed * dt, 0);
 	if(glfwGetKey(window, GLFW_KEY_ESCAPE)) glfwSetWindowShouldClose(window, GL_TRUE);
 
-    // TODO: if updated.
-    if(!(camera->transform == previousCameraTransform)) {
-        staticBlenderPass->frameCounter = 0;
-    }
 }
 
 void init_scene() {
@@ -341,14 +352,24 @@ void init_scene() {
     camera = new Camera(FOV_X, 1000);
     scene->add_child(camera);
     {
-        Instance *o1 = AssimpLoader::load_model("model/casa_obj.glb");
+//        Instance *o1 = AssimpLoader::load_model("model/casa_obj.glb");
+//        o1->transform.rotation = vec3(-90, 0, 0);
+//		scene->add_child(o1);
+//
+//        Instance *light = new Instance("light");
+//        light->transform.rotation = vec3(63, 60, 0);
+////        light->emitterType = Emitter_DIRECTIONAL;
+//        light->emission = vec3(5, 5, 5);
+//        scene->add_child(light);
+
+        Instance *o1 = AssimpLoader::load_model("model/room.glb");
         o1->transform.rotation = vec3(-90, 0, 0);
-		scene->add_child(o1);
+        scene->add_child(o1);
 
         Instance *light = new Instance("light");
-        light->transform.rotation = vec3(63, 60, 0);
+        light->transform.rotation = vec3(9, -1, 0);
         light->emitterType = Emitter_DIRECTIONAL;
-        light->emission = vec3(5, 5, 5);
+        light->emission = vec3(3000, 3000, 3000);
         scene->add_child(light);
     }
 

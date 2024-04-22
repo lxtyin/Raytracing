@@ -10,7 +10,8 @@
 class SVGFTemporalFilter: public VertexFragmentRenderPass {
 public:
 
-    SSBOBuffer<float> historycolorGBufferSSBO;
+    SSBOBuffer<float> historydirectLumGBufferSSBO;
+    SSBOBuffer<float> historyindirectLumGBufferSSBO;
     SSBOBuffer<float> historymomentGBufferSSBO;
     SSBOBuffer<float> historynormalGBufferSSBO;
     SSBOBuffer<float> historyinstanceIndexGBufferSSBO;
@@ -21,7 +22,8 @@ public:
 
     bool firstFrame = true;
 
-    void draw(SSBOBuffer<float> &colorGBufferSSBO,
+    void draw(SSBOBuffer<float> &directLumGBufferSSBO,
+              SSBOBuffer<float> &indirectLumGBufferSSBO,
               SSBOBuffer<float> &momentGBufferSSBO,
               SSBOBuffer<float> &normalGBufferSSBO,
               SSBOBuffer<float> &instanceIndexGBufferSSBO,

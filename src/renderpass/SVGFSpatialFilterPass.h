@@ -16,7 +16,8 @@ public:
     ~SVGFSpatialFilterPass();
 
 
-    void draw(SSBOBuffer<float> &colorGBufferSSBO,
+    void draw(SSBOBuffer<float> &directLumGBufferSSBO,
+              SSBOBuffer<float> &indirectLumGBufferSSBO,
               SSBOBuffer<float> &normalGBufferSSBO,
               SSBOBuffer<float> &depthGBufferSSBO,
               SSBOBuffer<float> &momentGBufferSSBO,

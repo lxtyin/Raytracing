@@ -43,7 +43,7 @@ void TinyUI::update(Scene *scene, float fps) {
 
         ImGui::Begin("Settings", &showUI);
         ImGui::Text(str_format("FPS: %.2f", fps).c_str());
-        insert_configuration();
+        Config::insert_gui();
         ImGui::End();
     }
     ImGui::Render();
@@ -175,16 +175,6 @@ void TinyUI::insert_instance_Editor(Instance *u) {
         ImGui::DragFloat3("emission", r, 0.1, -1000, 1000, "%.2f");
         u->emission = vec3(r[0], r[1], r[2]);
     }
-}
-
-void TinyUI::insert_configuration() {
-    ImGui::SeparatorText("Config");
-
-    ImGui::Checkbox("Use TAA", &Config::useTAA);
-    ImGui::Checkbox("Use TemporalFilter", &Config::useTemporalFilter);
-    ImGui::Checkbox("Use StaticBlender", &Config::useStaticBlender);
-    ImGui::SliderInt("Filter Level", &Config::filterLevel, 0, 5);
-    ImGui::SliderInt("Samples per pixel", &Config::SPP, 1, 16);
 }
 
 void TinyUI::selectInstance(Instance *instance) {

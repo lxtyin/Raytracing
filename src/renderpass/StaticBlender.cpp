@@ -8,7 +8,8 @@
 
 StaticBlender::StaticBlender(const string &fragShaderPath) :
     VertexFragmentRenderPass(fragShaderPath),
-    historyColorGBufferSSBO(SCREEN_W * SCREEN_H * 3)
+    historyColorGBufferSSBO(SCREEN_W * SCREEN_H * 3),
+    historyMomentGBufferSSBO(SCREEN_W * SCREEN_H * 2)
 {
     frameCounter = 0;
 }
@@ -20,6 +21,7 @@ void StaticBlender::draw(SSBOBuffer<float> &colorGBufferSSBO) {
 
     colorGBufferSSBO.bind_current_shader(0);
     historyColorGBufferSSBO.bind_current_shader(1);
+    historyMomentGBufferSSBO.bind_current_shader(2);
 
     drawcall();
 }

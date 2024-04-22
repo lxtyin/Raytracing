@@ -23,8 +23,6 @@ private:
 
     static void insert_instance_Editor(Instance *u);
 
-    static void insert_configuration();
-
 public:
 
     static Instance *selectedInstance;

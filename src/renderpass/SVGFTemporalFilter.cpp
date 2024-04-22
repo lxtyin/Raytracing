@@ -8,14 +8,16 @@
 
 SVGFTemporalFilter::SVGFTemporalFilter(const string &fragShaderPath) :
     VertexFragmentRenderPass(fragShaderPath),
-    historycolorGBufferSSBO(SCREEN_H * SCREEN_W * 3),
+    historydirectLumGBufferSSBO(SCREEN_H * SCREEN_W * 3),
+    historyindirectLumGBufferSSBO(SCREEN_H * SCREEN_W * 3),
     historymomentGBufferSSBO(SCREEN_H * SCREEN_W * 2),
     historynormalGBufferSSBO(SCREEN_H * SCREEN_W * 3),
     historyinstanceIndexGBufferSSBO(SCREEN_H * SCREEN_W * 1),
     historynumSamplesGBufferSSBO(SCREEN_H * SCREEN_W * 1)
     {}
 
-void SVGFTemporalFilter::draw(SSBOBuffer<float> &colorGBufferSSBO,
+void SVGFTemporalFilter::draw(SSBOBuffer<float> &directLumGBufferSSBO,
+                              SSBOBuffer<float> &indirectLumGBufferSSBO,
                               SSBOBuffer<float> &momentGBufferSSBO,
                               SSBOBuffer<float> &normalGBufferSSBO,
                               SSBOBuffer<float> &instanceIndexGBufferSSBO,
@@ -23,13 +25,11 @@ void SVGFTemporalFilter::draw(SSBOBuffer<float> &colorGBufferSSBO,
                               SSBOBuffer<float> &numSamplesGBufferSSBO) {
 
     if(!firstFrame) {
-        colorGBufferSSBO.bind_current_shader(0);
         momentGBufferSSBO.bind_current_shader(1);
         normalGBufferSSBO.bind_current_shader(2);
         instanceIndexGBufferSSBO.bind_current_shader(3);
         motionGBufferSSBO.bind_current_shader(4);
 
-        historycolorGBufferSSBO.bind_current_shader(5);
         historymomentGBufferSSBO.bind_current_shader(6);
         historynormalGBufferSSBO.bind_current_shader(7);
         historyinstanceIndexGBufferSSBO.bind_current_shader(8);
@@ -37,12 +37,21 @@ void SVGFTemporalFilter::draw(SSBOBuffer<float> &colorGBufferSSBO,
 
         numSamplesGBufferSSBO.bind_current_shader(10);
 
-        drawcall();
+        if(Config::SVGFForDI) {
+            directLumGBufferSSBO.bind_current_shader(0);
+            historydirectLumGBufferSSBO.bind_current_shader(5);
+            drawcall();
+        }
+        if(Config::SVGFForIDI) {
+            indirectLumGBufferSSBO.bind_current_shader(0);
+            historyindirectLumGBufferSSBO.bind_current_shader(5);
+            drawcall();
+        }
     }
     firstFrame = false;
 
-    historycolorGBufferSSBO.copy(&colorGBufferSSBO);
-    historycolorGBufferSSBO.copy(&colorGBufferSSBO);
+    historydirectLumGBufferSSBO.copy(&directLumGBufferSSBO);
+    historyindirectLumGBufferSSBO.copy(&indirectLumGBufferSSBO);
     historymomentGBufferSSBO.copy(&momentGBufferSSBO);
     historynormalGBufferSSBO.copy(&normalGBufferSSBO);
     historyinstanceIndexGBufferSSBO.copy(&instanceIndexGBufferSSBO);
@@ -50,7 +59,8 @@ void SVGFTemporalFilter::draw(SSBOBuffer<float> &colorGBufferSSBO,
 }
 
 SVGFTemporalFilter::~SVGFTemporalFilter() {
-    historycolorGBufferSSBO.release();
+    historydirectLumGBufferSSBO.release();
+    historyindirectLumGBufferSSBO.release();
     historymomentGBufferSSBO.release();
     historynormalGBufferSSBO.release();
     historyinstanceIndexGBufferSSBO.release();

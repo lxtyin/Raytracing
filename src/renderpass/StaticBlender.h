@@ -10,6 +10,7 @@
 class StaticBlender: public VertexFragmentRenderPass {
 public:
     SSBOBuffer<float> historyColorGBufferSSBO;
+    SSBOBuffer<float> historyMomentGBufferSSBO;
 
     int frameCounter;
 
