@@ -72,17 +72,30 @@ layout(binding = 5, std430) readonly buffer ssbo5 {
     BVHNode sceneBVHBuffer[];
 };
 
-layout(binding = 6) writeonly buffer ssbo6 {
+struct Light {
+    // point light (0) or directional light (1).
+    float type;
+    float r, g, b;
+    float x, y, z;
+};
+layout(binding = 14, std430) readonly buffer ssbo14 {
+    Light lightBuffer[];
+};
+uniform int lightCount;
+
+
+layout(binding = 6) buffer ssbo6 {
     float colorGBuffer[];
 };
-layout(binding = 7) writeonly buffer ssbo7 {
-    float motionGBuffer[];
-};
-layout(binding = 8) writeonly buffer ssbo8 {
+layout(binding = 7) buffer ssbo7 {
     float albedoGBuffer[];
 };
-layout(binding = 9) writeonly buffer ssbo9 {
+layout(binding = 8) buffer ssbo8 {
     float momentGBuffer[];
+};
+
+layout(binding = 9) writeonly buffer ssbo9 {
+    float motionGBuffer[];
 };
 layout(binding = 10) writeonly buffer ssbo10 {
     float numSamplesGBuffer[];
@@ -109,6 +122,7 @@ uniform mat4 v2wMat;
 uniform mat4 backprojMat; // Last frame matrix to project worldposition -> [-1, 1]
 uniform int MAX_DEPTH = 2;
 uniform float fov = PI / 3;
+uniform float cameraNear, cameraFar;
 uniform int SCREEN_W;
 uniform int SCREEN_H;
 uniform int WINDOW_W;
@@ -119,7 +133,8 @@ uniform float skybox_Light_SUM;
 uniform int SKY_W;
 uniform int SKY_H;
 uniform uint frameCounter;
-uniform int SPP;
+uniform int currentspp;
+uniform vec2 jitter;
 
 #include shader/materials/materials.glsl
 
@@ -181,10 +196,9 @@ struct Intersection {
     float t;
     vec2 uv;
     int instanceIndex;
-    int materialPtr;
     int triangleIndex;
 };
-const Intersection nointersect = Intersection(false, vec3(0), vec3(0, 0, 1), INF, vec2(0), -1, -1, -1);
+const Intersection nointersect = Intersection(false, vec3(0), vec3(0, 0, 1), INF, vec2(0), -1, -1);
 
 /// 检测是否与AABB碰撞，返回最早碰撞时间
 bool intersect_aabb(Ray ray, vec3 aa, vec3 bb, out float nearT) {
@@ -227,7 +241,7 @@ Intersection intersect_triangle(Ray ray, int triangleIndex) {
     //    frame.t = 1.0 / (D1.x * D2.y - D2.x * D1.y) * (E1 * D1.x - E2 * D2.x);
 
     // returns in local frame, then updated to world frame.
-    return Intersection(exist, pos, nor, t, interpolate_uv(tri, u, v), -1, -1, triangleIndex);
+    return Intersection(exist, pos, nor, t, interpolate_uv(tri, u, v), -1, triangleIndex);
 }
 
 
@@ -258,7 +272,6 @@ void intersect_meshBVH(int instanceIndex, Ray _ray, inout Intersection result) {
                 isect.position = _ray.ori + isect.t * _ray.dir;
                 result = isect;
                 result.instanceIndex = instanceIndex;
-                result.materialPtr = instanceInfoBuffer[instanceIndex].materialPtr;
             }
         } else {
             float tnear;
@@ -386,30 +399,32 @@ float skybox_sample_pdf(vec3 v) {
 // path tracing
 // ---------------------------------------------- //
 
-vec3 shade(Ray ray, in Intersection first_isect) {
+void shade(Ray ray, in Intersection first_isect, out vec3 resultDI, out vec3 resultGI) {
 
-    vec3 result = vec3(0), resultDI = vec3(0);
+    resultDI = vec3(0);
+    resultGI = vec3(0);
     vec3 history = vec3(1); // 栈上乘积
 
     Intersection isect = first_isect;
-    if(!isect.exist) return get_background_color(ray.dir);
+    if(!isect.exist) {
+        resultDI = resultGI = get_background_color(ray.dir);
+        return;
+    }
 
-
-    float total_eta = 1.0;
     for(int dep = 0; dep < MAX_DEPTH; dep++) {
 //        InstanceInfo hitMesh = instanceInfoBuffer[isect.meshIndex];
 //        if(hitMesh.emission.w > 0) {
-//            result += history * hitMesh.emission.xyz;
+//            resultGI += history * hitMesh.emission.xyz;
 //            break;
 //        }
-
+        int materialPtr = instanceInfoBuffer[isect.instanceIndex].materialPtr;
         Frame coord = create_coord(isect.normal);
         vec3 wi = to_local(coord, -ray.dir);
         vec3 wo, global_wo;
         float pdf;
         global_wo = skybox_sample(pdf);
 
-        BSDFQueryRecord bRec = BSDFQueryRecord(wi, to_local(coord, global_wo), isect.materialPtr, isect.uv, 1.0);
+        BSDFQueryRecord bRec = BSDFQueryRecord(wi, to_local(coord, global_wo), materialPtr, isect.uv, 1.0);
 
         // direct light
         if(pdf > 0) {
@@ -417,7 +432,7 @@ vec3 shade(Ray ray, in Intersection first_isect) {
             if(!tsect.exist) {
                 vec3 fr = eval_material(bRec);
                 vec3 recv_col = get_background_color(global_wo) * fr * abs(bRec.wo.z) / (pdf + pdf_material(bRec));
-                result += history * recv_col;
+                resultGI += history * recv_col;
                 if(dep == 0) resultDI = recv_col;
             }
         }
@@ -431,14 +446,12 @@ vec3 shade(Ray ray, in Intersection first_isect) {
         isect = intersect_sceneBVH(ray);
         if(!isect.exist) {  // hit sky
             vec3 recv_col = get_background_color(global_wo) * fr * abs(bRec.wo.z) / (pdf + skybox_sample_pdf(global_wo));
-            result += history * recv_col;
+            resultGI += history * recv_col;
             break;
         } else {
             history *= fr * abs(bRec.wo.z) / pdf;
         }
     }
-    if(result.x < 0 || result.y < 0 || result.z < 0) result = vec3(100000, 0, 0);
-    return result;
 }
 
 void main() {
@@ -455,24 +468,15 @@ void main() {
     pixelIndex.x * uint(1973) +
     pixelIndex.y * uint(9277) +
     uint(frameCounter) * uint(26699)) | uint(1);
-
-    vec3 colorout = vec3(0);
-    vec2 motionout = vec2(0, 0);
-    vec3 albedoout = vec3(0);
-
-
-    sobolseed = seed;
+    sobolseed = seed + currentspp;
     sobolcurdim = 0u;
 
-    vec2 jitter = vec2(0.5, 0.5);
     vec2 p = pixelIndex + jitter;
     float disz = SCREEN_W * 0.5 / tan(fov / 2);
     vec3 ori = vec3(v2wMat * vec4(0, 0, 0, 1));
     vec3 dir = normalize(vec3(v2wMat * vec4(p.x - SCREEN_W / 2, p.y - SCREEN_H / 2, -disz, 0)));
     Ray ray = Ray(ori, dir);
 
-
-    Intersection first_isect;
 
     // viewport at left upper corner.
     vec2 window_uv = vec2(screen_uv.x * SCREEN_W / WINDOW_W,
@@ -481,15 +485,26 @@ void main() {
     float depth = texture(depthGBufferTexture, window_uv).r;
     int instanceIndex = int(texture(instanceIndexGBufferTexture, window_uv).r + 0.01);
 
+    Intersection first_isect;
     first_isect.t = depth;
-    first_isect.exist = depth < 90000;
+    first_isect.exist = depth <= 100000;
     first_isect.normal = texture(normalGBufferTexture, window_uv).xyz;
     first_isect.uv = texture(uvGBufferTexture, window_uv).xy;
     first_isect.position = ray.ori + ray.dir * first_isect.t;
     first_isect.instanceIndex = instanceIndex;
-    first_isect.materialPtr = instanceInfoBuffer[instanceIndex].materialPtr;
 
-    colorout = shade(ray, first_isect);
+    vec3 resultDI, resultGI, albedo;
+    shade(ray, first_isect, resultDI, resultGI);
+
+    // TODO avoid cameraNear clip ?
+
+    if(first_isect.exist) {
+        int materialPtr = instanceInfoBuffer[instanceIndex].materialPtr;
+        BSDFQueryRecord bRec = BSDFQueryRecord(vec3(0), vec3(0), materialPtr, first_isect.uv, 1.0);
+        albedo = albedo_material(bRec);
+    } else {
+        albedo = resultGI;
+    }
 
     // TODO: let the last sample be in the center.
 //    vec2 p = pixelIndex + vec2(0.5);
@@ -515,23 +530,39 @@ void main() {
     vec4 lastNDC = backprojMat * vec4(first_isect.position, 1);
     lastNDC /= lastNDC.w;
     vec2 last_suv = (lastNDC.xy + 1.0) / 2;
-    motionout = screen_uv - last_suv;
+    vec2 motion = screen_uv - last_suv;
 
-    float lum = luminance(colorout);
+    float lum = luminance(resultGI);
+    vec2 moment = vec2(lum, lum * lum);
 
-    colorGBuffer[pixelPtr * 3 + 0] = colorout.x;
-    colorGBuffer[pixelPtr * 3 + 1] = colorout.y;
-    colorGBuffer[pixelPtr * 3 + 2] = colorout.z;
-    motionGBuffer[pixelPtr * 2 + 0] = motionout.x;
-    motionGBuffer[pixelPtr * 2 + 1] = motionout.y;
-    albedoGBuffer[pixelPtr * 3 + 0] = albedoout.x;
-    albedoGBuffer[pixelPtr * 3 + 1] = albedoout.y;
-    albedoGBuffer[pixelPtr * 3 + 2] = albedoout.z;
-    momentGBuffer[pixelPtr * 2 + 0] = lum;
-    momentGBuffer[pixelPtr * 2 + 1] = lum * lum;
-    numSamplesGBuffer[pixelPtr] = 1;
+    if(currentspp != 1) {
+        vec3 lastcolor = vec3(colorGBuffer[pixelPtr * 3 + 0],
+                              colorGBuffer[pixelPtr * 3 + 1],
+                              colorGBuffer[pixelPtr * 3 + 2]);
+        vec3 lastalbedo = vec3(albedoGBuffer[pixelPtr * 3 + 0],
+                               albedoGBuffer[pixelPtr * 3 + 1],
+                               albedoGBuffer[pixelPtr * 3 + 2]);
+        vec2 lastmoment = vec2(momentGBuffer[pixelPtr * 2 + 0],
+                               momentGBuffer[pixelPtr * 2 + 1]);
+        resultGI = mix(lastcolor, resultGI, 1.0 / currentspp);
+        albedo = mix(lastalbedo, albedo, 1.0 / currentspp);
+        moment = mix(lastmoment, moment, 1.0 / currentspp);
+    }
 
-    depthGBuffer[pixelPtr] = first_isect.t;
+    colorGBuffer[pixelPtr * 3 + 0] = resultGI.x;
+    colorGBuffer[pixelPtr * 3 + 1] = resultGI.y;
+    colorGBuffer[pixelPtr * 3 + 2] = resultGI.z;
+
+    albedoGBuffer[pixelPtr * 3 + 0] = albedo.x;
+    albedoGBuffer[pixelPtr * 3 + 1] = albedo.y;
+    albedoGBuffer[pixelPtr * 3 + 2] = albedo.z;
+    momentGBuffer[pixelPtr * 2 + 0] = moment.x;
+    momentGBuffer[pixelPtr * 2 + 1] = moment.y;
+    numSamplesGBuffer[pixelPtr] = currentspp;
+
+    motionGBuffer[pixelPtr * 2 + 0] = motion.x;
+    motionGBuffer[pixelPtr * 2 + 1] = motion.y;
+    depthGBuffer[pixelPtr] = depth;
     normalGBuffer[pixelPtr * 3 + 0] = first_isect.normal.x;
     normalGBuffer[pixelPtr * 3 + 1] = first_isect.normal.y;
     normalGBuffer[pixelPtr * 3 + 2] = first_isect.normal.z;

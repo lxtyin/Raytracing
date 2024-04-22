@@ -51,7 +51,7 @@ void RasterPass::init_shader(const string &vertexShaderPath, const string &fragS
     glDeleteShader(fragmentShader);
 }
 
-void RasterPass::draw(Camera *camera) {
+void RasterPass::draw(Camera *camera, vec2 jitter) {
     glBindFramebuffer(GL_FRAMEBUFFER, frameBufferObject);
     GLuint attaches[4] = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2, GL_COLOR_ATTACHMENT3};
     glDrawBuffers(4, attaches);
@@ -62,6 +62,9 @@ void RasterPass::draw(Camera *camera) {
 
     auto globalInstances = ResourceManager::manager->getGlobalInstances();
     mat4 proj = camera->projection();
+    proj[2][0] += (jitter.x - 0.5f) * 2.0f / SCREEN_W;
+    proj[2][1] += (jitter.y - 0.5f) * 2.0f / SCREEN_H;
+
     glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "proj_matrix"), 1, GL_FALSE, glm::value_ptr(proj));
 
     for(auto &[ins, l2w]: globalInstances) {

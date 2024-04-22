@@ -38,9 +38,10 @@ void Renderer::draw() {
     ResourceManager::manager->sceneBVHSSBO.bind_current_shader(5);
 
     colorGBufferSSBO.bind_current_shader(6);
-    motionGBufferSSBO.bind_current_shader(7);
-    albedoGBufferSSBO.bind_current_shader(8);
-    momentGBufferSSBO.bind_current_shader(9);
+    albedoGBufferSSBO.bind_current_shader(7);
+    momentGBufferSSBO.bind_current_shader(8);
+
+    motionGBufferSSBO.bind_current_shader(9);
     numSamplesGBufferSSBO.bind_current_shader(10);
 
     depthGBufferSSBO.bind_current_shader(11);

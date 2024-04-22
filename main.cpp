@@ -19,6 +19,8 @@
 #include "src/BVH.h"
 #include <opencv2/opencv.hpp>
 #include "src/TinyUI.h"
+#include <chrono>
+#include <random>
 using namespace std;
 
 /**
@@ -154,32 +156,39 @@ void update(float dt) {
     // 渲染管线
 	// ---------------------------------------
     {
-        rasterPass->use();
-        rasterPass->draw(camera);
+        std::mt19937 mrand(0);
+        for(int spp = 1;spp <= Config::SPP;spp++) {
+            vec2 jitter = vec2(mrand() * 1.0f / mrand.max(), mrand() * 1.0f / mrand.max());
+            rasterPass->use();
+            rasterPass->draw(camera, jitter);
 
-        renderPass->use();
-        {
-            renderPass->bind_texture("skybox", skybox->textureObject, 0);
-            renderPass->bind_texture("skybox_samplecache", skybox->skyboxsamplerObject, 1);
-            renderPass->bind_texture("depthGBufferTexture", rasterPass->depthGBufferTexture, 2);
-            renderPass->bind_texture("normalGBufferTexture", rasterPass->normalGBufferTexture, 3);
-            renderPass->bind_texture("uvGBufferTexture", rasterPass->uvGBufferTexture, 4);
-            renderPass->bind_texture("instanceIndexGBufferTexture", rasterPass->instanceIndexGBufferTexture, 5);
-            glUniform1f(glGetUniformLocation(renderPass->shaderProgram, "skybox_Light_SUM"), skybox->lightSum);
-            glUniformMatrix4fv(glGetUniformLocation(renderPass->shaderProgram, "v2wMat"), 1, GL_FALSE, glm::value_ptr(camera->v2w_matrix()));
-            glUniform1i(glGetUniformLocation(renderPass->shaderProgram, "SPP"), Config::SPP);
-            glUniform1i(glGetUniformLocation(renderPass->shaderProgram, "SCREEN_W"), SCREEN_W);
-            glUniform1i(glGetUniformLocation(renderPass->shaderProgram, "SCREEN_H"), SCREEN_H);
-            glUniform1i(glGetUniformLocation(renderPass->shaderProgram, "WINDOW_W"), Config::WINDOW_W);
-            glUniform1i(glGetUniformLocation(renderPass->shaderProgram, "WINDOW_H"), Config::WINDOW_H);
-            glUniform1i(glGetUniformLocation(renderPass->shaderProgram, "MAX_DEPTH"), 2);
-            glUniform1ui(glGetUniformLocation(renderPass->shaderProgram, "frameCounter"), frameCounter);
-            glUniform1f(glGetUniformLocation(renderPass->shaderProgram, "fov"), camera->fovX);
-            glUniform1i(glGetUniformLocation(renderPass->shaderProgram, "SKY_W"), skybox->width);
-            glUniform1i(glGetUniformLocation(renderPass->shaderProgram, "SKY_H"), skybox->height);
-            glUniformMatrix4fv(glGetUniformLocation(renderPass->shaderProgram, "backprojMat"), 1, GL_FALSE, glm::value_ptr(back_projection));
+            renderPass->use();
+            {
+                renderPass->bind_texture("skybox", skybox->textureObject, 0);
+                renderPass->bind_texture("skybox_samplecache", skybox->skyboxsamplerObject, 1);
+                renderPass->bind_texture("depthGBufferTexture", rasterPass->depthGBufferTexture, 2);
+                renderPass->bind_texture("normalGBufferTexture", rasterPass->normalGBufferTexture, 3);
+                renderPass->bind_texture("uvGBufferTexture", rasterPass->uvGBufferTexture, 4);
+                renderPass->bind_texture("instanceIndexGBufferTexture", rasterPass->instanceIndexGBufferTexture, 5);
+                glUniform2f(glGetUniformLocation(renderPass->shaderProgram, "jitter"), jitter.x, jitter.y);
+                glUniform1i(glGetUniformLocation(renderPass->shaderProgram, "currentspp"), spp);
+                glUniform1f(glGetUniformLocation(renderPass->shaderProgram, "skybox_Light_SUM"), skybox->lightSum);
+                glUniformMatrix4fv(glGetUniformLocation(renderPass->shaderProgram, "v2wMat"), 1, GL_FALSE, glm::value_ptr(camera->v2w_matrix()));
+                glUniform1i(glGetUniformLocation(renderPass->shaderProgram, "SCREEN_W"), SCREEN_W);
+                glUniform1i(glGetUniformLocation(renderPass->shaderProgram, "SCREEN_H"), SCREEN_H);
+                glUniform1i(glGetUniformLocation(renderPass->shaderProgram, "WINDOW_W"), Config::WINDOW_W);
+                glUniform1i(glGetUniformLocation(renderPass->shaderProgram, "WINDOW_H"), Config::WINDOW_H);
+                glUniform1i(glGetUniformLocation(renderPass->shaderProgram, "MAX_DEPTH"), 2);
+                glUniform1f(glGetUniformLocation(renderPass->shaderProgram, "cameraNear"), camera->near);
+                glUniform1f(glGetUniformLocation(renderPass->shaderProgram, "cameraFar"), camera->far);
+                glUniform1ui(glGetUniformLocation(renderPass->shaderProgram, "frameCounter"), frameCounter);
+                glUniform1f(glGetUniformLocation(renderPass->shaderProgram, "fov"), camera->fovX);
+                glUniform1i(glGetUniformLocation(renderPass->shaderProgram, "SKY_W"), skybox->width);
+                glUniform1i(glGetUniformLocation(renderPass->shaderProgram, "SKY_H"), skybox->height);
+                glUniformMatrix4fv(glGetUniformLocation(renderPass->shaderProgram, "backprojMat"), 1, GL_FALSE, glm::value_ptr(back_projection));
+            }
+            renderPass->draw();
         }
-        renderPass->draw();
 
         if(Config::useStaticBlender) {
             staticBlenderPass->use();

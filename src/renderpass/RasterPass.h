@@ -7,7 +7,7 @@
 
 #include "RenderPass.h"
 #include "../instance/Camera.h"
-
+using glm::vec2;
 class Instance;
 
 class RasterPass: public RenderPass {
@@ -27,7 +27,7 @@ public:
     RasterPass(const string &vertexShaderPath, const string &fragShaderPath);
     ~RasterPass();
 
-    void draw(Camera *camera);
+    void draw(Camera *camera, vec2 jitter);
 };
 
 
