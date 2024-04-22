@@ -33,6 +33,7 @@ include_directories(include ${OpenCV_INCLUDE_DIRS})
 link_directories(lib)
 add_executable(path_tracing ${SRC_FILES}
         src/renderpass/StaticBlender.h
+        src/renderpass/SVGFMergePass.h
 )
 
 #target_link_libraries(path_tracing opengl32 glu32 libglfw3.a libzlibstatic.a libassimp.dll.a ${OpenCV_LIBS})
