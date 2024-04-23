@@ -2,31 +2,105 @@
 #include "glad/glad.h"
 #include "src/tool/exglfw.h"
 #include "glm/gtc/type_ptr.hpp"
-#include "src/RenderPass.h"
-#include "src/Renderer.h"
+#include "src/renderpass/DirectDisplayer.h"
+#include "src/renderpass/RasterPass.h"
+#include "src/renderpass/Renderer.h"
+#include "src/renderpass/ToneMappingGamma.h"
+#include "src/renderpass/TAA.h"
+#include "src/renderpass/SVGFTemporalFilter.h"
+#include "src/renderpass/SVGFSpatialFilterPass.h"
+#include "src/renderpass/SVGFMergePass.h"
+#include "src/renderpass/StaticBlender.h"
+#include "src/ResourceManager.h"
 #include "src/tool/tool.h"
 #include "src/Config.h"
 #include "src/tool/loader.h"
-#include "src/texture/HDRTexture.h"
+#include "src/texture/Skybox.h"
 #include "src/instance/Camera.h"
-#include "imgui/imgui.h"
-#include "imgui/backend/imgui_impl_glfw.h"
-#include "imgui/backend/imgui_impl_opengl3.h"
-#include "NerfCreator.h"
+#include "src/BVH.h"
+#include <opencv2/opencv.hpp>
+#include "src/TinyUI.h"
+#include <chrono>
+#include <random>
 using namespace std;
 
-// 一些状态 ------
+/**
+ * TODO
+ * 降噪
+ *    - TAA使用GBuffer Check，双线性插值？
+ *    - Variance
+ * 改正emission->material
+ * 改正btdf
+ * 修改shader reader
+ * Ray hit
+ * ReSTIR GI
+ */
+
 GLFWwindow *window;
-Renderer *pass1;
-RenderPass *pass_mix, *pass_fw, *pass_fh;
 Scene *scene;
 Camera *camera;
-HDRTexture* skybox;
-NerfCreator nerfCreator;
-bool show_imgui = true;
+Skybox* skybox;
 uint frameCounter = 0;
 
+RasterPass *rasterPass;
+Renderer *renderPass;
+SVGFSpatialFilterPass *svgfSpatialFilterPass;
+SVGFTemporalFilter *svgfTemporalFilterPass;
+SVGFMergePass *svgfMergePass;
+ToneMappingGamma *mappingPass;
+TAA *taaPass;
+StaticBlender *staticBlenderPass;
+DirectDisplayer *directPass;
+std::mt19937 globalRand(0);
+
 // ----
+
+void APIENTRY glDebugOutput(GLenum source,
+                            GLenum type,
+                            GLuint id,
+                            GLenum severity,
+                            GLsizei length,
+                            const GLchar *message,
+                            void *userParam)
+{
+    // 忽略一些不重要的错误/警告代码
+    if(id == 131169 || id == 131185 || id == 131218 || id == 131204) return;
+
+    std::cout << "---------------" << std::endl;
+    std::cout << "Debug message (" << id << "): " <<  message << std::endl;
+
+    switch (source)
+    {
+        case GL_DEBUG_SOURCE_API:             std::cout << "Source: API"; break;
+        case GL_DEBUG_SOURCE_WINDOW_SYSTEM:   std::cout << "Source: Window System"; break;
+        case GL_DEBUG_SOURCE_SHADER_COMPILER: std::cout << "Source: Shader Compiler"; break;
+        case GL_DEBUG_SOURCE_THIRD_PARTY:     std::cout << "Source: Third Party"; break;
+        case GL_DEBUG_SOURCE_APPLICATION:     std::cout << "Source: Application"; break;
+        case GL_DEBUG_SOURCE_OTHER:           std::cout << "Source: Other"; break;
+    } std::cout << std::endl;
+
+    switch (type)
+    {
+        case GL_DEBUG_TYPE_ERROR:               std::cout << "Type: Error"; break;
+        case GL_DEBUG_TYPE_DEPRECATED_BEHAVIOR: std::cout << "Type: Deprecated Behaviour"; break;
+        case GL_DEBUG_TYPE_UNDEFINED_BEHAVIOR:  std::cout << "Type: Undefined Behaviour"; break;
+        case GL_DEBUG_TYPE_PORTABILITY:         std::cout << "Type: Portability"; break;
+        case GL_DEBUG_TYPE_PERFORMANCE:         std::cout << "Type: Performance"; break;
+        case GL_DEBUG_TYPE_MARKER:              std::cout << "Type: Marker"; break;
+        case GL_DEBUG_TYPE_PUSH_GROUP:          std::cout << "Type: Push Group"; break;
+        case GL_DEBUG_TYPE_POP_GROUP:           std::cout << "Type: Pop Group"; break;
+        case GL_DEBUG_TYPE_OTHER:               std::cout << "Type: Other"; break;
+    } std::cout << std::endl;
+
+    switch (severity)
+    {
+        case GL_DEBUG_SEVERITY_HIGH:         std::cout << "Severity: high"; break;
+        case GL_DEBUG_SEVERITY_MEDIUM:       std::cout << "Severity: medium"; break;
+        case GL_DEBUG_SEVERITY_LOW:          std::cout << "Severity: low"; break;
+        case GL_DEBUG_SEVERITY_NOTIFICATION: std::cout << "Severity: notification"; break;
+    } std::cout << std::endl;
+    std::cout << std::endl;
+}
 
 void mouse_callback(GLFWwindow* window, double xpos, double ypos) {
     static double mouse_lastX = xpos, mouse_lastY = ypos;
@@ -39,111 +113,218 @@ void mouse_callback(GLFWwindow* window, double xpos, double ypos) {
     if(mouse_button == GLFW_PRESS) {
         double dx = xpos - mouse_lastX;
         double dy = ypos - mouse_lastY;
-        camera->transform.rotation += vec3(0, -dx * 0.01, 0);
-        camera->transform.rotation += vec3(-dy * 0.01, 0, 0);
+        camera->transform.rotation += vec3(0, -dx * 0.3, 0);
+        camera->transform.rotation += vec3(-dy * 0.3, 0, 0);
         mouse_lastX = xpos;
         mouse_lastY = ypos;
-		frameCounter = 0;
     }
+}
+
+void mouse_clickcalback(GLFWwindow* window, int button, int state, int mod) {
+    if(button == GLFW_MOUSE_BUTTON_LEFT && state == GLFW_PRESS) {
+        double x, y;
+        glfwGetCursorPos(window, &x, &y); // →x ↓y
+
+        if(x >= SCREEN_W || y >= SCREEN_H) return;
+
+        float disz = SCREEN_W * 0.5 / tan(camera->fovX / 2);
+        mat4 v2w = camera->v2w_matrix();
+        vec3 ori = vec3(v2w * vec4(0, 0, 0, 1));
+        vec3 dir = normalize(vec3(v2w * vec4(x - SCREEN_W / 2, SCREEN_H / 2 - y, -disz, 0)));
+        Ray ray = Ray(ori, dir);
+
+        Intersection isect;
+        scene->sceneBVHRoot->rayIntersect(ray, isect);
+        if(isect.exist) {
+            TinyUI::selectInstance(isect.instancePtr);
+        } else {
+            TinyUI::selectInstance(nullptr);
+        }
+    }
+}
+
+void window_resize_callback(GLFWwindow* window, int w, int h) {
+    Config::WINDOW_H = h;
+    Config::WINDOW_W = w;
 }
 
 void update(float dt) {
 
-//    scene->reload();
-    pass1->reload_scene(scene);
-    static uint last_colorT = 0, last_wposT = 0;
-	static bool fast_shade = false;
-	static glm::mat4 back_projection(1);
+    if(Config::DynamicBVH) {
+        ResourceManager::manager->reload_scene(scene);
+    } else {
+        ResourceManager::manager->reload_meshes();
+    }
+
+	static glm::mat4 back_projection = camera->projection() * camera->w2v_matrix();
 
 	frameCounter++;
 
     // 渲染管线
 	// ---------------------------------------
     {
-        pass1->use();
-        {
-            glUniform1i(glGetUniformLocation(pass1->shaderProgram, "fast_shade"), fast_shade);
-            pass1->bind_texture("skybox", skybox->TTO);
-            pass1->bind_texture("skybox_samplecache", skybox->sample_cache_tto);
-            glUniformMatrix4fv(glGetUniformLocation(pass1->shaderProgram, "v2w_mat"), 1, GL_FALSE, glm::value_ptr(camera->v2w_matrix()));
-            glUniform1i(glGetUniformLocation(pass1->shaderProgram, "SCREEN_W"), SCREEN_W);
-            glUniform1i(glGetUniformLocation(pass1->shaderProgram, "SCREEN_H"), SCREEN_H);
-            glUniform1i(glGetUniformLocation(pass1->shaderProgram, "SPP"), Config::SPP);
-            glUniform1ui(glGetUniformLocation(pass1->shaderProgram, "frameCounter"), frameCounter);
-            glUniform1f(glGetUniformLocation(pass1->shaderProgram, "skybox_Light_SUM"), skybox->Light_SUM);
-            glUniform1f(glGetUniformLocation(pass1->shaderProgram, "fov"), SCREEN_FOV);
-            glUniform1i(glGetUniformLocation(pass1->shaderProgram, "SKY_W"), skybox->width);
-            glUniform1i(glGetUniformLocation(pass1->shaderProgram, "SKY_H"), skybox->height);
+        // TODO: support direct light filter.
+
+        std::mt19937 mrand(0);
+
+        vec2 jitter = vec2(0.5f);
+        if(Config::useStaticBlender) jitter = vec2(globalRand() * 1.0f / globalRand.max(), globalRand() * 1.0f / globalRand.max());
+
+        for(int spp = 1;spp <= Config::SPP;spp++) {
+            if(Config::SPP > 1) jitter = vec2(mrand() * 1.0f / mrand.max(), mrand() * 1.0f / mrand.max());
+            rasterPass->use();
+            rasterPass->draw(camera, jitter);
+
+            renderPass->use();
+            {
+                renderPass->bind_texture("skybox", skybox->textureObject, 0);
+                renderPass->bind_texture("skybox_samplecache", skybox->skyboxsamplerObject, 1);
+                renderPass->bind_texture("depthGBufferTexture", rasterPass->depthGBufferTexture, 2);
+                renderPass->bind_texture("normalGBufferTexture", rasterPass->normalGBufferTexture, 3);
+                renderPass->bind_texture("uvGBufferTexture", rasterPass->uvGBufferTexture, 4);
+                renderPass->bind_texture("instanceIndexGBufferTexture", rasterPass->instanceIndexGBufferTexture, 5);
+                glUniform2f(glGetUniformLocation(renderPass->shaderProgram, "jitter"), jitter.x, jitter.y);
+                glUniform1i(glGetUniformLocation(renderPass->shaderProgram, "currentspp"), spp);
+                glUniform1f(glGetUniformLocation(renderPass->shaderProgram, "skybox_Light_SUM"), skybox->lightSum);
+                glUniformMatrix4fv(glGetUniformLocation(renderPass->shaderProgram, "v2wMat"), 1, GL_FALSE, glm::value_ptr(camera->v2w_matrix()));
+                glUniform1i(glGetUniformLocation(renderPass->shaderProgram, "SCREEN_W"), SCREEN_W);
+                glUniform1i(glGetUniformLocation(renderPass->shaderProgram, "SCREEN_H"), SCREEN_H);
+                glUniform1i(glGetUniformLocation(renderPass->shaderProgram, "WINDOW_W"), Config::WINDOW_W);
+                glUniform1i(glGetUniformLocation(renderPass->shaderProgram, "WINDOW_H"), Config::WINDOW_H);
+                glUniform1i(glGetUniformLocation(renderPass->shaderProgram, "MAX_DEPTH"), Config::MaxDepth);
+                glUniform1f(glGetUniformLocation(renderPass->shaderProgram, "cameraNear"), camera->near);
+                glUniform1f(glGetUniformLocation(renderPass->shaderProgram, "cameraFar"), camera->far);
+                glUniform1ui(glGetUniformLocation(renderPass->shaderProgram, "frameCounter"), frameCounter);
+                glUniform1f(glGetUniformLocation(renderPass->shaderProgram, "fov"), camera->fovX);
+                glUniform1i(glGetUniformLocation(renderPass->shaderProgram, "SKY_W"), skybox->width);
+                glUniform1i(glGetUniformLocation(renderPass->shaderProgram, "SKY_H"), skybox->height);
+                glUniformMatrix4fv(glGetUniformLocation(renderPass->shaderProgram, "backprojMat"), 1, GL_FALSE, glm::value_ptr(back_projection));
+
+                glUniform1i(glGetUniformLocation(renderPass->shaderProgram, "BRDFSampling"), Config::BRDFSampling);
+                glUniform1i(glGetUniformLocation(renderPass->shaderProgram, "SkyboxSampling"), Config::SkyboxSampling);
+                glUniform1i(glGetUniformLocation(renderPass->shaderProgram, "SkyboxLighting"), Config::SkyboxLighting);
+                glUniform1i(glGetUniformLocation(renderPass->shaderProgram, "RasterizaionFor1st"), Config::RasterizaionFor1st);
+            }
+            renderPass->draw();
         }
-        pass1->draw();
 
-        glm::mat4 viewPort = glm::matbyrow({
-                                                   1./SCREEN_W, 0, 			0,	 0.5,
-                                                   0, 			 1./SCREEN_H, 	0,	 0.5,
-                                                   0, 			 0, 			0,	 0,
-                                                   0, 			 0, 			0,	 1
-                                           });
-        back_projection = viewPort * camera->projection() * camera->w2v_matrix();
+        if(Config::SVGFTemporalFilter) {
+            svgfTemporalFilterPass->use();
+            {
+                glUniform1i(glGetUniformLocation(svgfTemporalFilterPass->shaderProgram, "SCREEN_W"), SCREEN_W);
+                glUniform1i(glGetUniformLocation(svgfTemporalFilterPass->shaderProgram, "SCREEN_H"), SCREEN_H);
+            }
+            svgfTemporalFilterPass->draw(renderPass->directLumGBufferSSBO,
+                                         renderPass->indirectLumGBufferSSBO,
+                                         renderPass->momentGBufferSSBO,
+                                         renderPass->normalGBufferSSBO,
+                                         renderPass->instanceIndexGBufferSSBO,
+                                         renderPass->motionGBufferSSBO,
+                                         renderPass->numSamplesGBufferSSBO);
+        } else svgfTemporalFilterPass->firstFrame = true;
 
-        pass_mix->use();
-        {
-            pass_mix->bind_texture("cur_colorT", pass1->attach_textures[0]);
-            pass_mix->bind_texture("cur_wposT", pass1->attach_textures[3]);
-            pass_mix->bind_texture("last_colorT", last_colorT);
-            pass_mix->bind_texture("last_wposT", last_wposT);
-            glUniform1ui(glGetUniformLocation(pass_mix->shaderProgram, "frameCounter"), frameCounter);
-            glUniformMatrix4fv(glGetUniformLocation(pass_mix->shaderProgram, "back_proj"), 1, GL_FALSE, glm::value_ptr(back_projection));
-            glUniform1i(glGetUniformLocation(pass_mix->shaderProgram, "is_motionvector_enabled"), Config::is_motionvector_enabled);
+        // a'trous wavelet filter
+        for(int i = 0;i < Config::SVGFSpatialFilterLevel;i++) {
+            svgfSpatialFilterPass->use();
+            {
+                glUniform1i(glGetUniformLocation(svgfSpatialFilterPass->shaderProgram, "SCREEN_W"), SCREEN_W);
+                glUniform1i(glGetUniformLocation(svgfSpatialFilterPass->shaderProgram, "SCREEN_H"), SCREEN_H);
+                glUniformMatrix4fv(glGetUniformLocation(svgfSpatialFilterPass->shaderProgram, "w2vMat"), 1, GL_FALSE, glm::value_ptr(camera->w2v_matrix()));
+                glUniform1i(glGetUniformLocation(svgfSpatialFilterPass->shaderProgram, "step"), 1 << i);
+            }
+            svgfSpatialFilterPass->draw(renderPass->directLumGBufferSSBO,
+                                        renderPass->indirectLumGBufferSSBO,
+                                        renderPass->normalGBufferSSBO,
+                                        renderPass->depthGBufferSSBO,
+                                        renderPass->momentGBufferSSBO,
+                                        renderPass->numSamplesGBufferSSBO);
         }
-        pass_mix->draw();
 
-        last_colorT = pass_mix->attach_textures[1];
-        last_wposT = pass1->attach_textures[3];
-
-        pass_fw->use();
+        svgfMergePass->use();
         {
-            glUniform1i(glGetUniformLocation(pass_fw->shaderProgram, "SCREEN_W"), SCREEN_W);
-            glUniform1i(glGetUniformLocation(pass_fw->shaderProgram, "SCREEN_H"), SCREEN_H);
-            glUniform1i(glGetUniformLocation(pass_fw->shaderProgram, "is_filter_enabled"), Config::is_filter_enabled);
-            pass_fw->bind_texture("prevpass_color", pass_mix->attach_textures[0]);
-            pass_fw->bind_texture("prevpass_albedo", pass1->attach_textures[1]);
-            pass_fw->bind_texture("prevpass_normal", pass1->attach_textures[2]);
+            glUniform1i(glGetUniformLocation(svgfMergePass->shaderProgram, "SCREEN_W"), SCREEN_W);
+            glUniform1i(glGetUniformLocation(svgfMergePass->shaderProgram, "SCREEN_H"), SCREEN_H);
         }
-        pass_fw->draw();
+        svgfMergePass->draw(renderPass->directLumGBufferSSBO, renderPass->indirectLumGBufferSSBO, renderPass->albedoGBufferSSBO);
 
-        pass_fh->use();
+        if(Config::useStaticBlender) {
+            staticBlenderPass->use();
+            {
+                glUniform1i(glGetUniformLocation(staticBlenderPass->shaderProgram, "SCREEN_W"), SCREEN_W);
+                glUniform1i(glGetUniformLocation(staticBlenderPass->shaderProgram, "SCREEN_H"), SCREEN_H);
+            }
+            staticBlenderPass->draw(svgfMergePass->colorGBufferSSBO);
+        } else staticBlenderPass->frameCounter = 0;
+
+        mappingPass->use();
         {
-            glUniform1i(glGetUniformLocation(pass_fh->shaderProgram, "SCREEN_W"), SCREEN_W);
-            glUniform1i(glGetUniformLocation(pass_fh->shaderProgram, "SCREEN_H"), SCREEN_H);
-            glUniform1i(glGetUniformLocation(pass_fh->shaderProgram, "is_filter_enabled"), Config::is_filter_enabled);
-            pass_fh->bind_texture("prevpass_color", pass_fw->attach_textures[0]);
-            pass_fh->bind_texture("prevpass_albedo", pass1->attach_textures[1]);
-            pass_fh->bind_texture("prevpass_normal", pass1->attach_textures[2]);
+            glUniform1i(glGetUniformLocation(mappingPass->shaderProgram, "SCREEN_W"), SCREEN_W);
+            glUniform1i(glGetUniformLocation(mappingPass->shaderProgram, "SCREEN_H"), SCREEN_H);
         }
-        pass_fh->draw();
+        mappingPass->draw(svgfMergePass->colorGBufferSSBO);
+
+        if(Config::useTAA) {
+            taaPass->use();
+            {
+                glUniform1i(glGetUniformLocation(taaPass->shaderProgram, "SCREEN_W"), SCREEN_W);
+                glUniform1i(glGetUniformLocation(taaPass->shaderProgram, "SCREEN_H"), SCREEN_H);
+            }
+            taaPass->draw(svgfMergePass->colorGBufferSSBO,
+                          renderPass->motionGBufferSSBO,
+                          renderPass->normalGBufferSSBO,
+                          renderPass->instanceIndexGBufferSSBO);
+        } else taaPass->firstFrame = true;
+
+        directPass->use();
+        {
+            glUniform1i(glGetUniformLocation(directPass->shaderProgram, "SCREEN_W"), SCREEN_W);
+            glUniform1i(glGetUniformLocation(directPass->shaderProgram, "SCREEN_H"), SCREEN_H);
+            glUniform1f(glGetUniformLocation(directPass->shaderProgram, "scaling"), Config::visualType == Visual_DEPTH ? 0.01f : 1.0);
+            glUniform1i(glGetUniformLocation(directPass->shaderProgram, "channel"), Config::visualType == Visual_DEPTH ? 1 : 3);
+            glUniform1i(glGetUniformLocation(directPass->shaderProgram, "selectedInstanceIndex"),
+                        ResourceManager::manager->queryInstanceIndex(TinyUI::selectedInstance));
+        }
+        SSBOBuffer<float> *renderTarget;
+        if(Config::visualType == Visual_RENDER) renderTarget = &svgfMergePass->colorGBufferSSBO;
+        if(Config::visualType == Visual_DIRECT) renderTarget = &renderPass->directLumGBufferSSBO;
+        if(Config::visualType == Visual_INDIRECT) renderTarget = &renderPass->indirectLumGBufferSSBO;
+        if(Config::visualType == Visual_ALBEDO) renderTarget = &renderPass->albedoGBufferSSBO;
+        if(Config::visualType == Visual_DEPTH) renderTarget = &renderPass->depthGBufferSSBO;
+        if(Config::visualType == Visual_NORMAL) renderTarget = &renderPass->normalGBufferSSBO;
+
+        directPass->draw(*renderTarget,
+                         renderPass->instanceIndexGBufferSSBO);
+
+        back_projection = camera->projection() * camera->w2v_matrix();
+
     }
     //--------------------------------------
 
-	if(glfwGetKeyDown(window, GLFW_KEY_R)) fast_shade = !fast_shade, frameCounter = 0;
-
-	// Menu
-	if(glfwGetKeyDown(window, GLFW_KEY_E)) {
-		show_imgui = show_imgui ^ 1;
-		pass1->reload_meshes(scene);
-	}
 	// Output camera pose
 	if(glfwGetKeyDown(window, GLFW_KEY_P)) {
 		Transform t = camera->transform;
 		cout << "Camera pose:\n";
-		cout << "Position: " << t.position;
-		cout << "Rotation: " << t.rotation;
+		cout << "Position: " << t.position[0] << ", " << t.position[1] << ", " << t.position[2] << '\n';
+		cout << "Rotation: " << t.rotation[0] << ", " << t.rotation[1] << ", " << t.rotation[2] << '\n';
 	}
 
-	Transform before = camera->transform;
+	Transform previousCameraTransform = camera->transform;
 
-	// screen shot for nerf.
-	if(glfwGetKeyDown(window, GLFW_KEY_T)) nerfCreator.screenshot(camera);
-	if(glfwGetKeyDown(window, GLFW_KEY_Y) || glfwGetKeyDown(window, GLFW_KEY_Q)) nerfCreator.writejson();
+	// screen shot.
+	if(glfwGetKeyDown(window, GLFW_KEY_T)) {
+        string file_path = str_format("screenshots/%s.png", localtimestring().c_str());
+
+        int framesize = SCREEN_H * SCREEN_W;
+//        glBindBuffer(GL_SHADER_STORAGE_BUFFER, renderPass->colorGBufferSSBO); // TODO
+        float* tmpdata = (float*)glMapBufferRange(GL_SHADER_STORAGE_BUFFER, 0, framesize * 3 * sizeof(float), GL_MAP_READ_BIT);
+        std::vector<uchar> d(framesize * 3);
+        for(int i = 0;i < framesize * 3;i++) d[i] = std::min(255, int(tmpdata[i] * 255));
+        Texture t(SCREEN_W, SCREEN_H, 3, std::move(d));
+        t.savephoto(file_path);
+        glUnmapBuffer(GL_SHADER_STORAGE_BUFFER);
+
+        cout << "ScreenShot " << file_path << std::endl;
+    }
 
     float speed = 10;
     if(glfwGetKey(window, GLFW_KEY_W)) camera->transform.position += camera->transform.direction_z() * -speed * dt;
@@ -151,131 +332,120 @@ void update(float dt) {
     if(glfwGetKey(window, GLFW_KEY_D)) camera->transform.position += camera->transform.direction_x() * speed * dt;
     if(glfwGetKey(window, GLFW_KEY_A)) camera->transform.position += camera->transform.direction_x() * -speed * dt;
 
-	if(glfwGetKey(window, GLFW_KEY_LEFT)) camera->transform.rotation += vec3(0, 1, 0) * dt;
-	if(glfwGetKey(window, GLFW_KEY_RIGHT)) camera->transform.rotation += vec3(0, -1, 0) * dt;
-	if(glfwGetKey(window, GLFW_KEY_UP)) camera->transform.rotation += vec3(1, 0, 0) * dt;
-	if(glfwGetKey(window, GLFW_KEY_DOWN)) camera->transform.rotation += vec3(-1, 0, 0) * dt;
+	if(glfwGetKey(window, GLFW_KEY_LEFT)) camera->transform.rotation += vec3(0, 50, 0) * dt;
+	if(glfwGetKey(window, GLFW_KEY_RIGHT)) camera->transform.rotation += vec3(0, -50, 0) * dt;
+	if(glfwGetKey(window, GLFW_KEY_UP)) camera->transform.rotation += vec3(50, 0, 0) * dt;
+	if(glfwGetKey(window, GLFW_KEY_DOWN)) camera->transform.rotation += vec3(-50, 0, 0) * dt;
 
     if(glfwGetKey(window, GLFW_KEY_SPACE)) camera->transform.position += vec3(0, speed * dt, 0);
     if(glfwGetKey(window, GLFW_KEY_LEFT_SHIFT))  camera->transform.position += vec3(0, -speed * dt, 0);
-	if(glfwGetKey(window, GLFW_KEY_Q)) glfwSetWindowShouldClose(window, GL_TRUE);
+	if(glfwGetKey(window, GLFW_KEY_ESCAPE)) glfwSetWindowShouldClose(window, GL_TRUE);
 
-	if(!(camera->transform == before)) frameCounter = 0;
 }
 
-void init() {
+void init_scene() {
 
     // passes
-    pass1    = new Renderer("shader/pathtracing.frag", 4);
-    pass_mix = new RenderPass("shader/postprocessing/mixAndMap.frag", 2);
-    pass_fw  = new RenderPass("shader/postprocessing/filter_w.frag", 1);
-	pass_fh  = new RenderPass("shader/postprocessing/filter_h.frag", 0, true);
+    rasterPass = new RasterPass("shader/rasterization/raster_vs.glsl", "shader/rasterization/raster_ps.glsl");
+    renderPass    = new Renderer("shader/pathtracing.glsl");
+    svgfTemporalFilterPass = new SVGFTemporalFilter("shader/postprocessing/SVGF_TemporalFilter.glsl");
+    svgfSpatialFilterPass = new SVGFSpatialFilterPass("shader/postprocessing/SVGF_SpatialFilter.glsl");
+    svgfMergePass = new SVGFMergePass("shader/postprocessing/SVGF_Merge.glsl");
+    mappingPass    = new ToneMappingGamma("shader/postprocessing/ToneMappingGamma.glsl");
+    taaPass    = new TAA("shader/postprocessing/TAA.glsl");
+    directPass    = new DirectDisplayer("shader/postprocessing/direct.glsl");
+    staticBlenderPass = new StaticBlender("shader/postprocessing/StaticBlender.glsl");
 
-    scene = new Scene("Scene");
-    camera = new Camera(M_PI / 3);
+    ResourceManager::manager = new ResourceManager();
 
+    Scene::main_scene = scene = new Scene("Scene");
+    camera = new Camera(FOV_X, 1000);
+    scene->add_child(camera);
     {
         Instance *o1 = AssimpLoader::load_model("model/casa_obj.glb");
-        o1->transform.rotation = vec3(-M_PI / 2, M_PI / 4, 0);
-		// pre setting
-		Material *m1 = o1->get_child(0)->get_child(1)->meshes[0]->material;
-		m1->roughness = 0.01;
-		m1->metallic = 0;
-		m1->index_of_refraction = 1.25;
-		m1->spec_trans = 1;
-		Material *m2 = o1->get_child(0)->get_child(3)->meshes[0]->material;
-		m2->roughness = 0.04;
-		m2->metallic = 0;
-		m2->index_of_refraction = 1.01;
-		m2->spec_trans = 0.8;
+        o1->transform.rotation = vec3(-90, 0, 0);
 		scene->add_child(o1);
 
-        Instance *light= AssimpLoader::load_model("model/light.obj");
-        light->transform.scale = vec3(30, 30, 30);
-        light->transform.position = vec3(0, 100, 0);
-        light->get_child(0)->meshes[0]->material->emission = vec3(5);
-        light->get_child(0)->meshes[0]->material->is_emit = true;
+        Instance *light = new Instance("light");
+        light->transform.rotation = vec3(63, 60, 0);
+//        light->emitterType = Emitter_DIRECTIONAL;
+        light->emission = vec3(5, 5, 5);
         scene->add_child(light);
+
+//        Instance *o1 = AssimpLoader::load_model("model/room.glb");
+//        o1->transform.rotation = vec3(-90, -90, 0);
+//        delete o1->get_child(0)->get_child(11);
+//        scene->add_child(o1);
+//
+//        Instance *light = new Instance("light");
+//        light->transform.rotation = vec3(56, 90, 0);
+//        light->emitterType = Emitter_DIRECTIONAL;
+//        light->emission = vec3(100, 100, 100);
+//        scene->add_child(light);
     }
 
-	skybox = new HDRTexture("hdrs/kloofendal_48d_partly_cloudy_puresky_2k.hdr");
+	skybox = new Skybox("model/kloofendal_48d_partly_cloudy_puresky_2k.hdr");
 
-    camera->transform.rotation.y = M_PI;
-	camera->transform.position = vec3(-13.7884, 11.7131, 4.57255);
-	camera->transform.rotation = vec3(-0.58, 11.3216, 0);
-    scene->reload();
-    pass1->reload_scene(scene);
+    camera->transform.rotation.y = 180;
+	camera->transform.position = vec3(-12.1396, 9.27221, 13.2912);
+	camera->transform.rotation = vec3(-26.19, -45.8484, 0);
+
+    ResourceManager::manager->reload_scene(scene);
+
+    std::cout << "BVH size:" << scene->sceneBVHRoot->siz << std::endl;
+    std::cout << "BVH depth:" << scene->sceneBVHRoot->depth << std::endl;
 }
 
 int main(int argc, const char* argv[]) {
+
     glfwInit();
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);//主版本号
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);//次版本号
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);//次版本号
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);//使用核心渲染模式
 
     //创建窗口，放入上下文中
-    window = glfwCreateWindow(SCREEN_W, SCREEN_H, "My Window", NULL, NULL);
+    window = glfwCreateWindow(Config::WINDOW_W, Config::WINDOW_H, "My Window", NULL, NULL);
     glfwSetWindowPos(window, 500, 200);
     glfwMakeContextCurrent(window);
     glfwSwapInterval(1); // Enable vsync
     glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
     glfwSetCursorPosCallback(window, mouse_callback);
+    glfwSetMouseButtonCallback(window, mouse_clickcalback);
+    glfwSetFramebufferSizeCallback(window, window_resize_callback);
 
     //初始化glad
     gladLoadGLLoader((GLADloadproc)glfwGetProcAddress);
-    glDisable(GL_DEPTH_TEST);
 
-    IMGUI_CHECKVERSION();
-    ImGui::CreateContext();
-    ImGuiIO& io = ImGui::GetIO(); (void)io;
-    io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
-    ImGui::StyleColorsDark();
-    ImGui_ImplGlfw_InitForOpenGL(window, true);
-    ImGui_ImplOpenGL3_Init("#version 130");
+    glDisable(GL_DEPTH);
 
-    init();
+    TinyUI::init(window);
+    init_scene();
 
     float last_time = glfwGetTime(), detaTime;
-	float fps = 60, counter_time = 0;
+	float fps = 60, counter_time = 0, counter_frame = 0;
     while(!glfwWindowShouldClose(window)) {
+
         detaTime = glfwGetTime() - last_time;
         last_time += detaTime;
-        glfwPollEvents();	//检查有没有发生事件，调用相应回调函数
 
+        counter_frame ++;
+        counter_time += detaTime;
+        if(counter_time > 1) {
+            fps = counter_frame / counter_time;
+            counter_frame = counter_time = 0;
+        }
+
+        glViewport(0, Config::WINDOW_H - SCREEN_H, SCREEN_W, SCREEN_H);
         update(detaTime);
 
-        ImGui_ImplOpenGL3_NewFrame();
-        ImGui_ImplGlfw_NewFrame();
-        ImGui::NewFrame();
-
-		counter_time += detaTime;
-		if(counter_time > 1) {
-			counter_time = 0;
-			fps = 1.0 / detaTime;
-		}
-
-//        ImGui::ShowDemoWindow(&show_imgui);
-        if (show_imgui) {
-            ImGui::Begin("Editor", &show_imgui);
-			ImGui::Text(str_format("FPS: %.2f", fps).c_str());
-			Config::insert_gui();
-            scene->insert_gui();
-            ImGui::End();
-        }
-        ImGui::Render();
-
-		int display_w, display_h;
-        glfwGetFramebufferSize(window, &display_w, &display_h);
-        glViewport(0, 0, display_w, display_h);
-        ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+        glViewport(0, 0, Config::WINDOW_W, Config::WINDOW_H);
+        TinyUI::update(scene, fps);
 
         glfwSwapBuffers(window); //交换两层颜色缓冲
+        glfwPollEvents();	//检查有没有发生事件，调用相应回调函数
     }
 
-    //释放资源
-    ImGui_ImplOpenGL3_Shutdown();
-    ImGui_ImplGlfw_Shutdown();
-    ImGui::DestroyContext();
+    TinyUI::terminate();
     glfwTerminate();
     return 0;
 }

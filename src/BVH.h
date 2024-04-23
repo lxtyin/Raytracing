@@ -6,22 +6,41 @@
 #define PATH_TRACING_BVH_H
 
 #include "instance/Triangle.h"
+#include "AABB.h"
 #include <vector>
-using std::vector;
+#include "Intersection.h"
 
-#define MAX_TRIANGLES 1000002
+class Instance;
 
+struct BVHPrimitive {
+    AABB aabb;
+    Instance *instancePtr = nullptr;
+    Triangle *trianglePtr = nullptr;
+};
+
+/**
+ * Two-level BVH Tree.
+ * In scene-level, each mesh (in world space) is considered as a primitive (a box).
+ * At node has instancePtr != nullptr, only ls point to its object-level BVH tree,
+ * you need to transform the ray into the mesh's loacl space,
+ * and continue to intersect in object-level.
+ */
 class BVHNode {
 public:
-    vec3 aa, bb;            // x(a[0], b[0]), y(a[1], b[1]), z(a[2], b[2])
-    bool isleaf = false;
+    AABB aabb;
     BVHNode *ls = nullptr;
     BVHNode *rs = nullptr;
-    Triangle *triangle = nullptr;
+    Triangle* trianglePtr = nullptr;
+    Instance* instancePtr = nullptr;
+
     int siz = 1; // 子树节点数
     int depth = 0; // 树最大深度
 
-    static BVHNode* build(vector<Triangle*> &triangles);
+    static BVHNode* build(std::vector<BVHPrimitive> &primitives);
+
+    void rayIntersect(Ray ray, Intersection &isect, Instance* insp = nullptr);
+
+    ~BVHNode();
 };
 
 

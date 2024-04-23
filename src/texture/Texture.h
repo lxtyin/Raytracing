@@ -3,24 +3,34 @@
 
 #include "glad/glad.h"
 #include "stb_image.h"
+#include "../Config.h"
 #include <string>
 #include <vector>
 using std::string;
-using std::vector;
 using uint = unsigned int;
 using uchar = unsigned char;
 
-//纹理对象，一张图片，可以是各种类型
-class Texture{
-public:
-    uint TTO;
 
-	/**
-	 * 设置一些参数
-	 * \param pname
-	 * \param params
-	 */
-    void setParameter(int pname, int params);
+// Store in texture space. (Quadrant 1)
+class Texture {
+public:
+    GLuint textureObject = 0;
+    GLuint64 textureHandle = 0;
+
+    int width;
+    int height;
+    int channel;
+    std::vector<uchar> data;
+
+    void load_to_gpu();
+    void unload_from_gpu();
+
+    explicit Texture(const string &imagePath);
+
+    Texture(int width, int height, int channel, std::vector<uchar> &&data);
+
+    void savephoto(const string &path);
+
 };
 
 #endif //MAIN_CPP_TEXTURE_H

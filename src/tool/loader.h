@@ -6,11 +6,11 @@
 #include "../instance/Mesh.h"
 #include "../texture/Texture.h"
 #include "../instance/Instance.h"
-#include "../instance/Material.h"
+#include "../material/Material.h"
 
 namespace AssimpLoader{
 
-	SimpleTexture*  processImage(const string &name, const aiScene *scene);
+	Texture*  processImage(const string &name, const aiScene *scene);
 	Material* processMaterial(aiMaterial *mat, const aiScene *scene);
 	Instance* processNode(aiNode *node, const aiScene *scene, Instance *t_node);
     Mesh* processMesh(aiMesh *mesh, const aiScene *scene, Instance *t_node);

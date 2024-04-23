@@ -8,14 +8,13 @@
 #include "Instance.h"
 
 // perspective camera.
-// rely on SCREEN_W and SCREEN_H
 class Camera: public Instance {
-
-	float fov; // only rectangular window now.
-	float near;
  public:
 
-	explicit Camera(float _fov);
+    float fovX;
+    float near, far;
+
+	Camera(float _near, float _far);
 
 	mat4 w2v_matrix();
 	mat4 v2w_matrix();

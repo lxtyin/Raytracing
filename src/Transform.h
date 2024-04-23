@@ -15,8 +15,10 @@ class Transform {
     string order = "YXZ";       /* rotate order */
 public:
     vec3 position;
-    vec3 rotation;
+    vec3 rotation; // degrees.
     vec3 scale;
+
+    void insert_gui();
 
     mat4 matrix();
 

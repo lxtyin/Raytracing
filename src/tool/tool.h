@@ -1,5 +1,6 @@
 #pragma once
 
+#include "glad/glad.h"
 #include <cstdio>
 #include <cstdarg>
 #include <string>
@@ -16,3 +17,17 @@ inline string str_format(const char* fmt, T... args) {
 string read_file(const string &path);
 
 string read_shader(const string &path);
+
+void save_file(const string &path, const string &info);
+
+string localtimestring();
+
+
+string show_file_open_dialog() ;
+
+string show_save_dir_dialog() ;
+
+
+string show_file_open_dialog() ;
+
+string show_save_dir_dialog() ;

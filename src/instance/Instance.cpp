@@ -3,7 +3,6 @@
 //
 
 #include "Instance.h"
-#include "imgui/imgui.h"
 
 Instance::Instance(const string &nm, Instance *p): name(nm), parent(p) {
     if(p) p->children.push_back(p);
@@ -28,7 +27,7 @@ void Instance::set_parent(Instance *p) {
         }
     }
     parent = p;
-    p->children.push_back(this);
+    if(p) p->children.push_back(this);
 }
 
 int Instance::add_child(Instance *cd) {
@@ -41,16 +40,10 @@ mat4 Instance::matrix_to_global() {
 	return parent->matrix_to_global() * transform.matrix();
 }
 
-void Instance::insert_gui() {
-    if(ImGui::TreeNode(name.c_str())) {
-        for(auto *m: meshes) {
-            if(m->material) {
-                m->material->insert_gui();
-            }
-        }
-        for(auto *cd: children) {
-            cd->insert_gui();
-        }
-        ImGui::TreePop();
+Instance::~Instance() {
+    for(auto it: children) {
+        it->parent = nullptr;
+        delete it;
     }
+    if(parent) set_parent(nullptr);
 }

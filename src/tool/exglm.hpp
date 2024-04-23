@@ -1,4 +1,7 @@
-#pragma once
+
+
+#ifndef PATH_TRACING_SRC_TOOL_EXGLM_H_
+#define PATH_TRACING_SRC_TOOL_EXGLM_H_
 
 #include "glm/glm.hpp"
 #include "glm/gtc/matrix_transform.hpp"
@@ -53,3 +56,5 @@ namespace glm {
 		};
 	}
 }
+
+#endif //PATH_TRACING_SRC_TOOL_EXGLM_H_

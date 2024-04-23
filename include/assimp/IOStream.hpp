@@ -134,7 +134,9 @@ IOStream::IOStream() AI_NO_EXCEPT {
 
 // ----------------------------------------------------------------------------------
 AI_FORCE_INLINE
-IOStream::~IOStream() = default;
+IOStream::~IOStream() {
+    // empty
+}
 // ----------------------------------------------------------------------------------
 
 } //!namespace Assimp

@@ -5,30 +5,40 @@
 #ifndef OPENGL_INSTANCE_H
 #define OPENGL_INSTANCE_H
 
-#include "Mesh.h"
 #include "../Transform.h"
 #include <vector>
-using std::vector;
+
+class Mesh;
+class Material;
+
+enum EmitterType {
+    Emitter_NONE,
+    Emitter_SURFACE,
+    Emitter_POINT,
+    Emitter_DIRECTIONAL
+};
 
 class Instance {
+protected:
+    friend class TinyUI;
 
     Instance *parent = nullptr;
-    vector<Instance*> children;
+    std::vector<Instance*> children;
 
 public:
-    vector<Mesh*> meshes;
     string name = "A Instance";
+    Mesh* mesh = nullptr;
+    Material *material = nullptr;
     Transform transform;                 /**< transform to parent. */
+    EmitterType emitterType = Emitter_NONE;
+    vec3 emission = vec3(1.0);
 
     Instance() = default;
+    ~Instance();
+
     explicit Instance(const string &nm, Instance *p = nullptr);
 
-    /**
-     * Insert this node and it's childs into current image gui.
-     */
-    void insert_gui();
-
-	mat4 matrix_to_global();
+	mat4 matrix_to_global(); // O(Hierarchy depth), not large
 
     Instance* get_parent();
 
@@ -43,5 +53,7 @@ public:
      */
     int add_child(Instance *cd);
 };
+
+
 
 #endif //OPENGL_INSTANCE_H
