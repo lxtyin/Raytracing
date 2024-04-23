@@ -279,10 +279,20 @@ void update(float dt) {
         {
             glUniform1i(glGetUniformLocation(directPass->shaderProgram, "SCREEN_W"), SCREEN_W);
             glUniform1i(glGetUniformLocation(directPass->shaderProgram, "SCREEN_H"), SCREEN_H);
+            glUniform1f(glGetUniformLocation(directPass->shaderProgram, "scaling"), Config::visualType == Visual_DEPTH ? 0.01f : 1.0);
+            glUniform1i(glGetUniformLocation(directPass->shaderProgram, "channel"), Config::visualType == Visual_DEPTH ? 1 : 3);
             glUniform1i(glGetUniformLocation(directPass->shaderProgram, "selectedInstanceIndex"),
                         ResourceManager::manager->queryInstanceIndex(TinyUI::selectedInstance));
         }
-        directPass->draw(svgfMergePass->colorGBufferSSBO,
+        SSBOBuffer<float> *renderTarget;
+        if(Config::visualType == Visual_RENDER) renderTarget = &svgfMergePass->colorGBufferSSBO;
+        if(Config::visualType == Visual_DIRECT) renderTarget = &renderPass->directLumGBufferSSBO;
+        if(Config::visualType == Visual_INDIRECT) renderTarget = &renderPass->indirectLumGBufferSSBO;
+        if(Config::visualType == Visual_ALBEDO) renderTarget = &renderPass->albedoGBufferSSBO;
+        if(Config::visualType == Visual_DEPTH) renderTarget = &renderPass->depthGBufferSSBO;
+        if(Config::visualType == Visual_NORMAL) renderTarget = &renderPass->normalGBufferSSBO;
+
+        directPass->draw(*renderTarget,
                          renderPass->instanceIndexGBufferSSBO);
 
         back_projection = camera->projection() * camera->w2v_matrix();
@@ -352,25 +362,26 @@ void init_scene() {
     camera = new Camera(FOV_X, 1000);
     scene->add_child(camera);
     {
-//        Instance *o1 = AssimpLoader::load_model("model/casa_obj.glb");
-//        o1->transform.rotation = vec3(-90, 0, 0);
-//		scene->add_child(o1);
-//
-//        Instance *light = new Instance("light");
-//        light->transform.rotation = vec3(63, 60, 0);
-////        light->emitterType = Emitter_DIRECTIONAL;
-//        light->emission = vec3(5, 5, 5);
-//        scene->add_child(light);
-
-        Instance *o1 = AssimpLoader::load_model("model/room.glb");
+        Instance *o1 = AssimpLoader::load_model("model/casa_obj.glb");
         o1->transform.rotation = vec3(-90, 0, 0);
-        scene->add_child(o1);
+		scene->add_child(o1);
 
         Instance *light = new Instance("light");
-        light->transform.rotation = vec3(9, -1, 0);
-        light->emitterType = Emitter_DIRECTIONAL;
-        light->emission = vec3(3000, 3000, 3000);
+        light->transform.rotation = vec3(63, 60, 0);
+//        light->emitterType = Emitter_DIRECTIONAL;
+        light->emission = vec3(5, 5, 5);
         scene->add_child(light);
+
+//        Instance *o1 = AssimpLoader::load_model("model/room.glb");
+//        o1->transform.rotation = vec3(-90, -90, 0);
+//        delete o1->get_child(0)->get_child(11);
+//        scene->add_child(o1);
+//
+//        Instance *light = new Instance("light");
+//        light->transform.rotation = vec3(56, 90, 0);
+//        light->emitterType = Emitter_DIRECTIONAL;
+//        light->emission = vec3(100, 100, 100);
+//        scene->add_child(light);
     }
 
 	skybox = new Skybox("model/kloofendal_48d_partly_cloudy_puresky_2k.hdr");

@@ -1,6 +1,8 @@
 
 #version 460 core
 
+uniform int channel;
+uniform float scaling;
 layout(binding = 0, std430) readonly buffer ssbo0 {
     float colorGBuffer[];
 };
@@ -19,9 +21,16 @@ void main() {
     ivec2 pixelIndex = ivec2(int(screen_uv.x * SCREEN_W), int(screen_uv.y * SCREEN_H));
     int pixelPtr = pixelIndex.y * SCREEN_W + pixelIndex.x;
 
-    vec3 outputcolor = vec3(colorGBuffer[pixelPtr * 3 + 0],
-                            colorGBuffer[pixelPtr * 3 + 1],
-                            colorGBuffer[pixelPtr * 3 + 2]);
+    vec3 outputcolor;
+    if(channel == 3) {
+        outputcolor = vec3(colorGBuffer[pixelPtr * 3 + 0],
+            colorGBuffer[pixelPtr * 3 + 1],
+            colorGBuffer[pixelPtr * 3 + 2]) * scaling;
+    } else if(channel == 1) {
+        outputcolor = vec3(colorGBuffer[pixelPtr],
+                            colorGBuffer[pixelPtr],
+                            colorGBuffer[pixelPtr]) * scaling;
+    }
 
     if(selectedInstanceIndex >= 0) {
 
