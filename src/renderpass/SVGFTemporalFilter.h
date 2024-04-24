@@ -25,6 +25,8 @@ public:
 
     bool firstFrame = true;
 
+    void update_historycolor(const SSBOBuffer<float> &colorGBufferSSBO);
+
     void draw(const SSBOBuffer<float> &colorGBufferSSBO,
               const SSBOBuffer<float> &normalGBufferSSBO,
               const SSBOBuffer<float> &instanceIndexGBufferSSBO,

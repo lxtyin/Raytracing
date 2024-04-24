@@ -8,7 +8,6 @@
 #include "RenderPass.h"
 
 class SVGFSpatialFilterPass: public VertexFragmentRenderPass {
-    // output
     SSBOBuffer<float> tmpColorGBufferSSBO;
 public:
     // output
@@ -18,10 +17,9 @@ public:
     ~SVGFSpatialFilterPass();
 
     void draw(const SSBOBuffer<float> &colorGBufferSSBO,
-              const SSBOBuffer<float> &momentGBufferSSBO,
+              const SSBOBuffer<float> &varianceGBufferSSBO,
               const SSBOBuffer<float> &normalGBufferSSBO,
-              const SSBOBuffer<float> &depthGBufferSSBO,
-              const SSBOBuffer<float> &numSamplesGBufferSSBO);
+              const SSBOBuffer<float> &depthGBufferSSBO);
 };
 
 

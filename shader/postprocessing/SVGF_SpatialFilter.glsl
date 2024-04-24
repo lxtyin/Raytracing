@@ -19,16 +19,14 @@ layout(binding = 2, std430) readonly buffer ssbo2 {
     float depthGBuffer[];
 };
 layout(binding = 3, std430) readonly buffer ssbo3 {
-    float momentGBuffer[];
+    float varianceGBuffer[];
 };
-layout(binding = 4, std430) readonly buffer ssbo4 {
-    float numSamplesGBuffer[];
-};
+
 layout(binding = 5, std430) writeonly buffer ssbo5 {
     float outputColorGBuffer[];
 };
 
-const float kernel[3] = {1.0, 2.0 / 3.0, 1.0 / 6};
+const float kernel[3] = {3.0 / 8, 1.0 / 4.0, 1.0 / 16};
 
 void main() {
     ivec2 pixelIndex = ivec2(int(screen_uv.x * SCREEN_W), int(screen_uv.y * SCREEN_H)); // 像素的纹理坐标 第一象限
@@ -44,21 +42,12 @@ void main() {
         normalGBuffer[pixelPtr * 3 + 1],
         normalGBuffer[pixelPtr * 3 + 2]
     );
-    vec2 moment = vec2(
-        momentGBuffer[pixelPtr * 2 + 0],
-        momentGBuffer[pixelPtr * 2 + 1]
-    );
-    float numSamples = numSamplesGBuffer[pixelPtr];
     float depth = depthGBuffer[pixelPtr];
 
     // estimate variance
-    float variance = max(0, moment.y - moment.x * moment.x);
+    float variance = varianceGBuffer[pixelPtr];
     float sigma = sqrt(variance);
 
-//    outputColorGBuffer[pixelPtr * 3 + 0] = sigma;
-//    outputColorGBuffer[pixelPtr * 3 + 1] = sigma;
-//    outputColorGBuffer[pixelPtr * 3 + 2] = sigma;
-//    return;
 
     // filter
     float totalWeight = 0;

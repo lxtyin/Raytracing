@@ -63,3 +63,7 @@ SVGFTemporalFilter::~SVGFTemporalFilter() {
     historynormalGBufferSSBO.release();
     historyinstanceIndexGBufferSSBO.release();
 }
+
+void SVGFTemporalFilter::update_historycolor(const SSBOBuffer<float> &colorGBufferSSBO) {
+    historyColorGBufferSSBO.copy(&colorGBufferSSBO);
+}

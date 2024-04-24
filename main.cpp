@@ -9,6 +9,7 @@
 #include "src/renderpass/TAA.h"
 #include "src/renderpass/SVGFTemporalFilter.h"
 #include "src/renderpass/SVGFSpatialFilterPass.h"
+#include "src/renderpass/SVGFVarianceFilter.h"
 #include "src/renderpass/SVGFMergePass.h"
 #include "src/renderpass/StaticBlender.h"
 #include "src/ResourceManager.h"
@@ -46,6 +47,7 @@ RasterPass *rasterPass;
 Renderer *renderPass;
 SVGFSpatialFilterPass *svgfSpatialFilterPass[2];
 SVGFTemporalFilter *svgfTemporalFilterPass[2];
+SVGFVarianceFilter *svgfVarianceFilterPass[2];
 SVGFMergePass *svgfMergePass;
 ToneMappingGamma *mappingPass;
 TAA *taaPass;
@@ -220,13 +222,19 @@ void update(float dt) {
                                                 renderPass->instanceIndexGBufferSSBO,
                                                 renderPass->motionGBufferSSBO);
 
+                svgfVarianceFilterPass[0]->use();
+                svgfVarianceFilterPass[0]->draw(svgfTemporalFilterPass[0]->outputMomentGBufferSSBO,
+                                                renderPass->normalGBufferSSBO,
+                                                renderPass->depthGBufferSSBO,
+                                                svgfTemporalFilterPass[0]->outputNumSamplesGBufferSSBO);
+
                 svgfSpatialFilterPass[0]->use();
                 svgfSpatialFilterPass[0]->draw(svgfTemporalFilterPass[0]->outputColorGBufferSSBO,
-                                               svgfTemporalFilterPass[0]->outputMomentGBufferSSBO,
+                                               svgfVarianceFilterPass[0]->varianceGBufferSSBO,
                                                renderPass->normalGBufferSSBO,
-                                               renderPass->depthGBufferSSBO,
-                                               svgfTemporalFilterPass[0]->outputNumSamplesGBufferSSBO);
+                                               renderPass->depthGBufferSSBO);
                 targetTracer_directLum = &svgfSpatialFilterPass[0]->outputColorGBufferSSBO;
+                svgfTemporalFilterPass[0]->update_historycolor(*targetTracer_directLum);
             }
             if(Config::SVGFForIDI) {
                 svgfTemporalFilterPass[1]->use();
@@ -235,13 +243,19 @@ void update(float dt) {
                                                 renderPass->instanceIndexGBufferSSBO,
                                                 renderPass->motionGBufferSSBO);
 
+                svgfVarianceFilterPass[1]->use();
+                svgfVarianceFilterPass[1]->draw(svgfTemporalFilterPass[1]->outputMomentGBufferSSBO,
+                                                renderPass->normalGBufferSSBO,
+                                                renderPass->depthGBufferSSBO,
+                                                svgfTemporalFilterPass[1]->outputNumSamplesGBufferSSBO);
+
                 svgfSpatialFilterPass[1]->use();
                 svgfSpatialFilterPass[1]->draw(svgfTemporalFilterPass[1]->outputColorGBufferSSBO,
-                                               svgfTemporalFilterPass[1]->outputMomentGBufferSSBO,
+                                               svgfVarianceFilterPass[1]->varianceGBufferSSBO,
                                                renderPass->normalGBufferSSBO,
-                                               renderPass->depthGBufferSSBO,
-                                               svgfTemporalFilterPass[1]->outputNumSamplesGBufferSSBO);
+                                               renderPass->depthGBufferSSBO);
                 targetTracer_indirectLum = &svgfSpatialFilterPass[1]->outputColorGBufferSSBO;
+                svgfTemporalFilterPass[1]->update_historycolor(*targetTracer_indirectLum);
             }
         }
         if(!Config::SVGF || !Config::SVGFForDI) svgfTemporalFilterPass[0]->firstFrame = true;
@@ -351,8 +365,10 @@ void init_scene() {
     renderPass    = new Renderer("shader/pathtracing.glsl");
     svgfTemporalFilterPass[0] = new SVGFTemporalFilter("shader/postprocessing/SVGF_TemporalFilter.glsl");   // for di and idi
     svgfSpatialFilterPass[0] = new SVGFSpatialFilterPass("shader/postprocessing/SVGF_SpatialFilter.glsl");
+    svgfVarianceFilterPass[0] = new SVGFVarianceFilter("shader/postprocessing/SVGF_VarianceFilter.glsl");
     svgfTemporalFilterPass[1] = new SVGFTemporalFilter("shader/postprocessing/SVGF_TemporalFilter.glsl");
     svgfSpatialFilterPass[1] = new SVGFSpatialFilterPass("shader/postprocessing/SVGF_SpatialFilter.glsl");
+    svgfVarianceFilterPass[1] = new SVGFVarianceFilter("shader/postprocessing/SVGF_VarianceFilter.glsl");
     svgfMergePass = new SVGFMergePass("shader/postprocessing/SVGF_Merge.glsl");
     mappingPass    = new ToneMappingGamma("shader/postprocessing/ToneMappingGamma.glsl");
     taaPass    = new TAA("shader/postprocessing/TAA.glsl");

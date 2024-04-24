@@ -135,24 +135,24 @@ void main() {
     }
 
     // variance guide test (in RGB space, HDR).
-//    vec3 mu = vec3(0), var = vec3(0);
-//    int nv = 0;
-//    for(int i = 0;i < 9;i++) {
-//        ivec2 index = pixelIndex + ivec2(i / 3 - 1, i % 3 - 1);
-//        if(index.x < 0 || index.x >= SCREEN_W || index.y < 0 || index.y >= SCREEN_H) continue;
-//        int ptr = index.y * SCREEN_W + index.x;
-//        vec3 r = vec3(
-//            colorGBuffer[ptr * 3 + 0],
-//            colorGBuffer[ptr * 3 + 1],
-//            colorGBuffer[ptr * 3 + 2]
-//        );
-//        nv++;
-//        mu += r;
-//        var += r * r;
-//    }
-//    mu /= nv;
-//    var = max(vec3(0), var / nv - mu * mu);
-//    vec3 sigma = sqrt(var);
+    vec3 mu = vec3(0), var = vec3(0);
+    int nv = 0;
+    for(int i = 0;i < 9;i++) {
+        ivec2 index = pixelIndex + ivec2(i / 3 - 1, i % 3 - 1);
+        if(index.x < 0 || index.x >= SCREEN_W || index.y < 0 || index.y >= SCREEN_H) continue;
+        int ptr = index.y * SCREEN_W + index.x;
+        vec3 r = vec3(
+            colorGBuffer[ptr * 3 + 0],
+            colorGBuffer[ptr * 3 + 1],
+            colorGBuffer[ptr * 3 + 2]
+        );
+        nv++;
+        mu += r;
+        var += r * r;
+    }
+    mu /= nv;
+    var = max(vec3(0), var / nv - mu * mu);
+    vec3 sigma = sqrt(var) * 5;
 
 
     // Temporal accumulation
@@ -168,29 +168,29 @@ void main() {
         bool valid = interpolate(last_uv, pixelPtr, lastcolor, lastmoment);
 
         // No additional variance test
-        if(valid) {
+//        if(valid) {
+//            float historyLen = historyNumSamplesGBuffer[lastPixelPtr];
+//            outputNumSamplesGBuffer[pixelPtr] = historyLen + 1;
+////            color = mix(lastcolor, color, 1.0 / (historyLen + 1));
+////            moment = mix(lastmoment, moment, 1.0 / (historyLen + 1));
+//            color = mix(lastcolor, color, 0.2);
+//            moment = mix(lastmoment, moment, 0.2);
+//        } else {
+//            outputNumSamplesGBuffer[pixelPtr] = 1;
+//        }
+
+        // Additional variance test.
+        vec3 dir = lastcolor - mu;
+        if(!valid || abs(dir.x) > sigma.x || abs(dir.y) > sigma.y || abs(dir.z) > sigma.z) {
+            outputNumSamplesGBuffer[pixelPtr] = 1;
+        } else {
             float historyLen = historyNumSamplesGBuffer[lastPixelPtr];
             outputNumSamplesGBuffer[pixelPtr] = historyLen + 1;
 //            color = mix(lastcolor, color, 1.0 / (historyLen + 1));
 //            moment = mix(lastmoment, moment, 1.0 / (historyLen + 1));
             color = mix(lastcolor, color, 0.2);
             moment = mix(lastmoment, moment, 0.2);
-        } else {
-            outputNumSamplesGBuffer[pixelPtr] = 1;
         }
-
-        // Additional variance test.
-//        vec3 dir = lastcolor - mu;
-//        if(!valid || abs(dir.x) > sigma.x || abs(dir.y) > sigma.y || abs(dir.z) > sigma.z) {
-//            numSamplesGBuffer[pixelPtr] = 1;
-//        } else {
-//            float historyLen = historyNumSamplesGBuffer[lastPixelPtr];
-//            numSamplesGBuffer[pixelPtr] = historyLen + 1;
-////            color = mix(lastcolor, color, 1.0 / (historyLen + 1));
-////            moment = mix(lastmoment, moment, 1.0 / (historyLen + 1));
-//            color = mix(lastcolor, color, 0.2);
-//            moment = mix(lastmoment, moment, 0.2);
-//        }
     }
 
     outputColorGBuffer[pixelPtr * 3 + 0] = color.x;
