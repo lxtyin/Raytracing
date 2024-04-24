@@ -17,7 +17,8 @@ class RasterPass: public RenderPass {
     void init_fbo();
 
 public:
-    GLuint depthGBufferTexture;    // GBuffer, store distance (float).
+    // Output GBuffers, (store as texture).
+    GLuint depthGBufferTexture;
     GLuint normalGBufferTexture;
     GLuint uvGBufferTexture;
     GLuint instanceIndexGBufferTexture;

@@ -14,7 +14,7 @@ StaticBlender::StaticBlender(const string &fragShaderPath) :
     frameCounter = 0;
 }
 
-void StaticBlender::draw(SSBOBuffer<float> &colorGBufferSSBO) {
+void StaticBlender::draw(const SSBOBuffer<float> &colorGBufferSSBO) {
     ++frameCounter;
 
     glUniform1ui(glGetUniformLocation(shaderProgram, "frameCounter"), frameCounter);

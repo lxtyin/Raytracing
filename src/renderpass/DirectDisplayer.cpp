@@ -10,8 +10,8 @@
 DirectDisplayer::DirectDisplayer(const string &fragShaderPath) : VertexFragmentRenderPass(fragShaderPath) {}
 
 
-void DirectDisplayer::draw(SSBOBuffer<float> &colorGBufferSSBO,
-                           SSBOBuffer<float> &instanceIndexGBufferSSBO) {
+void DirectDisplayer::draw(const SSBOBuffer<float> &colorGBufferSSBO,
+                           const SSBOBuffer<float> &instanceIndexGBufferSSBO) {
 
     glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);

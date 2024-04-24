@@ -12,8 +12,8 @@ class DirectDisplayer: public VertexFragmentRenderPass {
 public:
     DirectDisplayer(const string &fragShaderPath);
 
-    void draw(SSBOBuffer<float> &colorGBufferSSBO,
-              SSBOBuffer<float> &instanceIndexGBufferSSBO);
+    void draw(const SSBOBuffer<float> &colorGBufferSSBO,
+              const SSBOBuffer<float> &instanceIndexGBufferSSBO);
 };
 
 

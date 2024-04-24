@@ -2,7 +2,6 @@
 #version 460 core
 
 uniform int channel;
-uniform float scaling;
 layout(binding = 0, std430) readonly buffer ssbo0 {
     float colorGBuffer[];
 };
@@ -25,11 +24,11 @@ void main() {
     if(channel == 3) {
         outputcolor = vec3(colorGBuffer[pixelPtr * 3 + 0],
             colorGBuffer[pixelPtr * 3 + 1],
-            colorGBuffer[pixelPtr * 3 + 2]) * scaling;
+            colorGBuffer[pixelPtr * 3 + 2]);
     } else if(channel == 1) {
         outputcolor = vec3(colorGBuffer[pixelPtr],
                             colorGBuffer[pixelPtr],
-                            colorGBuffer[pixelPtr]) * scaling;
+                            colorGBuffer[pixelPtr]);
     }
 
     if(selectedInstanceIndex >= 0) {

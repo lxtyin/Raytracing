@@ -8,7 +8,7 @@ in vec2 screen_uv;
 uniform int SCREEN_W;
 uniform int SCREEN_H;
 
-layout(binding = 0, std430) buffer ssbo0 {
+layout(binding = 0, std430) readonly buffer ssbo0 {
     float colorGBuffer[];
 };
 layout(binding = 1, std430) readonly buffer ssbo1 {
@@ -30,6 +30,10 @@ layout(binding = 5, std430) readonly buffer ssbo5 {
 };
 layout(binding = 6, std430) readonly buffer ssbo6 {
     float historyMeshIndexGBuffer[];
+};
+
+layout(binding = 7, std430) writeonly buffer ssbo7 {
+    float colorOutputGBuffer[];
 };
 
 
@@ -54,7 +58,6 @@ vec3 YCoCgR2RGB(vec3 YCoCgRColor) {
 
     return rgbColor;
 }
-
 
 bool geometry_test(uint ptr1, uint ptr2) {
     vec3 normal1 = vec3(
@@ -182,7 +185,7 @@ void main() {
     if(result.x < 0 || result.y < 0 || result.z < 0) result = vec3(10000, 0, 0);
     if(any(isnan(result))) result = vec3(0.0);
 
-    colorGBuffer[pixelPtr * 3 + 0] = result.x;
-    colorGBuffer[pixelPtr * 3 + 1] = result.y;
-    colorGBuffer[pixelPtr * 3 + 2] = result.z;
+    colorOutputGBuffer[pixelPtr * 3 + 0] = result.x;
+    colorOutputGBuffer[pixelPtr * 3 + 1] = result.y;
+    colorOutputGBuffer[pixelPtr * 3 + 2] = result.z;
 }

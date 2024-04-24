@@ -10,6 +10,9 @@ uniform int SCREEN_H;
 layout(binding = 0, std430) buffer ssbo0 {
     float colorGBuffer[];
 };
+layout(binding = 1, std430) buffer ssbo1 {
+    float outputColorGBuffer[];
+};
 
 vec3 ACESToneMapping(vec3 color) {
     const float A = 2.51;
@@ -45,7 +48,7 @@ void main() {
     cur = ACESToneMapping(cur);
     cur = igamma(cur);
 
-    colorGBuffer[pixelPtr * 3 + 0] = cur.x;
-    colorGBuffer[pixelPtr * 3 + 1] = cur.y;
-    colorGBuffer[pixelPtr * 3 + 2] = cur.z;
+    outputColorGBuffer[pixelPtr * 3 + 0] = cur.x;
+    outputColorGBuffer[pixelPtr * 3 + 1] = cur.y;
+    outputColorGBuffer[pixelPtr * 3 + 2] = cur.z;
 }

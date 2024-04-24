@@ -9,6 +9,7 @@
 
 class StaticBlender: public VertexFragmentRenderPass {
 public:
+    // Outputs
     SSBOBuffer<float> historyColorGBufferSSBO;
     SSBOBuffer<float> historyMomentGBufferSSBO;
 
@@ -17,11 +18,7 @@ public:
     StaticBlender(const string &fragShaderPath);
     ~StaticBlender();
 
-    /**
-     * Note curFrame will be stolen if saveFrame = false;
-     * \saveFrame set false only if it is the final pass.
-     */
-    void draw(SSBOBuffer<float> &colorGBufferSSBO);
+    void draw(const SSBOBuffer<float> &colorGBufferSSBO);
 };
 
 

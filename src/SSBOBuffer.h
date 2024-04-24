@@ -27,18 +27,18 @@ public:
 
     void release();
 
-    bool isempty();
-    void bind_current_shader(int index);
-    void copy(SSBOBuffer<T> *buffer);
-    void copy(T *data);
+    bool isempty() const;
+    void bind_current_shader(int index) const;
+    void copy(const SSBOBuffer<T> *buffer);
+    void copy(const T *data);
     void fill(const T &val);
 
-    void save_as_image(int width, int height, int channel, const string &path);
+    void save_as_image(int width, int height, int channel, const string &path) const;
 };
 
 
 template<class T>
-void SSBOBuffer<T>::save_as_image(int width, int height, int channel, const string &path) {
+void SSBOBuffer<T>::save_as_image(int width, int height, int channel, const string &path) const {
     // T must be float here !
     assert(width * height * channel == m_size);
 
@@ -62,7 +62,7 @@ void SSBOBuffer<T>::save_as_image(int width, int height, int channel, const stri
 }
 
 template<class T>
-void SSBOBuffer<T>::copy(T *data) {
+void SSBOBuffer<T>::copy(const T *data) {
     if(isempty()) return;
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, m_ssbo);
     glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, m_size * sizeof(T), data);
@@ -125,12 +125,12 @@ SSBOBuffer<T>::SSBOBuffer(uint siz, T *data) {
 
 
 template<class T>
-void SSBOBuffer<T>::bind_current_shader(int index) {
+void SSBOBuffer<T>::bind_current_shader(int index) const {
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, index, m_ssbo);
 }
 
 template<class T>
-void SSBOBuffer<T>::copy(SSBOBuffer<T> *buffer) {
+void SSBOBuffer<T>::copy(const SSBOBuffer<T> *buffer) {
     assert(m_size == buffer->m_size);
     glBindBuffer(GL_COPY_READ_BUFFER, buffer->m_ssbo);
     glBindBuffer(GL_COPY_WRITE_BUFFER, m_ssbo);
@@ -144,7 +144,7 @@ void SSBOBuffer<T>::copy(SSBOBuffer<T> *buffer) {
 
 
 template<class T>
-bool SSBOBuffer<T>::isempty() {
+bool SSBOBuffer<T>::isempty() const {
     return m_ssbo == 0;
 }
 

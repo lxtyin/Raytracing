@@ -7,41 +7,46 @@
 in vec2 screen_uv;
 uniform int SCREEN_W;
 uniform int SCREEN_H;
+uniform bool firstFrame = false;
 
-layout(binding = 0, std430) buffer ssbo0 {
+layout(binding = 0, std430) readonly buffer ssbo0 {
     float colorGBuffer[];
 };
-layout(binding = 1, std430) buffer ssbo1 {
-    float momentGBuffer[];
-};
-layout(binding = 2, std430) readonly buffer ssbo2 {
+layout(binding = 1, std430) readonly buffer ssbo1 {
     float normalGBuffer[];
 };
-layout(binding = 3, std430) readonly buffer ssbo3 {
+layout(binding = 2, std430) readonly buffer ssbo2 {
     float instanceIndexGBuffer[];
 };
-layout(binding = 4, std430) readonly buffer ssbo4 {
+layout(binding = 3, std430) readonly buffer ssbo3 {
     float motionGBuffer[];
 };
 
-layout(binding = 5, std430) readonly buffer ssbo5 {
-    float historyColorGBuffer[];
+layout(binding = 4, std430) writeonly buffer ssbo4 {
+    float outputColorGBuffer[];
 };
-layout(binding = 6, std430) readonly buffer ssbo6 {
-    float historyMomentGBuffer[];
+layout(binding = 5, std430) writeonly buffer ssbo5 {
+    float outputMomentGBuffer[];
 };
-layout(binding = 7, std430) readonly buffer ssbo7 {
-    float historyNormalGBuffer[];
-};
-layout(binding = 8, std430) readonly buffer ssbo8 {
-    float historyMeshIndexGBuffer[];
+layout(binding = 6, std430) writeonly buffer ssbo6 {
+    float outputNumSamplesGBuffer[];
 };
 
+layout(binding = 7, std430) readonly buffer ssbo7 {
+    float historyColorGBuffer[];
+};
+layout(binding = 8, std430) readonly buffer ssbo8 {
+    float historyMomentGBuffer[];
+};
 layout(binding = 9, std430) readonly buffer ssbo9 {
     float historyNumSamplesGBuffer[];
 };
-layout(binding = 10, std430) buffer ssbo10 {
-    float numSamplesGBuffer[];
+
+layout(binding = 10, std430) readonly buffer ssbo10 {
+    float historynormalGBuffer[];
+};
+layout(binding = 11, std430) readonly buffer ssbo11 {
+    float historyinstanceIndexGBuffer[];
 };
 
 bool geometry_test(uint ptr1, uint ptr2) {
@@ -52,11 +57,11 @@ bool geometry_test(uint ptr1, uint ptr2) {
     );
     float id1 = instanceIndexGBuffer[ptr1];
     vec3 normal2 = vec3(
-        historyNormalGBuffer[ptr2 * 3 + 0],
-        historyNormalGBuffer[ptr2 * 3 + 1],
-        historyNormalGBuffer[ptr2 * 3 + 2]
+        historynormalGBuffer[ptr2 * 3 + 0],
+        historynormalGBuffer[ptr2 * 3 + 1],
+        historynormalGBuffer[ptr2 * 3 + 2]
     );
-    float id2 = historyMeshIndexGBuffer[ptr2];
+    float id2 = historyinstanceIndexGBuffer[ptr2];
 
     return dot(normal1, normal2) > 0.9 && abs(id1 - id2) < 0.1;
 }
@@ -98,6 +103,10 @@ bool interpolate(vec2 suv, uint testptr, out vec3 color, out vec2 moment) {
     return totweight > 0.00001;
 }
 
+float luminance(vec3 c) {
+    return c.x * 0.212671f + c.y * 0.715160f + c.z * 0.072169f;
+}
+
 
 void main() {
     ivec2 pixelIndex = ivec2(int(screen_uv.x * SCREEN_W), int(screen_uv.y * SCREEN_H));
@@ -108,41 +117,48 @@ void main() {
         colorGBuffer[pixelPtr * 3 + 1],
         colorGBuffer[pixelPtr * 3 + 2]
     );
-    vec2 moment = vec2(
-        momentGBuffer[pixelPtr * 2 + 0],
-        momentGBuffer[pixelPtr * 2 + 1]
-    );
+    float lum = luminance(color);
+    vec2 moment = vec2(lum, lum * lum);
     vec2 motion = vec2(
         motionGBuffer[pixelPtr * 2 + 0],
         motionGBuffer[pixelPtr * 2 + 1]
     );
 
+    if(firstFrame) {
+        outputColorGBuffer[pixelPtr * 3 + 0] = color.x;
+        outputColorGBuffer[pixelPtr * 3 + 1] = color.y;
+        outputColorGBuffer[pixelPtr * 3 + 2] = color.z;
+        outputMomentGBuffer[pixelPtr * 2 + 0] = moment.x;
+        outputMomentGBuffer[pixelPtr * 2 + 1] = moment.y;
+        outputNumSamplesGBuffer[pixelPtr] = 1;
+        return;
+    }
 
     // variance guide test (in RGB space, HDR).
-    vec3 mu = vec3(0), var = vec3(0);
-    int nv = 0;
-    for(int i = 0;i < 9;i++) {
-        ivec2 index = pixelIndex + ivec2(i / 3 - 1, i % 3 - 1);
-        if(index.x < 0 || index.x >= SCREEN_W || index.y < 0 || index.y >= SCREEN_H) continue;
-        int ptr = index.y * SCREEN_W + index.x;
-        vec3 r = vec3(
-            colorGBuffer[ptr * 3 + 0],
-            colorGBuffer[ptr * 3 + 1],
-            colorGBuffer[ptr * 3 + 2]
-        );
-        nv++;
-        mu += r;
-        var += r * r;
-    }
-    mu /= nv;
-    var = var / nv - mu * mu;
-    vec3 sigma = sqrt(var);
+//    vec3 mu = vec3(0), var = vec3(0);
+//    int nv = 0;
+//    for(int i = 0;i < 9;i++) {
+//        ivec2 index = pixelIndex + ivec2(i / 3 - 1, i % 3 - 1);
+//        if(index.x < 0 || index.x >= SCREEN_W || index.y < 0 || index.y >= SCREEN_H) continue;
+//        int ptr = index.y * SCREEN_W + index.x;
+//        vec3 r = vec3(
+//            colorGBuffer[ptr * 3 + 0],
+//            colorGBuffer[ptr * 3 + 1],
+//            colorGBuffer[ptr * 3 + 2]
+//        );
+//        nv++;
+//        mu += r;
+//        var += r * r;
+//    }
+//    mu /= nv;
+//    var = max(vec3(0), var / nv - mu * mu);
+//    vec3 sigma = sqrt(var);
 
 
     // Temporal accumulation
     vec2 last_uv = screen_uv - motion;
     if(last_uv.x >= 1 || last_uv.y >= 1 || last_uv.x < 0 || last_uv.y < 0) {
-        numSamplesGBuffer[pixelPtr] = 1;
+        outputNumSamplesGBuffer[pixelPtr] = 1;
     } else {
         ivec2 lastPixelIndex = ivec2(int(last_uv.x * SCREEN_W), int(last_uv.y * SCREEN_H));
         int lastPixelPtr = lastPixelIndex.y * SCREEN_W + lastPixelIndex.x;
@@ -152,30 +168,34 @@ void main() {
         bool valid = interpolate(last_uv, pixelPtr, lastcolor, lastmoment);
 
         // No additional variance test
-//        if(valid) {
-//            float historyLen = historyNumSamplesGBuffer[lastPixelPtr];
-//            numSamplesGBuffer[pixelPtr] = historyLen + 1;
+        if(valid) {
+            float historyLen = historyNumSamplesGBuffer[lastPixelPtr];
+            outputNumSamplesGBuffer[pixelPtr] = historyLen + 1;
 //            color = mix(lastcolor, color, 1.0 / (historyLen + 1));
 //            moment = mix(lastmoment, moment, 1.0 / (historyLen + 1));
-//        } else {
-//            numSamplesGBuffer[pixelPtr] = 1;
-//        }
+            color = mix(lastcolor, color, 0.2);
+            moment = mix(lastmoment, moment, 0.2);
+        } else {
+            outputNumSamplesGBuffer[pixelPtr] = 1;
+        }
 
         // Additional variance test.
-        vec3 dir = lastcolor - mu;
-        if(!valid || abs(dir.x) > sigma.x || abs(dir.y) > sigma.y || abs(dir.z) > sigma.z) {
-            ;
-        } else {
-            float historyLen = historyNumSamplesGBuffer[lastPixelPtr];
-            numSamplesGBuffer[pixelPtr] += historyLen;
-            color = mix(lastcolor, color, 1.0 / (historyLen + 1));
-            moment = mix(lastmoment, moment, 1.0 / (historyLen + 1));
-        }
+//        vec3 dir = lastcolor - mu;
+//        if(!valid || abs(dir.x) > sigma.x || abs(dir.y) > sigma.y || abs(dir.z) > sigma.z) {
+//            numSamplesGBuffer[pixelPtr] = 1;
+//        } else {
+//            float historyLen = historyNumSamplesGBuffer[lastPixelPtr];
+//            numSamplesGBuffer[pixelPtr] = historyLen + 1;
+////            color = mix(lastcolor, color, 1.0 / (historyLen + 1));
+////            moment = mix(lastmoment, moment, 1.0 / (historyLen + 1));
+//            color = mix(lastcolor, color, 0.2);
+//            moment = mix(lastmoment, moment, 0.2);
+//        }
     }
 
-    colorGBuffer[pixelPtr * 3 + 0] = color.x;
-    colorGBuffer[pixelPtr * 3 + 1] = color.y;
-    colorGBuffer[pixelPtr * 3 + 2] = color.z;
-    momentGBuffer[pixelPtr * 2 + 0] = moment.x;
-    momentGBuffer[pixelPtr * 2 + 1] = moment.y;
+    outputColorGBuffer[pixelPtr * 3 + 0] = color.x;
+    outputColorGBuffer[pixelPtr * 3 + 1] = color.y;
+    outputColorGBuffer[pixelPtr * 3 + 2] = color.z;
+    outputMomentGBuffer[pixelPtr * 2 + 0] = moment.x;
+    outputMomentGBuffer[pixelPtr * 2 + 1] = moment.y;
 }

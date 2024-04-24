@@ -21,8 +21,6 @@ Renderer::Renderer(const string &shaderPath): VertexFragmentRenderPass(shaderPat
                                               indirectLumGBufferSSBO(SCREEN_W * SCREEN_H * 3),
                                               motionGBufferSSBO(SCREEN_W * SCREEN_H * 2),
                                               albedoGBufferSSBO(SCREEN_W * SCREEN_H * 3),
-                                              momentGBufferSSBO(SCREEN_W * SCREEN_H * 2),
-                                              numSamplesGBufferSSBO(SCREEN_W * SCREEN_H * 1),
                                               depthGBufferSSBO(SCREEN_W * SCREEN_H * 1),
                                               normalGBufferSSBO(SCREEN_W * SCREEN_H * 3),
                                               instanceIndexGBufferSSBO(SCREEN_W * SCREEN_H * 1)
@@ -44,14 +42,13 @@ void Renderer::draw() {
     directLumGBufferSSBO.bind_current_shader(14);
     indirectLumGBufferSSBO.bind_current_shader(15);
     albedoGBufferSSBO.bind_current_shader(7);
-    momentGBufferSSBO.bind_current_shader(8);
 
     motionGBufferSSBO.bind_current_shader(9);
-    numSamplesGBufferSSBO.bind_current_shader(10);
 
     depthGBufferSSBO.bind_current_shader(11);
     normalGBufferSSBO.bind_current_shader(12);
     instanceIndexGBufferSSBO.bind_current_shader(13);
+
 
     drawcall();
 }
@@ -61,8 +58,6 @@ Renderer::~Renderer() {
     indirectLumGBufferSSBO.release();
     motionGBufferSSBO.release();
     albedoGBufferSSBO.release();
-    momentGBufferSSBO.release();
-    numSamplesGBufferSSBO.release();
     depthGBufferSSBO.release();
     normalGBufferSSBO.release();
     instanceIndexGBufferSSBO.release();

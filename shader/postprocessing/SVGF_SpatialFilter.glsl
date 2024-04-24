@@ -24,8 +24,8 @@ layout(binding = 3, std430) readonly buffer ssbo3 {
 layout(binding = 4, std430) readonly buffer ssbo4 {
     float numSamplesGBuffer[];
 };
-layout(binding = 5, std430) buffer ssbo5 {
-    float colorOutputGBuffer[];
+layout(binding = 5, std430) writeonly buffer ssbo5 {
+    float outputColorGBuffer[];
 };
 
 const float kernel[3] = {1.0, 2.0 / 3.0, 1.0 / 6};
@@ -51,10 +51,14 @@ void main() {
     float numSamples = numSamplesGBuffer[pixelPtr];
     float depth = depthGBuffer[pixelPtr];
 
-
     // estimate variance
     float variance = max(0, moment.y - moment.x * moment.x);
     float sigma = sqrt(variance);
+
+//    outputColorGBuffer[pixelPtr * 3 + 0] = sigma;
+//    outputColorGBuffer[pixelPtr * 3 + 1] = sigma;
+//    outputColorGBuffer[pixelPtr * 3 + 2] = sigma;
+//    return;
 
     // filter
     float totalWeight = 0;
@@ -90,8 +94,8 @@ void main() {
     result /= totalWeight;
     if(any(isnan(result)) || any(isinf(result))) result = vec3(10000, 0, 0);
 
-    colorOutputGBuffer[pixelPtr * 3 + 0] = result.x;
-    colorOutputGBuffer[pixelPtr * 3 + 1] = result.y;
-    colorOutputGBuffer[pixelPtr * 3 + 2] = result.z;
+    outputColorGBuffer[pixelPtr * 3 + 0] = result.x;
+    outputColorGBuffer[pixelPtr * 3 + 1] = result.y;
+    outputColorGBuffer[pixelPtr * 3 + 2] = result.z;
 }
 

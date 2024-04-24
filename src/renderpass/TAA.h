@@ -8,25 +8,22 @@
 #include "RenderPass.h"
 
 class TAA: public VertexFragmentRenderPass {
-public:
-
     SSBOBuffer<float> historycolorGBufferSSBO;
     SSBOBuffer<float> historynormalGBufferSSBO;
     SSBOBuffer<float> historyinstanceIndexGBufferSSBO;
+public:
+    // output
+    SSBOBuffer<float> outputColorGBufferSSBO;
 
     bool firstFrame = true;
 
     TAA(const string &fragShaderPath);
     ~TAA();
 
-    /**
-     * Note curFrame will be stolen if saveFrame = false;
-     * \saveFrame set false only if it is the final pass.
-     */
-    void draw(SSBOBuffer<float> &colorGBufferSSBO,
-              SSBOBuffer<float> &motionGBufferSSBO,
-              SSBOBuffer<float> &normalGBufferSSBO,
-              SSBOBuffer<float> &instanceIndexGBufferSSBO, bool saveFrame = true);
+    void draw(const SSBOBuffer<float> &colorGBufferSSBO,
+              const SSBOBuffer<float> &motionGBufferSSBO,
+              const SSBOBuffer<float> &normalGBufferSSBO,
+              const SSBOBuffer<float> &instanceIndexGBufferSSBO);
 };
 
 

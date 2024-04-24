@@ -88,17 +88,10 @@ uniform int lightCount;
 layout(binding = 7) buffer ssbo7 {
     float albedoGBuffer[];
 };
-layout(binding = 8) buffer ssbo8 {
-    float momentGBuffer[];
-};
 
 layout(binding = 9) writeonly buffer ssbo9 {
     float motionGBuffer[];
 };
-layout(binding = 10) writeonly buffer ssbo10 {
-    float numSamplesGBuffer[];
-};
-
 layout(binding = 11) writeonly buffer ssbo11 {
     float depthGBuffer[];
 };
@@ -108,7 +101,6 @@ layout(binding = 12) writeonly buffer ssbo12 {
 layout(binding = 13) writeonly buffer ssbo13 {
     float instanceIndexGBuffer[];
 };
-
 
 layout(binding = 14) buffer ssbo14 {
     float directLumGBuffer[];
@@ -564,17 +556,14 @@ void main() {
         albedo = resultGI;
     }
 
-    resultDI /= albedo;
-    resultIDI /= albedo;
+    resultDI /= max(vec3(EPS), albedo);
+    resultIDI /= max(vec3(EPS), albedo);
 
     // calculate motion vector
     vec4 lastNDC = backprojMat * vec4(first_isect.position, 1);
     lastNDC /= lastNDC.w;
     vec2 last_suv = (lastNDC.xy + 1.0) / 2;
     vec2 motion = screen_uv - last_suv;
-
-    float lum = luminance(resultGI);
-    vec2 moment = vec2(lum, lum * lum);
 
     if(currentspp != 1) {
         vec3 lastdi = vec3(directLumGBuffer[pixelPtr * 3 + 0],
@@ -586,12 +575,9 @@ void main() {
         vec3 lastalbedo = vec3(albedoGBuffer[pixelPtr * 3 + 0],
                                albedoGBuffer[pixelPtr * 3 + 1],
                                albedoGBuffer[pixelPtr * 3 + 2]);
-        vec2 lastmoment = vec2(momentGBuffer[pixelPtr * 2 + 0],
-                               momentGBuffer[pixelPtr * 2 + 1]);
         resultDI = mix(lastdi, resultDI, 1.0 / currentspp);
         resultIDI = mix(lastidi, resultIDI, 1.0 / currentspp);
         albedo = mix(lastalbedo, albedo, 1.0 / currentspp);
-        moment = mix(lastmoment, moment, 1.0 / currentspp);
     }
 
     directLumGBuffer[pixelPtr * 3 + 0] = resultDI.x;
@@ -600,13 +586,9 @@ void main() {
     indirectLumGBuffer[pixelPtr * 3 + 0] = resultIDI.x;
     indirectLumGBuffer[pixelPtr * 3 + 1] = resultIDI.y;
     indirectLumGBuffer[pixelPtr * 3 + 2] = resultIDI.z;
-
     albedoGBuffer[pixelPtr * 3 + 0] = albedo.x;
     albedoGBuffer[pixelPtr * 3 + 1] = albedo.y;
     albedoGBuffer[pixelPtr * 3 + 2] = albedo.z;
-    momentGBuffer[pixelPtr * 2 + 0] = moment.x;
-    momentGBuffer[pixelPtr * 2 + 1] = moment.y;
-    numSamplesGBuffer[pixelPtr] = currentspp;
 
     motionGBuffer[pixelPtr * 2 + 0] = motion.x;
     motionGBuffer[pixelPtr * 2 + 1] = motion.y;

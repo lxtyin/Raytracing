@@ -10,14 +10,15 @@
 
 class SVGFMergePass: public VertexFragmentRenderPass {
 public:
+    // Output
     SSBOBuffer<float> colorGBufferSSBO;
 
     SVGFMergePass(const string &fragShaderPath);
     ~SVGFMergePass();
 
-    void draw(SSBOBuffer<float> &directLumGBufferSSBO,
-              SSBOBuffer<float> &indirectLumGBufferSSBO,
-              SSBOBuffer<float> &albedoGBufferSSBO);
+    void draw(const SSBOBuffer<float> &directLumGBufferSSBO,
+              const SSBOBuffer<float> &indirectLumGBufferSSBO,
+              const SSBOBuffer<float> &albedoGBufferSSBO);
 };
 
 

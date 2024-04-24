@@ -8,27 +8,27 @@
 #include "RenderPass.h"
 
 class SVGFTemporalFilter: public VertexFragmentRenderPass {
-public:
-
-    SSBOBuffer<float> historydirectLumGBufferSSBO;
-    SSBOBuffer<float> historyindirectLumGBufferSSBO;
-    SSBOBuffer<float> historymomentGBufferSSBO;
+    // stores
+    SSBOBuffer<float> historyColorGBufferSSBO;
+    SSBOBuffer<float> historyMomentGBufferSSBO;
+    SSBOBuffer<float> historyNumSamplesGBufferSSBO;
     SSBOBuffer<float> historynormalGBufferSSBO;
     SSBOBuffer<float> historyinstanceIndexGBufferSSBO;
-    SSBOBuffer<float> historynumSamplesGBufferSSBO;
+public:
+    // outputs.
+    SSBOBuffer<float> outputColorGBufferSSBO;
+    SSBOBuffer<float> outputMomentGBufferSSBO;
+    SSBOBuffer<float> outputNumSamplesGBufferSSBO;
 
     SVGFTemporalFilter(const string &fragShaderPath);
     ~SVGFTemporalFilter();
 
     bool firstFrame = true;
 
-    void draw(SSBOBuffer<float> &directLumGBufferSSBO,
-              SSBOBuffer<float> &indirectLumGBufferSSBO,
-              SSBOBuffer<float> &momentGBufferSSBO,
-              SSBOBuffer<float> &normalGBufferSSBO,
-              SSBOBuffer<float> &instanceIndexGBufferSSBO,
-              SSBOBuffer<float> &motionGBufferSSBO,
-              SSBOBuffer<float> &numSamplesGBufferSSBO);
+    void draw(const SSBOBuffer<float> &colorGBufferSSBO,
+              const SSBOBuffer<float> &normalGBufferSSBO,
+              const SSBOBuffer<float> &instanceIndexGBufferSSBO,
+              const SSBOBuffer<float> &motionGBufferSSBO);
 };
 
 
