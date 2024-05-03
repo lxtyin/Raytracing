@@ -60,12 +60,12 @@ void ResourceManager::update_globalinstance_recursive(Instance *cur, mat4 transf
         globalInstances.emplace_back(cur, transform2world);
     }
     if(cur->emitterType == Emitter_POINT) {
-        vec3 pos = vec3(transform2world * vec4(cur->transform.position, 1.0));
+        vec3 pos = vec3(transform2world * vec4(0, 0, 0, 1.0));
         LightInfo lightInfo(0, pos, cur->emission);
         lightBuffer.push_back(lightInfo);
     }
     if(cur->emitterType == Emitter_DIRECTIONAL) {
-        vec3 dir = vec3(transform2world * vec4(cur->transform.direction_z(), 0.0));
+        vec3 dir = vec3(transform2world * vec4(0, 0, 1, 0.0));
         LightInfo lightInfo(1, dir, cur->emission);
         lightBuffer.push_back(lightInfo);
     }

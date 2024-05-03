@@ -48,10 +48,10 @@ public:
 };
 
 class ResourceManager {
-    
+
     std::vector<Texture*> textures;
     std::vector<Mesh*> meshes;
-    std::vector<std::pair<Instance*, mat4>> globalInstances; // Instances and transform to global. (updated each frame)
+    std::vector<std::pair<Instance*, mat4>> globalInstances;
 
     std::map<Texture*, uint> textureIndexMap;
     std::map<Mesh*, uint> meshIndexMap;

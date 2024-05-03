@@ -182,7 +182,7 @@ void main() {
 //
 //        result = mix(lastcolor, cur, 0.05);
 //    }
-    if(result.x < 0 || result.y < 0 || result.z < 0) result = vec3(10000, 0, 0);
+    if(result.x < 0 || result.y < 0 || result.z < 0) result = vec3(0, 0, 0);
     if(any(isnan(result))) result = vec3(0.0);
 
     colorOutputGBuffer[pixelPtr * 3 + 0] = result.x;

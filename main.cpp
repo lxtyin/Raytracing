@@ -158,6 +158,7 @@ void update(float dt) {
         ResourceManager::manager->reload_meshes();
     }
 
+
 	static glm::mat4 back_projection = camera->projection() * camera->w2v_matrix();
 
 	frameCounter++;
@@ -165,15 +166,10 @@ void update(float dt) {
     // 渲染管线
 	// ---------------------------------------
     {
-        std::mt19937 mrand(0);
-
-        for(int spp = 1;spp <= Config::SPP;spp++) {
+        for(uint spp = 1;spp <= Config::SPP;spp++) {
             vec2 jitter = vec2(0.5f);
-            if(Config::useStaticBlender) jitter = vec2(globalRand() * 1.0f / globalRand.max(), globalRand() * 1.0f / globalRand.max());
-            else {
-                if(spp == Config::SPP) jitter = vec2(0.5f); // sample center for the last spp of each frame.
-                else jitter = vec2(mrand() * 1.0f / mrand.max(), mrand() * 1.0f / mrand.max());
-            }
+            jitter = vec2(globalRand() * 1.0f / globalRand.max(), globalRand() * 1.0f / globalRand.max());
+            if(!Config::useStaticBlender && spp == Config::SPP) jitter = vec2(0.5f); // sample center for the last spp of each frame.
 
             rasterPass->use();
             rasterPass->draw(camera, jitter);
@@ -187,7 +183,7 @@ void update(float dt) {
                 renderPass->bind_texture("uvGBufferTexture", rasterPass->uvGBufferTexture, 4);
                 renderPass->bind_texture("instanceIndexGBufferTexture", rasterPass->instanceIndexGBufferTexture, 5);
                 glUniform2f(glGetUniformLocation(renderPass->shaderProgram, "jitter"), jitter.x, jitter.y);
-                glUniform1i(glGetUniformLocation(renderPass->shaderProgram, "currentspp"), spp);
+                glUniform1ui(glGetUniformLocation(renderPass->shaderProgram, "currentspp"), spp);
                 glUniform1f(glGetUniformLocation(renderPass->shaderProgram, "skybox_Light_SUM"), skybox->lightSum);
                 glUniformMatrix4fv(glGetUniformLocation(renderPass->shaderProgram, "v2wMat"), 1, GL_FALSE, glm::value_ptr(camera->v2w_matrix()));
                 glUniform1i(glGetUniformLocation(renderPass->shaderProgram, "SCREEN_W"), SCREEN_W);
@@ -302,31 +298,30 @@ void update(float dt) {
             targetTracer_rendered = &taaPass->outputColorGBufferSSBO;
         } else taaPass->firstFrame = true;
 
-        SSBOBuffer<float> *renderTarget;
-        if(Config::visualType == Visual_RENDER) renderTarget = targetTracer_rendered;
-        if(Config::visualType == Visual_DIRECT) renderTarget = targetTracer_directLum;
-        if(Config::visualType == Visual_INDIRECT) renderTarget = targetTracer_indirectLum;
-        if(Config::visualType == Visual_ALBEDO) renderTarget = &renderPass->albedoGBufferSSBO;
-        if(Config::visualType == Visual_DEPTH) renderTarget = &renderPass->depthGBufferSSBO;
-        if(Config::visualType == Visual_NORMAL) renderTarget = &renderPass->normalGBufferSSBO;
-        int renderChannel = Config::visualType == Visual_DEPTH ? 1 : 3;
-
         directPass->use();
         {
             glUniform1i(glGetUniformLocation(directPass->shaderProgram, "SCREEN_W"), SCREEN_W);
             glUniform1i(glGetUniformLocation(directPass->shaderProgram, "SCREEN_H"), SCREEN_H);
-            glUniform1i(glGetUniformLocation(directPass->shaderProgram, "channel"), renderChannel);
+            glUniform1i(glGetUniformLocation(directPass->shaderProgram, "visualType"), (int)Config::visualType);
             glUniform1i(glGetUniformLocation(directPass->shaderProgram, "selectedInstanceIndex"),
                         ResourceManager::manager->queryInstanceIndex(TinyUI::selectedInstance));
         }
-        directPass->draw(*renderTarget,
+        directPass->draw(*targetTracer_rendered,
+                         *targetTracer_directLum,
+                         *targetTracer_indirectLum,
+                         renderPass->albedoGBufferSSBO,
+                         renderPass->depthGBufferSSBO,
+                         renderPass->normalGBufferSSBO,
                          renderPass->instanceIndexGBufferSSBO);
 
         back_projection = camera->projection() * camera->w2v_matrix();
 
         if(glfwGetKeyDown(window, GLFW_KEY_T)) {
-            string path = str_format("screenshots/%s.png", localtimestring().c_str());
-            renderTarget->save_as_image(SCREEN_W, SCREEN_H, renderChannel, path);
+            // TODO: tofix windows打开文件读取窗口后导致 opencv路径不对的问题
+            // tmporal: 绝对路径
+            string path = str_format("C:/Users/19450/Desktop/RayTracing/screenshots/%s.png", localtimestring().c_str());
+            targetTracer_rendered->save_as_image(SCREEN_W, SCREEN_H, 3, path);
+
             cout << "Screen shot saved in " << path << std::endl;
         }
     }
@@ -380,39 +375,40 @@ void init_scene() {
     Scene::main_scene = scene = new Scene("Scene");
     camera = new Camera(FOV_X, 1000);
     scene->add_child(camera);
+
+
     {
         Instance *o1 = AssimpLoader::load_model("model/casa_obj.glb");
         o1->transform.rotation = vec3(-90, 0, 0);
 		scene->add_child(o1);
-
-        Instance *light = new Instance("light");
-        light->transform.rotation = vec3(63, 60, 0);
-//        light->emitterType = Emitter_DIRECTIONAL;
-        light->emission = vec3(5, 5, 5);
-        scene->add_child(light);
-
-//        Instance *o1 = AssimpLoader::load_model("model/room.glb");
-//        o1->transform.rotation = vec3(-90, -90, 0);
-//        delete o1->get_child(0)->get_child(11);
-//        scene->add_child(o1);
+        camera->transform.rotation.y = 180;
+        camera->transform.position = vec3(-16.9924, 8.50888, 17.9285);
+        camera->transform.rotation = vec3(-23.19, -48.8484, 0);
+        skybox = new Skybox("model/kloofendal_48d_partly_cloudy_puresky_2k.hdr");
+    }
+    {
+//        Instance *o2 = AssimpLoader::load_model("model/room.glb");
+//        o2->transform.rotation = vec3(-90, -97.8, 0);
+//        delete o2->get_child(0)->get_child(11);
+//        scene->add_child(o2);
+//        camera->transform.rotation.y = 180;
+//        camera->transform.position = vec3(-17.6017, 5.97177, 8.64118);
+//        camera->transform.rotation = vec3(-9.09, -62.3486, 0);
 //
 //        Instance *light = new Instance("light");
-//        light->transform.rotation = vec3(56, 90, 0);
+//        light->transform.rotation = vec3(90, 0, 0);
 //        light->emitterType = Emitter_DIRECTIONAL;
-//        light->emission = vec3(100, 100, 100);
+//        light->emission = vec3(1);
 //        scene->add_child(light);
+//        skybox = new Skybox("model/lonely_road_afternoon_puresky_4k.hdr");
     }
 
-	skybox = new Skybox("model/kloofendal_48d_partly_cloudy_puresky_2k.hdr");
-
-    camera->transform.rotation.y = 180;
-	camera->transform.position = vec3(-12.1396, 9.27221, 13.2912);
-	camera->transform.rotation = vec3(-26.19, -45.8484, 0);
 
     ResourceManager::manager->reload_scene(scene);
 
-    std::cout << "BVH size:" << scene->sceneBVHRoot->siz << std::endl;
-    std::cout << "BVH depth:" << scene->sceneBVHRoot->depth << std::endl;
+    std::cout << "BVH size: " << scene->sceneBVHRoot->siz << std::endl;
+    std::cout << "BVH depth: " << scene->sceneBVHRoot->depth << std::endl;
+    std::cout << "Triangle count: " << Mesh::triangleCount << std::endl;
 }
 
 int main(int argc, const char* argv[]) {

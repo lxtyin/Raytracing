@@ -17,7 +17,9 @@ class BVHNode;
 class Mesh {
     GLuint VAO, VBO;
     void bind_vaovbo();
+
 public:
+    static int triangleCount;
 
     string name = "A Mesh";
     std::vector<Triangle> triangles;    /**< triangles in local space >**/

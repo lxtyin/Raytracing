@@ -16,15 +16,16 @@ vec3 eval_RoughConductor(in BSDFQueryRecord bRec) {
     vec3 F0 = mix(vec3(0.04), albedo, metallic);
     vec3 H = normalize(bRec.wi + bRec.wo);
     H *= sign(H.z);
-    float LdotH = abs(dot(bRec.wo, H));
+    float OdotH = abs(dot(bRec.wo, H));
+    float OdotN = abs(bRec.wo.z), IdotN = abs(bRec.wi.z);
     float D = eval_GGX(alpha, H);
-    vec3 F = SchlickFresnel(F0, LdotH);
+    vec3 F = SchlickFresnel(F0, OdotH);
 
     float k = pow2(alpha + 1) / 8;
-    float Gi4io = 0.25 / ((bRec.wi.z * (1 - k) + k) * (bRec.wo.z * (1 - k) + k));
+    float Gi4io = 0.25 / ((IdotN * (1 - k) + k) * (OdotN * (1 - k) + k));
 
-    float FL = pow5(1 - bRec.wi.z), FV = pow5(1 - bRec.wo.z);
-    float Fd90 = 0.5 + 2 * pow2(LdotH) * alpha;
+    float FL = pow5(1 - IdotN), FV = pow5(1 - OdotN);
+    float Fd90 = 0.5 + 2 * pow2(OdotH) * alpha;
     float Fd = mix(1.0f, Fd90, FL) * mix(1.0f, Fd90, FV);
 
     return D * F * Gi4io + (1 - metallic) * albedo * Fd * INV_PI;
@@ -36,9 +37,9 @@ float pdf_RoughConductor(in BSDFQueryRecord bRec) {
 
     vec3 H = normalize(bRec.wi + bRec.wo);
     H *= sign(H.z);
-    float LdotH = abs(dot(bRec.wo, H));
+    float OdotH = abs(dot(bRec.wo, H));
     float pdf = pdf_GGX(alpha, H);
-    return pdf / (4 * LdotH);
+    return pdf / (4 * OdotH);
 }
 
 vec3 sample_RoughConductor(inout BSDFQueryRecord bRec, out float pdf) {
@@ -52,8 +53,8 @@ vec3 sample_RoughConductor(inout BSDFQueryRecord bRec, out float pdf) {
         pdf = -1;
         return vec3(0);
     }
-    float LdotH = dot(bRec.wo, H);
-    pdf /= (4 * LdotH);
+    float OdotH = abs(dot(bRec.wo, H));
+    pdf /= (4 * OdotH);
     return eval_RoughConductor(bRec);
 }
 
@@ -67,3 +68,4 @@ vec3 albedo_RoughConductor(in BSDFQueryRecord bRec) {
     }
     return albedo;
 }
+

@@ -5,6 +5,8 @@
 #include "Mesh.h"
 #include "../BVH.h"
 
+int Mesh::triangleCount = 0;
+
 void Mesh::build_meshBVH() {
 
     std::vector<BVHPrimitive> primitives;
@@ -23,6 +25,7 @@ Mesh::Mesh(string _name, std::vector<Triangle> &&_triangles):
     name(_name), triangles(_triangles)
 {
     assert(_triangles.size() > 0);
+    triangleCount += _triangles.size();
 
     bind_vaovbo();
     build_meshBVH();

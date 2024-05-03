@@ -22,8 +22,9 @@ enum VisualizeType {
     Visual_DIRECT,
     Visual_INDIRECT,
     Visual_ALBEDO,
+    Visual_DEPTH,
     Visual_NORMAL,
-    Visual_DEPTH
+    Visual_INSTANCEID
 };
 
 class Config {
@@ -94,7 +95,7 @@ inline void Config::insert_gui() {
     ImGui::Checkbox("RasterizaionFor1st", &Config::RasterizaionFor1st);
 
     static ImGuiComboFlags flags = ImGuiComboFlags_HeightSmall | ImGuiComboFlags_PopupAlignLeft;
-    const char* items[] = { "Render", "Direct", "Indirect", "Albedo", "Normal", "Depth"};
+    const char* items[] = { "Render", "Direct", "Indirect", "Albedo", "Depth", "Normal", "InstanceID"};
     int item_current_idx = Config::visualType;
     const char* combo_preview_value = items[item_current_idx];
     if (ImGui::BeginCombo("Visualize", combo_preview_value, flags)) {
