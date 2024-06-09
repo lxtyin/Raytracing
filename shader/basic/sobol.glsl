@@ -38,9 +38,3 @@ float rand() {
 //    return float(wang_hash(sobolseed)) / 4294967296.0;
     return sobol(sobolcurdim++, sobolseed);
 }
-
-vec2 rand2D() {
-//    return vec2(rand(), rand());
-    sobolcurdim += 2;
-    return vec2(sobol(sobolcurdim - 2, sobolseed), sobol(sobolcurdim - 1, sobolseed));
-}

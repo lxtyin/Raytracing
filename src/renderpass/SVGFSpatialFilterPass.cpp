@@ -8,34 +8,34 @@
 
 SVGFSpatialFilterPass::SVGFSpatialFilterPass(const string &fragShaderPath) :
     VertexFragmentRenderPass(fragShaderPath),
-    colorOutputGBufferSSBO(SCREEN_H * SCREEN_W * 3) {}
+    outputColorGBufferSSBO(SCREEN_H * SCREEN_W * 3),
+    tmpColorGBufferSSBO(SCREEN_H * SCREEN_W * 3){}
 
-void SVGFSpatialFilterPass::draw(SSBOBuffer<float> &directLumGBufferSSBO,
-                                 SSBOBuffer<float> &indirectLumGBufferSSBO,
-                                 SSBOBuffer<float> &normalGBufferSSBO,
-                                 SSBOBuffer<float> &depthGBufferSSBO,
-                                 SSBOBuffer<float> &momentGBufferSSBO,
-                                 SSBOBuffer<float> &numSamplesGBufferSSBO) {
+void SVGFSpatialFilterPass::draw(const SSBOBuffer<float> &colorGBufferSSBO,
+                                 const SSBOBuffer<float> &varianceGBufferSSBO,
+                                 const SSBOBuffer<float> &normalGBufferSSBO,
+                                 const SSBOBuffer<float> &depthGBufferSSBO) {
 
-    normalGBufferSSBO.bind_current_shader(1);
-    depthGBufferSSBO.bind_current_shader(2);
-    momentGBufferSSBO.bind_current_shader(3);
-    numSamplesGBufferSSBO.bind_current_shader(4);
-    colorOutputGBufferSSBO.bind_current_shader(5);
+    glUniform1i(glGetUniformLocation(shaderProgram, "SCREEN_W"), SCREEN_W);
+    glUniform1i(glGetUniformLocation(shaderProgram, "SCREEN_H"), SCREEN_H);
 
-    if(Config::SVGFForDI) {
-        directLumGBufferSSBO.bind_current_shader(0);
+    outputColorGBufferSSBO.copy(&colorGBufferSSBO);
+
+    for(int i = 0;i < Config::SVGFSpatialFilterLevel;i++) {
+        glUniform1i(glGetUniformLocation(shaderProgram, "step"), 1 << i);
+
+        outputColorGBufferSSBO.bind_current_shader(0); // in
+        normalGBufferSSBO.bind_current_shader(1);
+        depthGBufferSSBO.bind_current_shader(2);
+        varianceGBufferSSBO.bind_current_shader(3);
+        tmpColorGBufferSSBO.bind_current_shader(5);     // out
+
         drawcall();
-        directLumGBufferSSBO.copy(&colorOutputGBufferSSBO);
-    }
-
-    if(Config::SVGFForIDI) {
-        indirectLumGBufferSSBO.bind_current_shader(0);
-        drawcall();
-        indirectLumGBufferSSBO.copy(&colorOutputGBufferSSBO);
+        std::swap(tmpColorGBufferSSBO, outputColorGBufferSSBO);
     }
 }
 
 SVGFSpatialFilterPass::~SVGFSpatialFilterPass() {
-    colorOutputGBufferSSBO.release();
+    outputColorGBufferSSBO.release();
+    tmpColorGBufferSSBO.release();
 }

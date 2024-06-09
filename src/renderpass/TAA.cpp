@@ -9,14 +9,14 @@ TAA::TAA(const string &fragShaderPath) :
     VertexFragmentRenderPass(fragShaderPath),
     historycolorGBufferSSBO(SCREEN_H * SCREEN_W * 3),
     historynormalGBufferSSBO(SCREEN_H * SCREEN_W * 3),
-    historyinstanceIndexGBufferSSBO(SCREEN_H * SCREEN_W * 1)
+    historyinstanceIndexGBufferSSBO(SCREEN_H * SCREEN_W * 1),
+    outputColorGBufferSSBO(SCREEN_H * SCREEN_W * 3)
     { firstFrame = true;}
 
-void TAA::draw(SSBOBuffer<float> &colorGBufferSSBO,
-               SSBOBuffer<float> &motionGBufferSSBO,
-               SSBOBuffer<float> &normalGBufferSSBO,
-               SSBOBuffer<float> &instanceIndexGBufferSSBO,
-               bool saveFrame) {
+void TAA::draw(const SSBOBuffer<float> &colorGBufferSSBO,
+               const SSBOBuffer<float> &motionGBufferSSBO,
+               const SSBOBuffer<float> &normalGBufferSSBO,
+               const SSBOBuffer<float> &instanceIndexGBufferSSBO) {
 
     if(firstFrame) {
         firstFrame = false;
@@ -33,22 +33,18 @@ void TAA::draw(SSBOBuffer<float> &colorGBufferSSBO,
     instanceIndexGBufferSSBO.bind_current_shader(4);
     historynormalGBufferSSBO.bind_current_shader(5);
     historyinstanceIndexGBufferSSBO.bind_current_shader(6);
+    outputColorGBufferSSBO.bind_current_shader(7);
 
     drawcall();
 
-    if(saveFrame) {
-        historycolorGBufferSSBO.copy(&colorGBufferSSBO);
-        historynormalGBufferSSBO.copy(&normalGBufferSSBO);
-        historyinstanceIndexGBufferSSBO.copy(&instanceIndexGBufferSSBO);
-    } else {
-        std::swap(historycolorGBufferSSBO, colorGBufferSSBO);
-        std::swap(historynormalGBufferSSBO, normalGBufferSSBO);
-        std::swap(historyinstanceIndexGBufferSSBO, instanceIndexGBufferSSBO);
-    }
+    historycolorGBufferSSBO.copy(&outputColorGBufferSSBO);
+    historynormalGBufferSSBO.copy(&normalGBufferSSBO);
+    historyinstanceIndexGBufferSSBO.copy(&instanceIndexGBufferSSBO);
 }
 
 TAA::~TAA() {
     historycolorGBufferSSBO.release();
     historynormalGBufferSSBO.release();
     historyinstanceIndexGBufferSSBO.release();
+    outputColorGBufferSSBO.release();
 }

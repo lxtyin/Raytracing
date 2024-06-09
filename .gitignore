@@ -2,8 +2,4 @@
 /cmake-build-release*
 /.idea
 .vscode/
-/notes
-/screenshots
-/lib
-/model
-/hdrs
+notes/

@@ -43,8 +43,8 @@ void main() {
 
     vec3 result = (di + idi) * albedo;
 
-    if(any(isnan(result))) result = vec3(0.0);
-    if(any(isinf(result))) result = vec3(0.0);
+    if(any(isnan(result))) result = vec3(10000.0);
+    if(any(isinf(result))) result = vec3(10000.0);
 
     colorGBuffer[pixelPtr * 3 + 0] = result.x;
     colorGBuffer[pixelPtr * 3 + 1] = result.y;

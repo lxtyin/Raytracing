@@ -9,7 +9,7 @@ uniform int SCREEN_W;
 uniform int SCREEN_H;
 uniform uint frameCounter;
 
-layout(binding = 0, std430) buffer ssbo0 {
+layout(binding = 0, std430) readonly buffer ssbo0 {
     float colorGBuffer[];
 };
 layout(binding = 1, std430) buffer ssbo1 {
@@ -53,9 +53,9 @@ void main() {
     }
     moment = mix(lastmoment, moment, 1.0 / frameCounter);
 
-    colorGBuffer[pixelPtr * 3 + 0] = historyColorGBuffer[pixelPtr * 3 + 0] = color.x;
-    colorGBuffer[pixelPtr * 3 + 1] = historyColorGBuffer[pixelPtr * 3 + 1] = color.y;
-    colorGBuffer[pixelPtr * 3 + 2] = historyColorGBuffer[pixelPtr * 3 + 2] = color.z;
+    historyColorGBuffer[pixelPtr * 3 + 0] = color.x;
+    historyColorGBuffer[pixelPtr * 3 + 1] = color.y;
+    historyColorGBuffer[pixelPtr * 3 + 2] = color.z;
     historyMomentGBuffer[pixelPtr * 2 + 0] = moment.x;
     historyMomentGBuffer[pixelPtr * 2 + 1] = moment.y;
 }

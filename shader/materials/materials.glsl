@@ -32,7 +32,7 @@ float G_GGX(float alpha, float cosI) {
 
 
 vec3 sample_uniformsphere(out float pdf) {
-    vec2 s = rand2D();
+    vec2 s = vec2(rand(), rand());
     float z = s.x * 2 - 1;
     float r = sqrt(1 - z * z), phi = s.y * 2 * PI;
     pdf = 0.25 * INV_PI;
@@ -109,5 +109,3 @@ vec3 albedo_material(in BSDFQueryRecord bRec) {
     else if(type == 2) return albedo_RoughDielectric(bRec);
     else return vec3(0);
 }
-
-// TODO spj for emitter.

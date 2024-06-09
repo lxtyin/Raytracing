@@ -9,10 +9,12 @@
 
 class ToneMappingGamma: public VertexFragmentRenderPass {
 public:
+    SSBOBuffer<float> outputColorGBufferSSBO;
 
     ToneMappingGamma(const string &fragShaderPath);
+    ~ToneMappingGamma();
 
-    void draw(SSBOBuffer<float> &colorGBufferSSBO);
+    void draw(const SSBOBuffer<float> &colorGBufferSSBO);
 };
 
 

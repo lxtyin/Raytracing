@@ -22,8 +22,9 @@ enum VisualizeType {
     Visual_DIRECT,
     Visual_INDIRECT,
     Visual_ALBEDO,
+    Visual_DEPTH,
     Visual_NORMAL,
-    Visual_DEPTH
+    Visual_INSTANCEID
 };
 
 class Config {
@@ -35,7 +36,7 @@ class Config {
     static int MaxDepth;
 
 	static bool useTAA;
-    static bool SVGFTemporalFilter;
+    static bool SVGF;
     static int SVGFSpatialFilterLevel;
     static bool SVGFForDI, SVGFForIDI;
     static bool useStaticBlender;
@@ -55,20 +56,20 @@ inline int Config::WINDOW_W = 1100;
 inline int Config::WINDOW_H = 800;
 
 inline int Config::SPP = 1;
-inline int Config::MaxDepth = 1;
+inline int Config::MaxDepth = 2;
 
 inline bool Config::useTAA = false;
-inline bool Config::SVGFTemporalFilter = false;
+inline bool Config::SVGF = false;
 inline int Config::SVGFSpatialFilterLevel = 0;
 inline bool Config::SVGFForDI = false;
 inline bool Config::SVGFForIDI = false;
 inline bool Config::useStaticBlender = false;
 
-inline bool Config::BRDFSampling = false;
-inline bool Config::SkyboxSampling = false;
+inline bool Config::BRDFSampling = true;
+inline bool Config::SkyboxSampling = true;
 inline bool Config::SkyboxLighting = true;
-inline bool Config::DynamicBVH = false;
-inline bool Config::RasterizaionFor1st = false;
+inline bool Config::DynamicBVH = true;
+inline bool Config::RasterizaionFor1st = true;
 
 inline VisualizeType Config::visualType = Visual_RENDER;
 
@@ -83,7 +84,7 @@ inline void Config::insert_gui() {
 
     ImGui::Checkbox("SVGFForDI", &Config::SVGFForDI);  ImGui::SameLine();
     ImGui::Checkbox("SVGFForIDI", &Config::SVGFForIDI);  ImGui::SameLine();
-    ImGui::Checkbox("SVGFTemporalFilter", &Config::SVGFTemporalFilter);
+    ImGui::Checkbox("SVGF", &Config::SVGF);
     ImGui::SliderInt("SVGFSpatialFilterLevel", &Config::SVGFSpatialFilterLevel, 0, 5);
 
     ImGui::Checkbox("SkyboxLighting", &Config::SkyboxLighting);  ImGui::SameLine();
@@ -94,7 +95,7 @@ inline void Config::insert_gui() {
     ImGui::Checkbox("RasterizaionFor1st", &Config::RasterizaionFor1st);
 
     static ImGuiComboFlags flags = ImGuiComboFlags_HeightSmall | ImGuiComboFlags_PopupAlignLeft;
-    const char* items[] = { "Render", "Direct", "Indirect", "Albedo", "Normal", "Depth"};
+    const char* items[] = { "Render", "Direct", "Indirect", "Albedo", "Depth", "Normal", "InstanceID"};
     int item_current_idx = Config::visualType;
     const char* combo_preview_value = items[item_current_idx];
     if (ImGui::BeginCombo("Visualize", combo_preview_value, flags)) {

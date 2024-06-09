@@ -12,7 +12,7 @@ void RoughDielectric::insert_gui() {
 
     ImGui::SliderFloat("roughness", &roughness, 0.001, 1, "%.3f");
     ImGui::SliderFloat("metallic", &metallic, 0, 1, "%.3f");
-    ImGui::SliderFloat("interiorIOR", &interiorIOR, 1.01, 3.0, "%.2f");
+    ImGui::SliderFloat("interiorIOR", &interiorIOR, 1.001, 3.0, "%.3f");
     if(albedo_map && albedo_map->textureHandle) {
         ImGui::Text("Albedo map");
         ImGui::SameLine();

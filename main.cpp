@@ -9,6 +9,7 @@
 #include "src/renderpass/TAA.h"
 #include "src/renderpass/SVGFTemporalFilter.h"
 #include "src/renderpass/SVGFSpatialFilterPass.h"
+#include "src/renderpass/SVGFVarianceFilter.h"
 #include "src/renderpass/SVGFMergePass.h"
 #include "src/renderpass/StaticBlender.h"
 #include "src/ResourceManager.h"
@@ -44,8 +45,9 @@ uint frameCounter = 0;
 
 RasterPass *rasterPass;
 Renderer *renderPass;
-SVGFSpatialFilterPass *svgfSpatialFilterPass;
-SVGFTemporalFilter *svgfTemporalFilterPass;
+SVGFSpatialFilterPass *svgfSpatialFilterPass[2];
+SVGFTemporalFilter *svgfTemporalFilterPass[2];
+SVGFVarianceFilter *svgfVarianceFilterPass[2];
 SVGFMergePass *svgfMergePass;
 ToneMappingGamma *mappingPass;
 TAA *taaPass;
@@ -156,6 +158,7 @@ void update(float dt) {
         ResourceManager::manager->reload_meshes();
     }
 
+
 	static glm::mat4 back_projection = camera->projection() * camera->w2v_matrix();
 
 	frameCounter++;
@@ -163,15 +166,11 @@ void update(float dt) {
     // 渲染管线
 	// ---------------------------------------
     {
-        // TODO: support direct light filter.
+        for(uint spp = 1;spp <= Config::SPP;spp++) {
+            vec2 jitter = vec2(0.5f);
+            jitter = vec2(globalRand() * 1.0f / globalRand.max(), globalRand() * 1.0f / globalRand.max());
+            if(!Config::useStaticBlender && spp == Config::SPP) jitter = vec2(0.5f); // sample center for the last spp of each frame.
 
-        std::mt19937 mrand(0);
-
-        vec2 jitter = vec2(0.5f);
-        if(Config::useStaticBlender) jitter = vec2(globalRand() * 1.0f / globalRand.max(), globalRand() * 1.0f / globalRand.max());
-
-        for(int spp = 1;spp <= Config::SPP;spp++) {
-            if(Config::SPP > 1) jitter = vec2(mrand() * 1.0f / mrand.max(), mrand() * 1.0f / mrand.max());
             rasterPass->use();
             rasterPass->draw(camera, jitter);
 
@@ -184,7 +183,7 @@ void update(float dt) {
                 renderPass->bind_texture("uvGBufferTexture", rasterPass->uvGBufferTexture, 4);
                 renderPass->bind_texture("instanceIndexGBufferTexture", rasterPass->instanceIndexGBufferTexture, 5);
                 glUniform2f(glGetUniformLocation(renderPass->shaderProgram, "jitter"), jitter.x, jitter.y);
-                glUniform1i(glGetUniformLocation(renderPass->shaderProgram, "currentspp"), spp);
+                glUniform1ui(glGetUniformLocation(renderPass->shaderProgram, "currentspp"), spp);
                 glUniform1f(glGetUniformLocation(renderPass->shaderProgram, "skybox_Light_SUM"), skybox->lightSum);
                 glUniformMatrix4fv(glGetUniformLocation(renderPass->shaderProgram, "v2wMat"), 1, GL_FALSE, glm::value_ptr(camera->v2w_matrix()));
                 glUniform1i(glGetUniformLocation(renderPass->shaderProgram, "SCREEN_W"), SCREEN_W);
@@ -208,44 +207,65 @@ void update(float dt) {
             renderPass->draw();
         }
 
-        if(Config::SVGFTemporalFilter) {
-            svgfTemporalFilterPass->use();
-            {
-                glUniform1i(glGetUniformLocation(svgfTemporalFilterPass->shaderProgram, "SCREEN_W"), SCREEN_W);
-                glUniform1i(glGetUniformLocation(svgfTemporalFilterPass->shaderProgram, "SCREEN_H"), SCREEN_H);
-            }
-            svgfTemporalFilterPass->draw(renderPass->directLumGBufferSSBO,
-                                         renderPass->indirectLumGBufferSSBO,
-                                         renderPass->momentGBufferSSBO,
-                                         renderPass->normalGBufferSSBO,
-                                         renderPass->instanceIndexGBufferSSBO,
-                                         renderPass->motionGBufferSSBO,
-                                         renderPass->numSamplesGBufferSSBO);
-        } else svgfTemporalFilterPass->firstFrame = true;
+        SSBOBuffer<float> *targetTracer_directLum = &renderPass->directLumGBufferSSBO;
+        SSBOBuffer<float> *targetTracer_indirectLum = &renderPass->indirectLumGBufferSSBO;
 
-        // a'trous wavelet filter
-        for(int i = 0;i < Config::SVGFSpatialFilterLevel;i++) {
-            svgfSpatialFilterPass->use();
-            {
-                glUniform1i(glGetUniformLocation(svgfSpatialFilterPass->shaderProgram, "SCREEN_W"), SCREEN_W);
-                glUniform1i(glGetUniformLocation(svgfSpatialFilterPass->shaderProgram, "SCREEN_H"), SCREEN_H);
-                glUniformMatrix4fv(glGetUniformLocation(svgfSpatialFilterPass->shaderProgram, "w2vMat"), 1, GL_FALSE, glm::value_ptr(camera->w2v_matrix()));
-                glUniform1i(glGetUniformLocation(svgfSpatialFilterPass->shaderProgram, "step"), 1 << i);
+        if(Config::SVGF) {
+            if(Config::SVGFForDI) {
+                svgfTemporalFilterPass[0]->use();
+                svgfTemporalFilterPass[0]->draw(*targetTracer_directLum,
+                                                renderPass->normalGBufferSSBO,
+                                                renderPass->instanceIndexGBufferSSBO,
+                                                renderPass->motionGBufferSSBO);
+
+                svgfVarianceFilterPass[0]->use();
+                svgfVarianceFilterPass[0]->draw(svgfTemporalFilterPass[0]->outputMomentGBufferSSBO,
+                                                renderPass->normalGBufferSSBO,
+                                                renderPass->depthGBufferSSBO,
+                                                svgfTemporalFilterPass[0]->outputNumSamplesGBufferSSBO);
+
+                svgfSpatialFilterPass[0]->use();
+                svgfSpatialFilterPass[0]->draw(svgfTemporalFilterPass[0]->outputColorGBufferSSBO,
+                                               svgfVarianceFilterPass[0]->varianceGBufferSSBO,
+                                               renderPass->normalGBufferSSBO,
+                                               renderPass->depthGBufferSSBO);
+                targetTracer_directLum = &svgfSpatialFilterPass[0]->outputColorGBufferSSBO;
+                svgfTemporalFilterPass[0]->update_historycolor(*targetTracer_directLum);
             }
-            svgfSpatialFilterPass->draw(renderPass->directLumGBufferSSBO,
-                                        renderPass->indirectLumGBufferSSBO,
-                                        renderPass->normalGBufferSSBO,
-                                        renderPass->depthGBufferSSBO,
-                                        renderPass->momentGBufferSSBO,
-                                        renderPass->numSamplesGBufferSSBO);
+            if(Config::SVGFForIDI) {
+                svgfTemporalFilterPass[1]->use();
+                svgfTemporalFilterPass[1]->draw(*targetTracer_indirectLum,
+                                                renderPass->normalGBufferSSBO,
+                                                renderPass->instanceIndexGBufferSSBO,
+                                                renderPass->motionGBufferSSBO);
+
+                svgfVarianceFilterPass[1]->use();
+                svgfVarianceFilterPass[1]->draw(svgfTemporalFilterPass[1]->outputMomentGBufferSSBO,
+                                                renderPass->normalGBufferSSBO,
+                                                renderPass->depthGBufferSSBO,
+                                                svgfTemporalFilterPass[1]->outputNumSamplesGBufferSSBO);
+
+                svgfSpatialFilterPass[1]->use();
+                svgfSpatialFilterPass[1]->draw(svgfTemporalFilterPass[1]->outputColorGBufferSSBO,
+                                               svgfVarianceFilterPass[1]->varianceGBufferSSBO,
+                                               renderPass->normalGBufferSSBO,
+                                               renderPass->depthGBufferSSBO);
+                targetTracer_indirectLum = &svgfSpatialFilterPass[1]->outputColorGBufferSSBO;
+                svgfTemporalFilterPass[1]->update_historycolor(*targetTracer_indirectLum);
+            }
         }
+        if(!Config::SVGF || !Config::SVGFForDI) svgfTemporalFilterPass[0]->firstFrame = true;
+        if(!Config::SVGF || !Config::SVGFForIDI) svgfTemporalFilterPass[1]->firstFrame = true;
+
 
         svgfMergePass->use();
         {
             glUniform1i(glGetUniformLocation(svgfMergePass->shaderProgram, "SCREEN_W"), SCREEN_W);
             glUniform1i(glGetUniformLocation(svgfMergePass->shaderProgram, "SCREEN_H"), SCREEN_H);
         }
-        svgfMergePass->draw(renderPass->directLumGBufferSSBO, renderPass->indirectLumGBufferSSBO, renderPass->albedoGBufferSSBO);
+        svgfMergePass->draw(*targetTracer_directLum, *targetTracer_indirectLum, renderPass->albedoGBufferSSBO);
+
+        SSBOBuffer<float> *targetTracer_rendered = &svgfMergePass->colorGBufferSSBO;
 
         if(Config::useStaticBlender) {
             staticBlenderPass->use();
@@ -253,7 +273,8 @@ void update(float dt) {
                 glUniform1i(glGetUniformLocation(staticBlenderPass->shaderProgram, "SCREEN_W"), SCREEN_W);
                 glUniform1i(glGetUniformLocation(staticBlenderPass->shaderProgram, "SCREEN_H"), SCREEN_H);
             }
-            staticBlenderPass->draw(svgfMergePass->colorGBufferSSBO);
+            staticBlenderPass->draw(*targetTracer_rendered);
+            targetTracer_rendered = &staticBlenderPass->historyColorGBufferSSBO;
         } else staticBlenderPass->frameCounter = 0;
 
         mappingPass->use();
@@ -261,7 +282,8 @@ void update(float dt) {
             glUniform1i(glGetUniformLocation(mappingPass->shaderProgram, "SCREEN_W"), SCREEN_W);
             glUniform1i(glGetUniformLocation(mappingPass->shaderProgram, "SCREEN_H"), SCREEN_H);
         }
-        mappingPass->draw(svgfMergePass->colorGBufferSSBO);
+        mappingPass->draw(*targetTracer_rendered);
+        targetTracer_rendered = &mappingPass->outputColorGBufferSSBO;
 
         if(Config::useTAA) {
             taaPass->use();
@@ -269,34 +291,39 @@ void update(float dt) {
                 glUniform1i(glGetUniformLocation(taaPass->shaderProgram, "SCREEN_W"), SCREEN_W);
                 glUniform1i(glGetUniformLocation(taaPass->shaderProgram, "SCREEN_H"), SCREEN_H);
             }
-            taaPass->draw(svgfMergePass->colorGBufferSSBO,
+            taaPass->draw(*targetTracer_rendered,
                           renderPass->motionGBufferSSBO,
                           renderPass->normalGBufferSSBO,
                           renderPass->instanceIndexGBufferSSBO);
+            targetTracer_rendered = &taaPass->outputColorGBufferSSBO;
         } else taaPass->firstFrame = true;
 
         directPass->use();
         {
             glUniform1i(glGetUniformLocation(directPass->shaderProgram, "SCREEN_W"), SCREEN_W);
             glUniform1i(glGetUniformLocation(directPass->shaderProgram, "SCREEN_H"), SCREEN_H);
-            glUniform1f(glGetUniformLocation(directPass->shaderProgram, "scaling"), Config::visualType == Visual_DEPTH ? 0.01f : 1.0);
-            glUniform1i(glGetUniformLocation(directPass->shaderProgram, "channel"), Config::visualType == Visual_DEPTH ? 1 : 3);
+            glUniform1i(glGetUniformLocation(directPass->shaderProgram, "visualType"), (int)Config::visualType);
             glUniform1i(glGetUniformLocation(directPass->shaderProgram, "selectedInstanceIndex"),
                         ResourceManager::manager->queryInstanceIndex(TinyUI::selectedInstance));
         }
-        SSBOBuffer<float> *renderTarget;
-        if(Config::visualType == Visual_RENDER) renderTarget = &svgfMergePass->colorGBufferSSBO;
-        if(Config::visualType == Visual_DIRECT) renderTarget = &renderPass->directLumGBufferSSBO;
-        if(Config::visualType == Visual_INDIRECT) renderTarget = &renderPass->indirectLumGBufferSSBO;
-        if(Config::visualType == Visual_ALBEDO) renderTarget = &renderPass->albedoGBufferSSBO;
-        if(Config::visualType == Visual_DEPTH) renderTarget = &renderPass->depthGBufferSSBO;
-        if(Config::visualType == Visual_NORMAL) renderTarget = &renderPass->normalGBufferSSBO;
-
-        directPass->draw(*renderTarget,
+        directPass->draw(*targetTracer_rendered,
+                         *targetTracer_directLum,
+                         *targetTracer_indirectLum,
+                         renderPass->albedoGBufferSSBO,
+                         renderPass->depthGBufferSSBO,
+                         renderPass->normalGBufferSSBO,
                          renderPass->instanceIndexGBufferSSBO);
 
         back_projection = camera->projection() * camera->w2v_matrix();
 
+        if(glfwGetKeyDown(window, GLFW_KEY_T)) {
+            // TODO: tofix windows打开文件读取窗口后导致 opencv路径不对的问题
+            // tmporal: 绝对路径
+            string path = str_format("C:/Users/19450/Desktop/RayTracing/screenshots/%s.png", localtimestring().c_str());
+            targetTracer_rendered->save_as_image(SCREEN_W, SCREEN_H, 3, path);
+
+            cout << "Screen shot saved in " << path << std::endl;
+        }
     }
     //--------------------------------------
 
@@ -307,24 +334,7 @@ void update(float dt) {
 		cout << "Position: " << t.position[0] << ", " << t.position[1] << ", " << t.position[2] << '\n';
 		cout << "Rotation: " << t.rotation[0] << ", " << t.rotation[1] << ", " << t.rotation[2] << '\n';
 	}
-
 	Transform previousCameraTransform = camera->transform;
-
-	// screen shot.
-	if(glfwGetKeyDown(window, GLFW_KEY_T)) {
-        string file_path = str_format("screenshots/%s.png", localtimestring().c_str());
-
-        int framesize = SCREEN_H * SCREEN_W;
-//        glBindBuffer(GL_SHADER_STORAGE_BUFFER, renderPass->colorGBufferSSBO); // TODO
-        float* tmpdata = (float*)glMapBufferRange(GL_SHADER_STORAGE_BUFFER, 0, framesize * 3 * sizeof(float), GL_MAP_READ_BIT);
-        std::vector<uchar> d(framesize * 3);
-        for(int i = 0;i < framesize * 3;i++) d[i] = std::min(255, int(tmpdata[i] * 255));
-        Texture t(SCREEN_W, SCREEN_H, 3, std::move(d));
-        t.savephoto(file_path);
-        glUnmapBuffer(GL_SHADER_STORAGE_BUFFER);
-
-        cout << "ScreenShot " << file_path << std::endl;
-    }
 
     float speed = 10;
     if(glfwGetKey(window, GLFW_KEY_W)) camera->transform.position += camera->transform.direction_z() * -speed * dt;
@@ -348,8 +358,12 @@ void init_scene() {
     // passes
     rasterPass = new RasterPass("shader/rasterization/raster_vs.glsl", "shader/rasterization/raster_ps.glsl");
     renderPass    = new Renderer("shader/pathtracing.glsl");
-    svgfTemporalFilterPass = new SVGFTemporalFilter("shader/postprocessing/SVGF_TemporalFilter.glsl");
-    svgfSpatialFilterPass = new SVGFSpatialFilterPass("shader/postprocessing/SVGF_SpatialFilter.glsl");
+    svgfTemporalFilterPass[0] = new SVGFTemporalFilter("shader/postprocessing/SVGF_TemporalFilter.glsl");   // for di and idi
+    svgfSpatialFilterPass[0] = new SVGFSpatialFilterPass("shader/postprocessing/SVGF_SpatialFilter.glsl");
+    svgfVarianceFilterPass[0] = new SVGFVarianceFilter("shader/postprocessing/SVGF_VarianceFilter.glsl");
+    svgfTemporalFilterPass[1] = new SVGFTemporalFilter("shader/postprocessing/SVGF_TemporalFilter.glsl");
+    svgfSpatialFilterPass[1] = new SVGFSpatialFilterPass("shader/postprocessing/SVGF_SpatialFilter.glsl");
+    svgfVarianceFilterPass[1] = new SVGFVarianceFilter("shader/postprocessing/SVGF_VarianceFilter.glsl");
     svgfMergePass = new SVGFMergePass("shader/postprocessing/SVGF_Merge.glsl");
     mappingPass    = new ToneMappingGamma("shader/postprocessing/ToneMappingGamma.glsl");
     taaPass    = new TAA("shader/postprocessing/TAA.glsl");
@@ -361,39 +375,24 @@ void init_scene() {
     Scene::main_scene = scene = new Scene("Scene");
     camera = new Camera(FOV_X, 1000);
     scene->add_child(camera);
+
+
     {
         Instance *o1 = AssimpLoader::load_model("model/casa_obj.glb");
         o1->transform.rotation = vec3(-90, 0, 0);
 		scene->add_child(o1);
-
-        Instance *light = new Instance("light");
-        light->transform.rotation = vec3(63, 60, 0);
-//        light->emitterType = Emitter_DIRECTIONAL;
-        light->emission = vec3(5, 5, 5);
-        scene->add_child(light);
-
-//        Instance *o1 = AssimpLoader::load_model("model/room.glb");
-//        o1->transform.rotation = vec3(-90, -90, 0);
-//        delete o1->get_child(0)->get_child(11);
-//        scene->add_child(o1);
-//
-//        Instance *light = new Instance("light");
-//        light->transform.rotation = vec3(56, 90, 0);
-//        light->emitterType = Emitter_DIRECTIONAL;
-//        light->emission = vec3(100, 100, 100);
-//        scene->add_child(light);
+        camera->transform.rotation.y = 180;
+        camera->transform.position = vec3(-16.9924, 8.50888, 17.9285);
+        camera->transform.rotation = vec3(-23.19, -48.8484, 0);
+        skybox = new Skybox("model/kloofendal_48d_partly_cloudy_puresky_2k.hdr");
     }
 
-	skybox = new Skybox("model/kloofendal_48d_partly_cloudy_puresky_2k.hdr");
-
-    camera->transform.rotation.y = 180;
-	camera->transform.position = vec3(-12.1396, 9.27221, 13.2912);
-	camera->transform.rotation = vec3(-26.19, -45.8484, 0);
 
     ResourceManager::manager->reload_scene(scene);
 
-    std::cout << "BVH size:" << scene->sceneBVHRoot->siz << std::endl;
-    std::cout << "BVH depth:" << scene->sceneBVHRoot->depth << std::endl;
+    std::cout << "BVH size: " << scene->sceneBVHRoot->siz << std::endl;
+    std::cout << "BVH depth: " << scene->sceneBVHRoot->depth << std::endl;
+    std::cout << "Triangle count: " << Mesh::triangleCount << std::endl;
 }
 
 int main(int argc, const char* argv[]) {

@@ -13,8 +13,9 @@ SVGFMergePass::~SVGFMergePass() {
     colorGBufferSSBO.release();
 }
 
-void SVGFMergePass::draw(SSBOBuffer<float> &directLumGBufferSSBO, SSBOBuffer<float> &indirectLumGBufferSSBO,
-                         SSBOBuffer<float> &albedoGBufferSSBO) {
+void SVGFMergePass::draw(const SSBOBuffer<float> &directLumGBufferSSBO,
+                         const SSBOBuffer<float> &indirectLumGBufferSSBO,
+                         const SSBOBuffer<float> &albedoGBufferSSBO) {
 
     colorGBufferSSBO.bind_current_shader(0);
     directLumGBufferSSBO.bind_current_shader(1);
