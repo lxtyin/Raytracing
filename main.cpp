@@ -386,22 +386,6 @@ void init_scene() {
         camera->transform.rotation = vec3(-23.19, -48.8484, 0);
         skybox = new Skybox("model/kloofendal_48d_partly_cloudy_puresky_2k.hdr");
     }
-    {
-//        Instance *o2 = AssimpLoader::load_model("model/room.glb");
-//        o2->transform.rotation = vec3(-90, -97.8, 0);
-//        delete o2->get_child(0)->get_child(11);
-//        scene->add_child(o2);
-//        camera->transform.rotation.y = 180;
-//        camera->transform.position = vec3(-17.6017, 5.97177, 8.64118);
-//        camera->transform.rotation = vec3(-9.09, -62.3486, 0);
-//
-//        Instance *light = new Instance("light");
-//        light->transform.rotation = vec3(90, 0, 0);
-//        light->emitterType = Emitter_DIRECTIONAL;
-//        light->emission = vec3(1);
-//        scene->add_child(light);
-//        skybox = new Skybox("model/lonely_road_afternoon_puresky_4k.hdr");
-    }
 
 
     ResourceManager::manager->reload_scene(scene);
